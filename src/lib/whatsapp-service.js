@@ -16,8 +16,13 @@ export function generateWhatsAppMessage(items, restaurantName, customerName = ''
 
     // Order type
     if (deliveryAddress) {
-        message += `🛵 *Tipo:* Envío a domicilio\n`
-        message += `📍 *Dirección:* ${deliveryAddress}\n`
+        if (deliveryAddress.startsWith('Mesa:')) {
+            message += `🪑 *Tipo:* Comer en el lugar\n`
+            message += `🔢 *${deliveryAddress}*\n`
+        } else {
+            message += `🛵 *Tipo:* Envío a domicilio\n`
+            message += `📍 *Dirección:* ${deliveryAddress}\n`
+        }
     } else {
         message += `🏪 *Tipo:* Paso a recoger\n`
     }

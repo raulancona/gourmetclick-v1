@@ -8,6 +8,8 @@ import { DashboardPage } from './pages/dashboard'
 import { SettingsPage } from './pages/settings'
 import { ProductsPage } from './pages/products'
 import { CategoriesPage } from './pages/categories'
+import { OrdersPage } from './pages/orders'
+import POSPage from './pages/pos'
 import { PublicMenuPage } from './pages/public-menu'
 import { Toaster } from 'sonner'
 
@@ -37,6 +39,8 @@ function App() {
             <Route path="products" element={<ProductsPage />} />
             <Route path="categories" element={<CategoriesPage />} />
             <Route path="settings" element={<SettingsPage />} />
+            <Route path="orders" element={<OrdersPage />} />
+            <Route path="pos" element={<POSPage />} />
           </Route>
 
           {/* Catch all */}

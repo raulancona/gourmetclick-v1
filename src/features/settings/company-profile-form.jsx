@@ -29,6 +29,7 @@ export function CompanyProfileForm() {
     const [profile, setProfile] = useState(null)
     const [uploading, setUploading] = useState(false)
     const [saving, setSaving] = useState(false)
+    const [uploadingBanner, setUploadingBanner] = useState(false)
     const [uploadingPopup, setUploadingPopup] = useState(false)
     const { register, handleSubmit, setValue, watch, formState: { errors } } = useForm()
 
@@ -92,6 +93,33 @@ export function CompanyProfileForm() {
             toast.error('Error al subir el logo')
         } finally {
             setUploading(false)
+        }
+    }
+
+    const handleBannerUpload = async (event) => {
+        try {
+            setUploadingBanner(true)
+            const file = event.target.files?.[0]
+            if (!file) return
+            if (!file.type.startsWith('image/')) { toast.error('Selecciona una imagen'); return }
+            if (file.size > 5 * 1024 * 1024) { toast.error('Máximo 5MB'); return }
+
+            const fileExt = file.name.split('.').pop()
+            const filePath = `${user.id}/banner.${fileExt}`
+            const { error: uploadError } = await supabase.storage.from('company_logos').upload(filePath, file, { upsert: true })
+            if (uploadError) throw uploadError
+
+            const { data: { publicUrl } } = supabase.storage.from('company_logos').getPublicUrl(filePath)
+            const { error: updateError } = await supabase.from('profiles').update({ banner_url: publicUrl }).eq('id', user.id)
+            if (updateError) throw updateError
+
+            setProfile({ ...profile, banner_url: publicUrl })
+            toast.success('Portada actualizada')
+        } catch (error) {
+            console.error('Error uploading banner:', error)
+            toast.error('Error al subir la portada')
+        } finally {
+            setUploadingBanner(false)
         }
     }
 
@@ -162,20 +190,52 @@ export function CompanyProfileForm() {
                     <CardDescription>Configura la información de tu empresa</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-6">
-                    {/* Logo Upload */}
-                    <div className="space-y-4">
-                        <Label>Logo de Empresa</Label>
-                        <div className="flex items-center gap-4">
-                            <Avatar className="h-20 w-20">
-                                <AvatarImage src={profile?.logo_url || undefined} alt="Company logo" />
-                                <AvatarFallback>{profile?.company_name?.substring(0, 2).toUpperCase() || 'CO'}</AvatarFallback>
-                            </Avatar>
-                            <div>
-                                <input type="file" id="logo-upload" className="hidden" accept="image/*" onChange={handleLogoUpload} disabled={uploading} />
-                                <Button variant="outline" onClick={() => document.getElementById('logo-upload').click()} disabled={uploading}>
-                                    {uploading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Subiendo...</> : <><Upload className="mr-2 h-4 w-4" />Subir Logo</>}
-                                </Button>
-                                <p className="mt-2 text-xs text-muted-foreground">PNG, JPG, WebP. Máximo 5MB.</p>
+                    {/* Logo & Banner Upload */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                        <div className="space-y-4">
+                            <Label>Logo de Empresa</Label>
+                            <div className="flex items-center gap-4">
+                                <Avatar className="h-20 w-20">
+                                    <AvatarImage src={profile?.logo_url || undefined} alt="Company logo" />
+                                    <AvatarFallback>{profile?.company_name?.substring(0, 2).toUpperCase() || 'CO'}</AvatarFallback>
+                                </Avatar>
+                                <div>
+                                    <input type="file" id="logo-upload" className="hidden" accept="image/*" onChange={handleLogoUpload} disabled={uploading} />
+                                    <Button variant="outline" size="sm" onClick={() => document.getElementById('logo-upload').click()} disabled={uploading}>
+                                        {uploading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Subiendo...</> : <><Upload className="mr-2 h-4 w-4" />Subir Logo</>}
+                                    </Button>
+                                    <p className="mt-2 text-xs text-muted-foreground">PNG, JPG. Máximo 5MB.</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="space-y-4">
+                            <Label>Portada del Restaurante</Label>
+                            <div className="space-y-4">
+                                {profile?.banner_url ? (
+                                    <div className="relative w-full h-24 rounded-xl overflow-hidden border">
+                                        <img src={profile.banner_url} alt="Banner" className="w-full h-full object-cover" />
+                                        <div className="absolute inset-0 bg-black/20 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity">
+                                            <Button variant="secondary" size="sm" onClick={() => document.getElementById('banner-upload').click()} disabled={uploadingBanner}>
+                                                Cambiar
+                                            </Button>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <div className="w-full h-24 rounded-xl bg-gray-100 border-2 border-dashed flex flex-col items-center justify-center text-gray-400">
+                                        <Image className="w-8 h-8 mb-1" />
+                                        <span className="text-xs">Sin portada</span>
+                                    </div>
+                                )}
+                                <div>
+                                    <input type="file" id="banner-upload" className="hidden" accept="image/*" onChange={handleBannerUpload} disabled={uploadingBanner} />
+                                    {!profile?.banner_url && (
+                                        <Button variant="outline" size="sm" onClick={() => document.getElementById('banner-upload').click()} disabled={uploadingBanner} className="w-full">
+                                            {uploadingBanner ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Subiendo...</> : <><Upload className="mr-2 h-4 w-4" />Subir Portada</>}
+                                        </Button>
+                                    )}
+                                    <p className="mt-2 text-[10px] text-muted-foreground">Idealmente horizontal (Recomendado: 1200x400px).</p>
+                                </div>
                             </div>
                         </div>
                     </div>

@@ -13,7 +13,7 @@ export async function getCategories(userId) {
         .from('categories')
         .select('*')
         .eq('user_id', userId)
-        .order('order_index', { ascending: true })
+        .order('sort_order', { ascending: true })
 
     if (error) throw error
     return data || []
@@ -39,14 +39,11 @@ export async function createCategory(categoryData, userId) {
 /**
  * Update a category
  */
-export async function updateCategory(id, categoryData, userId) {
+export async function updateCategory(categoryId, updates, userId) {
     const { data, error } = await supabase
         .from('categories')
-        .update({
-            ...categoryData,
-            updated_at: new Date().toISOString()
-        })
-        .eq('id', id)
+        .update(updates)
+        .eq('id', categoryId)
         .eq('user_id', userId)
         .select()
         .single()
@@ -58,11 +55,11 @@ export async function updateCategory(id, categoryData, userId) {
 /**
  * Delete a category
  */
-export async function deleteCategory(id, userId) {
+export async function deleteCategory(categoryId, userId) {
     const { error } = await supabase
         .from('categories')
         .delete()
-        .eq('id', id)
+        .eq('id', categoryId)
         .eq('user_id', userId)
 
     if (error) throw error
@@ -74,8 +71,9 @@ export async function deleteCategory(id, userId) {
 export async function reorderCategories(categories, userId) {
     const updates = categories.map((cat, index) => ({
         id: cat.id,
-        order_index: index,
-        user_id: userId
+        sort_order: index,
+        user_id: userId,
+        updated_at: new Date().toISOString()
     }))
 
     const { error } = await supabase
@@ -102,7 +100,7 @@ export async function getCategoriesBySlug(slug) {
         .from('categories')
         .select('*')
         .eq('user_id', profile.id)
-        .order('order_index', { ascending: true })
+        .order('sort_order', { ascending: true })
 
     if (error) throw error
     return data || []

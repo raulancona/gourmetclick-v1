@@ -1,6 +1,9 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Plus, GripVertical, Edit2, Trash2 } from 'lucide-react'
+import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core'
+import { arrayMove, SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy, useSortable } from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
 import { useAuth } from '../features/auth/auth-context'
 import { getCategories, createCategory, updateCategory, deleteCategory, reorderCategories } from '../lib/category-service'
 import { Button } from '../components/ui/button'
@@ -9,6 +12,57 @@ import { Label } from '../components/ui/label'
 import { Modal } from '../components/ui/modal'
 import { Card } from '../components/ui/card'
 import { toast } from 'sonner'
+
+function SortableCategoryItem({ category, onEdit, onDelete }) {
+    const {
+        attributes,
+        listeners,
+        setNodeRef,
+        transform,
+        transition,
+        isDragging
+    } = useSortable({ id: category.id })
+
+    const style = {
+        transform: CSS.Transform.toString(transform),
+        transition,
+        zIndex: isDragging ? 50 : 'auto',
+        position: 'relative'
+    }
+
+    return (
+        <div ref={setNodeRef} style={style} className="mb-3">
+            <Card className={`p-4 ${isDragging ? 'shadow-lg border-primary/50' : ''}`}>
+                <div className="flex items-center gap-4">
+                    <div {...attributes} {...listeners} className="cursor-move touch-none">
+                        <GripVertical className="w-5 h-5 text-gray-400 hover:text-gray-600" />
+                    </div>
+                    <div className="flex-1">
+                        <h3 className="font-medium">{category.name}</h3>
+                    </div>
+                    <div className="flex gap-2">
+                        <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => onEdit(category)}
+                            className="h-8 w-8 p-0"
+                        >
+                            <Edit2 className="w-4 h-4" />
+                        </Button>
+                        <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => onDelete(category.id)}
+                            className="h-8 w-8 p-0 hover:bg-red-50 hover:text-red-600 hover:border-red-300"
+                        >
+                            <Trash2 className="w-4 h-4" />
+                        </Button>
+                    </div>
+                </div>
+            </Card>
+        </div>
+    )
+}
 
 export function CategoriesPage() {
     const { user } = useAuth()
@@ -26,9 +80,28 @@ export function CategoriesPage() {
         enabled: !!user?.id
     })
 
+    const sensors = useSensors(
+        useSensor(PointerSensor),
+        useSensor(KeyboardSensor, {
+            coordinateGetter: sortableKeyboardCoordinates,
+        })
+    )
+
+    // Reorder mutation
+    const reorderMutation = useMutation({
+        mutationFn: (newCategories) => reorderCategories(newCategories, user.id),
+        onSuccess: () => {
+            // Invalidate but don't force refetch immediately to prevent jumpiness if we are optimistic
+            // actually, better to just let the query update naturally or optimistically update
+            // for now, invalidate is safe
+            queryClient.invalidateQueries(['categories'])
+        },
+        onError: () => toast.error('Error al reordenar categorías')
+    })
+
     // Create mutation
     const createMutation = useMutation({
-        mutationFn: (name) => createCategory({ name, order_index: categories.length }, user.id),
+        mutationFn: (name) => createCategory({ name, sort_order: categories.length }, user.id),
         onSuccess: () => {
             queryClient.invalidateQueries(['categories'])
             setIsCreateModalOpen(false)
@@ -61,6 +134,23 @@ export function CategoriesPage() {
         onError: () => toast.error('Error al eliminar la categoría')
     })
 
+    const handleDragEnd = (event) => {
+        const { active, over } = event
+
+        if (active.id !== over.id) {
+            const oldIndex = categories.findIndex((cat) => cat.id === active.id)
+            const newIndex = categories.findIndex((cat) => cat.id === over.id)
+
+            const newCategories = arrayMove(categories, oldIndex, newIndex)
+
+            // Optimistic update via queryClient would be better, but for now we rely on mutation
+            // We should update the cache immediately to prevent flicker
+            queryClient.setQueryData(['categories', user?.id], newCategories)
+
+            reorderMutation.mutate(newCategories)
+        }
+    }
+
     const handleCreate = () => {
         if (!categoryName.trim()) return
         createMutation.mutate(categoryName)
@@ -90,7 +180,7 @@ export function CategoriesPage() {
                     <div>
                         <h1 className="text-3xl font-bold tracking-tight">Categorías</h1>
                         <p className="text-muted-foreground">
-                            Organiza tu menú en categorías
+                            Organiza tu menú en categorías (Arrastra para reordenar)
                         </p>
                     </div>
                     <Button onClick={() => setIsCreateModalOpen(true)}>
@@ -121,34 +211,28 @@ export function CategoriesPage() {
                     </Button>
                 </Card>
             ) : (
-                <div className="space-y-3">
-                    {categories.map((category) => (
-                        <Card key={category.id} className="p-4">
-                            <div className="flex items-center gap-4">
-                                <GripVertical className="w-5 h-5 text-gray-400 cursor-move" />
-                                <div className="flex-1">
-                                    <h3 className="font-medium">{category.name}</h3>
-                                </div>
-                                <div className="flex gap-2">
-                                    <Button
-                                        size="sm"
-                                        variant="outline"
-                                        onClick={() => handleEdit(category)}
-                                    >
-                                        <Edit2 className="w-4 h-4" />
-                                    </Button>
-                                    <Button
-                                        size="sm"
-                                        variant="outline"
-                                        onClick={() => handleDelete(category.id)}
-                                        className="hover:bg-red-50 hover:text-red-600 hover:border-red-300"
-                                    >
-                                        <Trash2 className="w-4 h-4" />
-                                    </Button>
-                                </div>
+                <div className="max-w-3xl">
+                    <DndContext
+                        sensors={sensors}
+                        collisionDetection={closestCenter}
+                        onDragEnd={handleDragEnd}
+                    >
+                        <SortableContext
+                            items={categories.map(c => c.id)}
+                            strategy={verticalListSortingStrategy}
+                        >
+                            <div className="space-y-3">
+                                {categories.map((category) => (
+                                    <SortableCategoryItem
+                                        key={category.id}
+                                        category={category}
+                                        onEdit={handleEdit}
+                                        onDelete={handleDelete}
+                                    />
+                                ))}
                             </div>
-                        </Card>
-                    ))}
+                        </SortableContext>
+                    </DndContext>
                 </div>
             )}
 

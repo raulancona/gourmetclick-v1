@@ -4,6 +4,8 @@ import { Search, ShoppingBag, X, Plus, Minus, Trash2, Send, MapPin, Clock, Star,
 import { getMenuBySlug } from '../lib/restaurant-service'
 import { trackVisit } from '../lib/analytics-service'
 import { generateWhatsAppMessage, sendWhatsAppOrder } from '../lib/whatsapp-service'
+import { createOrder } from '../lib/order-service'
+import { toast } from 'sonner'
 
 // ─── Cart Context (inline for self-contained public page) ─────────────────────
 import { createContext, useContext } from 'react'
@@ -722,6 +724,7 @@ function CheckoutFlow({ restaurant, primaryColor, secondaryColor, onClose, onBac
         paymentMethod: 'cash'
     })
     const [address, setAddress] = useState('')
+    const [tableNumber, setTableNumber] = useState('')
     const [locationUrl, setLocationUrl] = useState('')
     const [gettingLocation, setGettingLocation] = useState(false)
 
@@ -743,22 +746,53 @@ function CheckoutFlow({ restaurant, primaryColor, secondaryColor, onClose, onBac
         )
     }
 
-    const handleSubmit = () => {
+    const handleSubmit = async () => {
         if (!formData.name.trim()) return
 
-        const message = generateWhatsAppMessage(
-            items,
-            restaurant.company_name || 'Restaurante',
-            formData.name,
-            formData.phone,
-            formData.orderType === 'delivery' ? address : null,
-            formData.notes,
-            formData.paymentMethod,
-            formData.orderType === 'delivery' ? locationUrl : ''
-        )
-        sendWhatsAppOrder(restaurant.phone, message)
-        clearCart()
-        onClose()
+        const orderData = {
+            user_id: restaurant.id, // The owner of the restaurant
+            customer_name: formData.name,
+            customer_phone: formData.phone,
+            order_type: formData.orderType,
+            delivery_address: formData.orderType === 'delivery' ? address : (formData.orderType === 'dine_in' ? `Mesa: ${tableNumber}` : null),
+            table_number: formData.orderType === 'dine_in' ? tableNumber : null,
+            location_url: formData.orderType === 'delivery' ? locationUrl : '',
+            payment_method: formData.paymentMethod,
+            notes: formData.notes,
+            items: items.map(item => ({
+                product: { name: item.product.name },
+                quantity: item.quantity,
+                subtotal: item.subtotal,
+                modifiers: item.modifiers.map(m => ({ name: m.name }))
+            })),
+            total: getTotal(),
+            status: 'pending'
+        }
+
+        try {
+            // Save to DB
+            await createOrder(orderData)
+
+            // Send WhatsApp
+            const message = generateWhatsAppMessage(
+                items,
+                restaurant.company_name || 'Restaurante',
+                formData.name,
+                formData.phone,
+                formData.orderType === 'delivery' ? address : (formData.orderType === 'dine_in' ? `Mesa: ${tableNumber}` : null),
+                formData.notes,
+                formData.paymentMethod,
+                formData.orderType === 'delivery' ? locationUrl : ''
+            )
+            sendWhatsAppOrder(restaurant.phone, message)
+
+            toast.success('¡Pedido enviado con éxito!')
+            clearCart()
+            onClose()
+        } catch (error) {
+            console.error('Error saving order:', error)
+            toast.error('Hubo un problema al procesar tu pedido. Intenta de nuevo.')
+        }
     }
 
     const totalSteps = 3
@@ -818,20 +852,39 @@ function CheckoutFlow({ restaurant, primaryColor, secondaryColor, onClose, onBac
                         {/* Order Type */}
                         <div>
                             <label className="text-sm font-semibold text-gray-700 block mb-2">Tipo de pedido</label>
-                            <div className="grid grid-cols-2 gap-3">
-                                {[{ value: 'pickup', label: '🏪 Recoger', desc: 'Paso a recoger' }, { value: 'delivery', label: '🛵 Envío', desc: 'A domicilio' }].map(opt => (
+                            <div className="grid grid-cols-3 gap-2">
+                                {[
+                                    { value: 'pickup', label: '🏪 Recoger', desc: 'Para llevar' },
+                                    { value: 'delivery', label: '🛵 Envío', desc: 'A domicilio' },
+                                    { value: 'dine_in', label: '🪑 Aquí', desc: 'Comer aquí' }
+                                ].map(opt => (
                                     <button
                                         key={opt.value}
                                         onClick={() => setFormData({ ...formData, orderType: opt.value })}
-                                        className={`p-4 rounded-2xl border-2 text-left transition-all ${formData.orderType === opt.value ? 'bg-orange-50' : 'border-gray-200'}`}
+                                        className={`p-3 rounded-2xl border-2 text-left transition-all ${formData.orderType === opt.value ? 'bg-orange-50' : 'border-gray-200'}`}
                                         style={formData.orderType === opt.value ? { borderColor: primaryColor } : {}}
                                     >
-                                        <span className="text-lg block">{opt.label}</span>
-                                        <span className="text-xs text-gray-500">{opt.desc}</span>
+                                        <span className="text-sm font-bold block">{opt.label}</span>
+                                        <span className="text-[10px] text-gray-500">{opt.desc}</span>
                                     </button>
                                 ))}
                             </div>
                         </div>
+
+                        {formData.orderType === 'dine_in' && (
+                            <div>
+                                <label className="text-sm font-semibold text-gray-700 block mb-2">
+                                    Número de mesa *
+                                </label>
+                                <input
+                                    type="text"
+                                    value={tableNumber}
+                                    onChange={e => setTableNumber(e.target.value)}
+                                    placeholder="Ej. 5, 12, VIP..."
+                                    className="w-full px-4 py-3.5 rounded-2xl border-2 border-gray-200 focus:border-current focus:outline-none text-[15px] transition-colors"
+                                />
+                            </div>
+                        )}
 
                         {formData.orderType === 'delivery' && (
                             <>
@@ -873,8 +926,8 @@ function CheckoutFlow({ restaurant, primaryColor, secondaryColor, onClose, onBac
                         )}
 
                         <button
-                            onClick={() => formData.name.trim() && setStep(2)}
-                            disabled={!formData.name.trim()}
+                            onClick={() => formData.name.trim() && (formData.orderType !== 'dine_in' || tableNumber.trim()) && setStep(2)}
+                            disabled={!formData.name.trim() || (formData.orderType === 'dine_in' && !tableNumber.trim())}
                             className="w-full py-4 rounded-2xl text-white font-bold text-base disabled:opacity-40 active:scale-[0.98] transition-all"
                             style={{ background: primaryColor }}
                         >
