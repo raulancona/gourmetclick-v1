@@ -1,8 +1,10 @@
 import { useState, useEffect, useRef } from 'react'
 import { useParams } from 'react-router-dom'
 import { Search, ShoppingBag, X, Plus, Minus, Trash2, Send, MapPin, Clock, Star, ChevronDown, User, Phone, MessageCircle, CreditCard, Banknote, Building2, MapPinned, Loader2, Leaf } from 'lucide-react'
-import { getMenuBySlug } from '../lib/restaurant-service'
+import { getRestaurantBySlug, getMenuBySlug } from '../lib/restaurant-service'
+import { getCategoriesBySlug } from '../lib/category-service'
 import { trackVisit } from '../lib/analytics-service'
+import { useCategorySubscription } from '../hooks/use-category-subscription'
 import { generateWhatsAppMessage, sendWhatsAppOrder } from '../lib/whatsapp-service'
 import { createOrder } from '../lib/order-service'
 import { toast } from 'sonner'
@@ -87,7 +89,7 @@ export function PublicMenuPage() {
             await trackVisit(data.restaurant.id, navigator.userAgent).catch(() => { })
             // Show popup if enabled
             if (data.restaurant.popup_enabled && (data.restaurant.popup_title || data.restaurant.popup_image_url)) {
-                const popupKey = `popup_dismissed_${data.restaurant.id}`
+                const popupKey = `popup_dismissed_${data.restaurant.id} `
                 if (!sessionStorage.getItem(popupKey)) {
                     setTimeout(() => setShowPopup(true), 800)
                 }
@@ -183,7 +185,7 @@ export function PublicMenuPage() {
                     primaryColor={primaryColor}
                     onClose={() => {
                         setShowPopup(false)
-                        sessionStorage.setItem(`popup_dismissed_${restaurant.id}`, '1')
+                        sessionStorage.setItem(`popup_dismissed_${restaurant.id} `, '1')
                     }}
                 />
             )}
@@ -252,7 +254,7 @@ function MenuContent({
     return (
         <div className="min-h-screen" style={{ background: '#FAFAFA' }}>
             {/* ─── Hero Header ───────────────────────────────────── */}
-            <header className="relative overflow-hidden" style={{ background: `linear-gradient(135deg, ${primaryColor}dd 0%, ${primaryColor} 50%, ${primaryColor}bb 100%)` }}>
+            <header className="relative overflow-hidden" style={{ background: `linear - gradient(135deg, ${primaryColor}dd 0 %, ${primaryColor} 50 %, ${primaryColor}bb 100 %)` }}>
                 {restaurant.banner_url && (
                     <div className="absolute inset-0">
                         <img src={restaurant.banner_url} alt="" className="w-full h-full object-cover" />
@@ -368,7 +370,7 @@ function MenuContent({
                         <button
                             onClick={() => setShowCart(true)}
                             className="w-full py-4 px-6 rounded-2xl text-white font-bold text-base flex items-center justify-between shadow-2xl transition-all active:scale-[0.98]"
-                            style={{ background: primaryColor, boxShadow: `0 8px 32px ${primaryColor}50` }}
+                            style={{ background: primaryColor, boxShadow: `0 8px 32px ${primaryColor} 50` }}
                         >
                             <div className="flex items-center gap-3">
                                 <div className="w-8 h-8 rounded-xl bg-white/20 flex items-center justify-center">
@@ -413,7 +415,7 @@ function MenuContent({
                 />
             )}
 
-            <style>{`.no-scrollbar::-webkit-scrollbar{display:none}.no-scrollbar{-ms-overflow-style:none;scrollbar-width:none}`}</style>
+            <style>{`.no - scrollbar:: -webkit - scrollbar{ display: none }.no - scrollbar{ -ms - overflow - style: none; scrollbar - width: none } `}</style>
         </div>
     )
 }
@@ -584,7 +586,7 @@ function ProductModal({ product, primaryColor, secondaryColor, onClose }) {
                                         <button
                                             key={opt.id}
                                             onClick={() => toggleModifier(opt)}
-                                            className={`w-full flex items-center justify-between p-3 rounded-xl border-2 transition-all text-left ${isSelected ? 'border-current bg-orange-50' : 'border-gray-100 hover:border-gray-200'}`}
+                                            className={`w - full flex items - center justify - between p - 3 rounded - xl border - 2 transition - all text - left ${isSelected ? 'border-current bg-orange-50' : 'border-gray-100 hover:border-gray-200'} `}
                                             style={isSelected ? { borderColor: primaryColor, color: primaryColor } : {}}
                                         >
                                             <span className="text-sm font-medium text-gray-800">{opt.name}</span>
@@ -664,7 +666,7 @@ function CartPanel({ restaurant, primaryColor, onClose, onCheckout }) {
                                             <div className="mt-1 flex flex-wrap gap-1">
                                                 {item.modifiers.map((mod, i) => (
                                                     <span key={i} className="text-xs px-2 py-0.5 bg-white rounded-full text-gray-600 border border-gray-200">
-                                                        {mod.name}{parseFloat(mod.extra_price) > 0 && ` +$${parseFloat(mod.extra_price).toFixed(2)}`}
+                                                        {mod.name}{parseFloat(mod.extra_price) > 0 && ` + $${parseFloat(mod.extra_price).toFixed(2)} `}
                                                     </span>
                                                 ))}
                                             </div>

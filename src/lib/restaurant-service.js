@@ -74,7 +74,7 @@ export async function getMenuBySlug(slug) {
         .from('categories')
         .select('*')
         .eq('user_id', profile.id)
-        .order('order_index', { ascending: true })
+        .order('sort_order', { ascending: true })
 
     if (categoriesError) throw categoriesError
 

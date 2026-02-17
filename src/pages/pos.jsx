@@ -14,6 +14,7 @@ import { toast } from 'sonner'
 import { formatCurrency } from '../lib/utils'
 import { useAuth } from '../features/auth/auth-context'
 import { supabase } from '../lib/supabase'
+import { useCategorySubscription } from '../hooks/use-category-subscription'
 
 export default function POSPage() {
     const { user, signOut } = useAuth()
@@ -31,7 +32,11 @@ export default function POSPage() {
     const [deliveryAddress, setDeliveryAddress] = useState('')
     const [notes, setNotes] = useState('')
     const [isSubmitting, setIsSubmitting] = useState(false)
+
     const [editingOrder, setEditingOrder] = useState(null)
+
+    // Realtime subscription
+    useCategorySubscription(user?.id)
 
     useEffect(() => {
         const checkEditMode = () => {

@@ -12,7 +12,7 @@ const navigation = [
     { name: 'Ajustes', href: '/settings', icon: Settings },
 ]
 
-export function Sidebar() {
+export function Sidebar({ isOpen, onClose }) {
     const location = useLocation()
     const navigate = useNavigate()
     const { user, signOut } = useAuth()
@@ -28,46 +28,60 @@ export function Sidebar() {
     }
 
     return (
-        <div className="flex h-screen w-20 flex-col items-center border-r border-border bg-card py-6 shrink-0 z-20">
-            {/* Logo */}
-            <div className="w-10 h-10 bg-primary/10 text-primary rounded-xl flex items-center justify-center mb-8">
-                <ChefHat className="w-6 h-6" />
-            </div>
+        <>
+            {/* Mobile Backdrop */}
+            {isOpen && (
+                <div
+                    className="fixed inset-0 bg-black/50 z-40 lg:hidden"
+                    onClick={onClose}
+                />
+            )}
 
-            {/* Navigation */}
-            <nav className="flex-1 flex flex-col gap-4 w-full px-2">
-                {navigation.map((item) => {
-                    const isActive = location.pathname === item.href
-                    const Icon = item.icon
+            <aside className={`
+                fixed inset-y-0 left-0 z-50 h-screen w-20 flex flex-col items-center border-r border-border bg-card py-6 shrink-0 transition-transform duration-300 ease-in-out lg:static lg:translate-x-0
+                ${isOpen ? 'translate-x-0' : '-translate-x-full'}
+            `}>
+                {/* Logo */}
+                <div className="w-10 h-10 bg-primary/10 text-primary rounded-xl flex items-center justify-center mb-8 shrink-0">
+                    <ChefHat className="w-6 h-6" />
+                </div>
 
-                    return (
-                        <Link
-                            key={item.name}
-                            to={item.href}
-                            title={item.name}
-                            className={`
-                                flex flex-col items-center justify-center w-full aspect-square rounded-xl transition-all cursor-pointer gap-1
-                                ${isActive
-                                    ? 'bg-primary text-primary-foreground shadow-lg shadow-primary/30'
-                                    : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'}
-                            `}
-                        >
-                            <Icon className={`w-6 h-6 ${isActive ? 'stroke-[2.5px]' : 'stroke-2'}`} />
-                        </Link>
-                    )
-                })}
-            </nav>
+                {/* Navigation */}
+                <nav className="flex-1 flex flex-col gap-4 w-full px-2 overflow-y-auto no-scrollbar">
+                    {navigation.map((item) => {
+                        const isActive = location.pathname === item.href
+                        const Icon = item.icon
 
-            {/* User section */}
-            <div className="mt-auto">
-                <button
-                    onClick={handleLogout}
-                    title="Cerrar sesión"
-                    className="w-10 h-10 flex items-center justify-center text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-xl transition-all"
-                >
-                    <LogOut className="w-5 h-5" />
-                </button>
-            </div>
-        </div>
+                        return (
+                            <Link
+                                key={item.name}
+                                to={item.href}
+                                title={item.name}
+                                onClick={onClose}
+                                className={`
+                                    flex flex-col items-center justify-center w-full aspect-square rounded-xl transition-all cursor-pointer gap-1 shrink-0
+                                    ${isActive
+                                        ? 'bg-primary text-primary-foreground shadow-lg shadow-primary/30'
+                                        : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'}
+                                `}
+                            >
+                                <Icon className={`w-6 h-6 ${isActive ? 'stroke-[2.5px]' : 'stroke-2'}`} />
+                            </Link>
+                        )
+                    })}
+                </nav>
+
+                {/* User section */}
+                <div className="mt-auto pt-4 shrink-0">
+                    <button
+                        onClick={handleLogout}
+                        title="Cerrar sesión"
+                        className="w-10 h-10 flex items-center justify-center text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-xl transition-all"
+                    >
+                        <LogOut className="w-5 h-5" />
+                    </button>
+                </div>
+            </aside>
+        </>
     )
 }
