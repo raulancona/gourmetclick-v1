@@ -71,6 +71,7 @@ export async function deleteCategory(categoryId, userId) {
 export async function reorderCategories(categories, userId) {
     const updates = categories.map((cat, index) => ({
         id: cat.id,
+        name: cat.name, // Required for upsert to work with non-null constraint
         sort_order: index,
         user_id: userId,
         updated_at: new Date().toISOString()
