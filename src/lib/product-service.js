@@ -1,0 +1,141 @@
+import { supabase } from './supabase'
+
+/**
+ * Product Service
+ * Handles all CRUD operations for products with user ownership verification
+ */
+
+/**
+ * Fetch all products for the authenticated user
+ * @param {string} userId - The authenticated user's ID
+ * @returns {Promise<Array>} Array of products
+ */
+export async function getProducts(userId) {
+    const { data, error } = await supabase
+        .from('products')
+        .select('*')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false })
+
+    if (error) throw error
+    return data || []
+}
+
+/**
+ * Fetch a single product by ID with ownership verification
+ * @param {string} id - Product ID
+ * @param {string} userId - The authenticated user's ID
+ * @returns {Promise<Object>} Product object
+ */
+export async function getProductById(id, userId) {
+    const { data, error } = await supabase
+        .from('products')
+        .select('*')
+        .eq('id', id)
+        .eq('user_id', userId)
+        .single()
+
+    if (error) throw error
+    return data
+}
+
+/**
+ * Create a new product
+ * @param {Object} productData - Product data (name, description, price, sku, image_url)
+ * @param {string} userId - The authenticated user's ID
+ * @returns {Promise<Object>} Created product
+ */
+export async function createProduct(productData, userId) {
+    const { data, error } = await supabase
+        .from('products')
+        .insert([{
+            ...productData,
+            user_id: userId
+        }])
+        .select()
+        .single()
+
+    if (error) throw error
+    return data
+}
+
+/**
+ * Update an existing product with ownership verification
+ * @param {string} id - Product ID
+ * @param {Object} productData - Updated product data
+ * @param {string} userId - The authenticated user's ID
+ * @returns {Promise<Object>} Updated product
+ */
+export async function updateProduct(id, productData, userId) {
+    // First verify ownership
+    await getProductById(id, userId)
+
+    const { data, error } = await supabase
+        .from('products')
+        .update({
+            ...productData,
+            updated_at: new Date().toISOString()
+        })
+        .eq('id', id)
+        .eq('user_id', userId)
+        .select()
+        .single()
+
+    if (error) throw error
+    return data
+}
+
+/**
+ * Delete a product with ownership verification
+ * @param {string} id - Product ID
+ * @param {string} userId - The authenticated user's ID
+ * @returns {Promise<void>}
+ */
+export async function deleteProduct(id, userId) {
+    // First verify ownership
+    await getProductById(id, userId)
+
+    const { error } = await supabase
+        .from('products')
+        .delete()
+        .eq('id', id)
+        .eq('user_id', userId)
+
+    if (error) throw error
+}
+
+/**
+ * Bulk create products from CSV import
+ * @param {Array} productsArray - Array of product objects
+ * @param {string} userId - The authenticated user's ID
+ * @returns {Promise<Array>} Array of created products
+ */
+export async function bulkCreateProducts(productsArray, userId) {
+    const productsWithUserId = productsArray.map(product => ({
+        ...product,
+        user_id: userId
+    }))
+
+    const { data, error } = await supabase
+        .from('products')
+        .insert(productsWithUserId)
+        .select()
+
+    if (error) throw error
+    return data || []
+}
+
+/**
+ * Get product count for the authenticated user
+ * @param {string} userId - The authenticated user's ID
+ * @returns {Promise<number>} Product count
+ */
+export async function getProductCount(userId) {
+    const { count, error } = await supabase
+        .from('products')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', userId)
+
+    if (error) throw error
+    return count || 0
+}
