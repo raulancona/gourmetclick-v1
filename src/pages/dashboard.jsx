@@ -1,9 +1,13 @@
 import { useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useAuth } from '../features/auth/auth-context'
 import { getProductCount } from '../lib/product-service'
-import { getOrderStats, getOrders, getSalesAnalytics } from '../lib/order-service'
+import { getOrderStats, getOrders, getSalesAnalytics, updateOrderStatus, updateOrder, deleteOrder } from '../lib/order-service'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card'
+import { OrderDetailModal } from '../features/orders/order-detail-modal'
+import { toast } from 'sonner'
+import { formatCurrency } from '../lib/utils'
+
 import {
     TrendingUp,
     ShoppingBag,
@@ -27,7 +31,41 @@ import {
 
 export function DashboardPage() {
     const { user } = useAuth()
+    const queryClient = useQueryClient()
+    const [selectedOrder, setSelectedOrder] = useState(null)
+
+    // Date Filtering Logic
     const [timeRange, setTimeRange] = useState('7d')
+
+    const getDateRange = (range) => {
+        const now = new Date()
+        const end = now.toISOString()
+        let start = new Date()
+
+        switch (range) {
+            case 'today':
+                start.setHours(0, 0, 0, 0)
+                break
+            case 'yesterday':
+                start.setDate(now.getDate() - 1)
+                start.setHours(0, 0, 0, 0)
+                const endYesterday = new Date()
+                endYesterday.setDate(now.getDate() - 1)
+                endYesterday.setHours(23, 59, 59, 999)
+                return { start: start.toISOString(), end: endYesterday.toISOString() }
+            case '7d':
+                start.setDate(now.getDate() - 7)
+                break
+            case 'month':
+                start.setMonth(now.getMonth() - 1)
+                break
+            default:
+                start.setDate(now.getDate() - 7)
+        }
+        return { start: start.toISOString(), end }
+    }
+
+    const { start: startDate, end: endDate } = getDateRange(timeRange)
 
     // Fetch product count
     const { data: productCount = 0 } = useQuery({
@@ -36,25 +74,37 @@ export function DashboardPage() {
         enabled: !!user?.id
     })
 
-    // Fetch order stats
+    // Fetch order stats (Analytics Mode - Date Based)
     const { data: stats, isLoading: isLoadingStats } = useQuery({
-        queryKey: ['order-stats', user?.id],
-        queryFn: () => getOrderStats(user.id),
+        queryKey: ['order-stats-dashboard', user?.id, timeRange],
+        queryFn: () => getOrderStats(user.id, {
+            filterByShift: false,
+            startDate,
+            endDate
+        }),
         enabled: !!user?.id
     })
 
-    // Fetch sales analytics
+    // Fetch sales analytics (Analytics Mode - Date Based)
     const { data: analytics, isLoading: isLoadingAnalytics } = useQuery({
-        queryKey: ['sales-analytics', user?.id],
-        queryFn: () => getSalesAnalytics(user.id),
+        queryKey: ['sales-analytics-dashboard', user?.id, timeRange],
+        queryFn: () => getSalesAnalytics(user.id, {
+            filterByShift: false,
+            startDate,
+            endDate
+        }),
         enabled: !!user?.id
     })
 
-    // Fetch recent orders for the dashboard view
+    // Fetch recent orders for the dashboard view (Date Based)
     const { data: recentOrders = [] } = useQuery({
-        queryKey: ['recent-orders', user?.id],
+        queryKey: ['recent-orders-dashboard', user?.id, timeRange],
         queryFn: async () => {
-            const all = await getOrders(user.id)
+            const all = await getOrders(user.id, {
+                includeClosed: true, // Dashboard shows everything in the range
+                startDate,
+                endDate
+            })
             return all.slice(0, 5)
         },
         enabled: !!user?.id
@@ -84,67 +134,93 @@ export function DashboardPage() {
     const productsC = analytics?.abcAnalysis?.filter(p => p.category === 'C') || []
 
     return (
-        <div className="p-8 pb-16 space-y-8 max-w-7xl mx-auto">
-            <div>
-                <h1 className="text-3xl font-black tracking-tight text-foreground mb-1">Resumen del Negocio</h1>
-                <p className="text-muted-foreground">Analítica detallada y estado actual de tu restaurante</p>
+        <div className="p-4 sm:p-8 pb-16 space-y-6 max-w-7xl mx-auto">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div>
+                    <h1 className="text-3xl font-black tracking-tight text-foreground mb-1">Resumen del Negocio</h1>
+                    <p className="text-muted-foreground">Analítica detallada y estado histórico de tu restaurante</p>
+                </div>
+
+                {/* Date Filter Selector */}
+                <div className="flex items-center gap-2 bg-white dark:bg-gray-800 p-1 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-sm">
+                    {[
+                        { id: 'today', label: 'Hoy' },
+                        { id: 'yesterday', label: 'Ayer' },
+                        { id: '7d', label: '7 días' },
+                        { id: 'month', label: 'Mes' }
+                    ].map(range => (
+                        <button
+                            key={range.id}
+                            onClick={() => setTimeRange(range.id)}
+                            className={`px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-all ${timeRange === range.id
+                                ? 'bg-primary text-white shadow-md'
+                                : 'text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700'
+                                }`}
+                        >
+                            {range.label}
+                        </button>
+                    ))}
+                </div>
             </div>
 
-            {/* Main Metrics */}
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-                {/* ... existing cards ... */}
-                <Card className="border-none shadow-sm bg-blue-50/50 dark:bg-blue-900/20">
-                    <CardHeader className="pb-2">
-                        <CardDescription className="text-blue-600 dark:text-blue-400 font-semibold flex items-center gap-2">
-                            <TrendingUp className="w-4 h-4" /> Ventas Totales
-                        </CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-3xl font-black text-blue-900 dark:text-blue-100">{formatCurrency(stats?.revenue || 0)}</div>
-                    </CardContent>
-                </Card>
-
-                <Card className="border-none shadow-sm bg-orange-50/50 dark:bg-orange-900/20">
-                    <CardHeader className="pb-2">
-                        <CardDescription className="text-orange-600 dark:text-orange-400 font-semibold flex items-center gap-2">
-                            <ShoppingBag className="w-4 h-4" /> Órdenes Totales
-                        </CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-3xl font-black text-orange-900 dark:text-orange-100">{stats?.total || 0}</div>
-                    </CardContent>
-                </Card>
-
-                <Card className="border-none shadow-sm bg-purple-50/50 dark:bg-purple-900/20">
-                    <CardHeader className="pb-2">
-                        <CardDescription className="text-purple-600 dark:text-purple-400 font-semibold flex items-center gap-2">
-                            <Package className="w-4 h-4" /> Productos
-                        </CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-3xl font-black text-purple-900 dark:text-purple-100">{productCount}</div>
-                    </CardContent>
-                </Card>
-
-                <Card className="border-none shadow-sm bg-green-50/50 dark:bg-green-900/20">
-                    <CardHeader className="pb-2">
-                        <CardDescription className="text-green-600 dark:text-green-400 font-semibold flex items-center gap-2">
-                            <BadgeDollarSign className="w-4 h-4" /> Cobro más utilizado
-                        </CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="flex items-center gap-2">
-                            {topPayment ? (
-                                <>
-                                    <topPayment.icon className="w-6 h-6" style={{ color: topPayment.color }} />
-                                    <div className="text-2xl font-black text-green-900 dark:text-green-100">{topPayment.label}</div>
-                                </>
-                            ) : (
-                                <div className="text-2xl font-black text-muted-foreground">N/A</div>
-                            )}
+            {/* Main Metrics — Left-accent border pattern for clean Dark/Light Mode */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                {/* Revenue */}
+                <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 border-l-4 border-l-blue-500 shadow-sm p-6 flex flex-col gap-3">
+                    <div className="flex items-center gap-2">
+                        <div className="w-9 h-9 rounded-xl bg-blue-50 dark:bg-blue-900/30 flex items-center justify-center">
+                            <TrendingUp className="w-5 h-5 text-blue-500" />
                         </div>
-                    </CardContent>
-                </Card>
+                        <span className="text-[11px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest">Ventas Totales</span>
+                    </div>
+                    <div className="text-3xl font-black text-gray-900 dark:text-white tracking-tight">{formatCurrency(stats?.revenue || 0)}</div>
+                    <p className="text-xs text-gray-400 dark:text-gray-500">Órdenes entregadas en el periodo</p>
+                </div>
+
+                {/* Orders */}
+                <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 border-l-4 border-l-orange-500 shadow-sm p-6 flex flex-col gap-3">
+                    <div className="flex items-center gap-2">
+                        <div className="w-9 h-9 rounded-xl bg-orange-50 dark:bg-orange-900/30 flex items-center justify-center">
+                            <ShoppingBag className="w-5 h-5 text-orange-500" />
+                        </div>
+                        <span className="text-[11px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest">Órdenes</span>
+                    </div>
+                    <div className="text-3xl font-black text-gray-900 dark:text-white tracking-tight">{stats?.total || 0}</div>
+                    <p className="text-xs text-gray-400 dark:text-gray-500">{stats?.delivered || 0} entregadas · {stats?.cancelled || 0} canceladas</p>
+                </div>
+
+                {/* Products */}
+                <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 border-l-4 border-l-purple-500 shadow-sm p-6 flex flex-col gap-3">
+                    <div className="flex items-center gap-2">
+                        <div className="w-9 h-9 rounded-xl bg-purple-50 dark:bg-purple-900/30 flex items-center justify-center">
+                            <Package className="w-5 h-5 text-purple-500" />
+                        </div>
+                        <span className="text-[11px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest">Productos</span>
+                    </div>
+                    <div className="text-3xl font-black text-gray-900 dark:text-white tracking-tight">{productCount}</div>
+                    <p className="text-xs text-gray-400 dark:text-gray-500">En tu catálogo activo</p>
+                </div>
+
+                {/* Top Payment */}
+                <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 border-l-4 border-l-green-500 shadow-sm p-6 flex flex-col gap-3">
+                    <div className="flex items-center gap-2">
+                        <div className="w-9 h-9 rounded-xl bg-green-50 dark:bg-green-900/30 flex items-center justify-center">
+                            <BadgeDollarSign className="w-5 h-5 text-green-500" />
+                        </div>
+                        <span className="text-[11px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest">Cobro Estelar</span>
+                    </div>
+                    <div className="flex items-center gap-3">
+                        {topPayment ? (
+                            <>
+                                <topPayment.icon className="w-8 h-8" style={{ color: topPayment.color }} />
+                                <span className="text-2xl font-black text-gray-900 dark:text-white">{topPayment.label}</span>
+                            </>
+                        ) : (
+                            <span className="text-2xl font-black text-gray-400">N/A</span>
+                        )}
+                    </div>
+                    <p className="text-xs text-gray-400 dark:text-gray-500">Método más frecuente</p>
+                </div>
             </div>
 
             {/* Analytics Section - Charts */}
@@ -231,52 +307,49 @@ export function DashboardPage() {
             </div>
 
             {/* Secondary Metrics */}
-            <div className="grid gap-6 md:grid-cols-3">
-                <Card className="bg-emerald-50/50 border-emerald-100 dark:bg-emerald-900/20 dark:border-emerald-900/50">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <Card className="bg-white dark:bg-gray-800 border-2 border-emerald-100 dark:border-emerald-900/50 shadow-sm">
                     <CardHeader className="pb-2">
-                        <CardTitle className="text-emerald-700 dark:text-emerald-400 text-lg flex items-center gap-2">
+                        <CardTitle className="text-emerald-600 dark:text-emerald-400 text-lg flex items-center gap-2 uppercase text-[10px] tracking-widest font-black">
                             <Banknote className="w-5 h-5" />
                             Ticket Promedio
                         </CardTitle>
-                        <CardDescription className="text-emerald-600/80 dark:text-emerald-400/80">Promedio por orden</CardDescription>
                     </CardHeader>
                     <CardContent>
-                        <div className="text-3xl font-black text-emerald-900 dark:text-emerald-100 mb-1">
+                        <div className="text-3xl font-black text-gray-900 dark:text-white mb-1">
                             {formatCurrency(analytics?.metrics?.averageTicket || 0)}
                         </div>
-                        <p className="text-xs text-emerald-700 dark:text-emerald-300 font-medium">Promedio de venta en órdenes completadas.</p>
+                        <p className="text-xs text-muted-foreground">Promedio histórico del periodo.</p>
                     </CardContent>
                 </Card>
 
-                <Card className="bg-blue-50/50 border-blue-100 dark:bg-blue-900/20 dark:border-blue-900/50">
+                <Card className="bg-white dark:bg-gray-800 border-2 border-blue-100 dark:border-blue-900/50 shadow-sm">
                     <CardHeader className="pb-2">
-                        <CardTitle className="text-blue-700 dark:text-blue-400 text-lg flex items-center gap-2">
+                        <CardTitle className="text-blue-600 dark:text-blue-400 text-lg flex items-center gap-2 uppercase text-[10px] tracking-widest font-black">
                             <Clock className="w-5 h-5" />
                             Tiempo de Preparación
                         </CardTitle>
-                        <CardDescription className="text-blue-600/80 dark:text-blue-400/80">Promedio cocina &rarr; listo</CardDescription>
                     </CardHeader>
                     <CardContent>
-                        <div className="text-3xl font-black text-blue-900 dark:text-blue-100 mb-1">
+                        <div className="text-3xl font-black text-gray-900 dark:text-white mb-1">
                             {analytics?.metrics?.preparationTime || 'N/A'}
                         </div>
-                        <p className="text-xs text-blue-700 dark:text-blue-300 font-medium">Tiempo promedio de procesamiento.</p>
+                        <p className="text-xs text-muted-foreground">Efectividad operativa.</p>
                     </CardContent>
                 </Card>
 
-                <Card className="bg-amber-50/50 border-amber-100 dark:bg-amber-900/20 dark:border-amber-900/50">
+                <Card className="bg-white dark:bg-gray-800 border-2 border-amber-100 dark:border-amber-900/50 shadow-sm">
                     <CardHeader className="pb-2">
-                        <CardTitle className="text-amber-700 dark:text-amber-400 text-lg flex items-center gap-2">
+                        <CardTitle className="text-amber-600 dark:text-amber-400 text-lg flex items-center gap-2 uppercase text-[10px] tracking-widest font-black">
                             <Users className="w-5 h-5" />
-                            Clientes Recurrentes
+                            Fidelización
                         </CardTitle>
-                        <CardDescription className="text-amber-600/80 dark:text-amber-400/80">Fidelización</CardDescription>
                     </CardHeader>
                     <CardContent>
-                        <div className="text-3xl font-black text-amber-900 dark:text-amber-100 mb-1">
+                        <div className="text-3xl font-black text-gray-900 dark:text-white mb-1">
                             {Math.round(analytics?.metrics?.recurringCustomersPercentage || 0)}%
                         </div>
-                        <p className="text-xs text-amber-700 dark:text-amber-300 font-medium">Porcentaje de órdenes de clientes frecuentes.</p>
+                        <p className="text-xs text-muted-foreground">Retorno de clientes.</p>
                     </CardContent>
                 </Card>
             </div>
@@ -330,7 +403,11 @@ export function DashboardPage() {
                         ) : (
                             <div className="divide-y divide-border">
                                 {recentOrders.map(order => (
-                                    <div key={order.id} className="py-3 flex items-center justify-between">
+                                    <div
+                                        key={order.id}
+                                        className="py-3 flex items-center justify-between cursor-pointer hover:bg-muted/50 transition-colors px-2 -mx-2 rounded-xl"
+                                        onClick={() => setSelectedOrder(order)}
+                                    >
                                         <div className="flex items-center gap-3">
                                             <div className="w-10 h-10 rounded-xl bg-muted flex items-center justify-center">
                                                 <Clock className="w-5 h-5 text-muted-foreground" />
@@ -361,6 +438,46 @@ export function DashboardPage() {
                     </CardContent>
                 </Card>
             </div>
-        </div>
+
+            {
+                selectedOrder && (
+                    <OrderDetailModal
+                        order={selectedOrder}
+                        onClose={() => setSelectedOrder(null)}
+                        onUpdateStatus={async (status) => {
+                            try {
+                                await updateOrderStatus(selectedOrder.id, status, user.id)
+                                toast.success('Estado actualizado')
+                                setSelectedOrder({ ...selectedOrder, status })
+                                queryClient.invalidateQueries(['orders'])
+                            } catch (err) {
+                                toast.error('Error al actualizar')
+                            }
+                        }}
+                        onUpdateOrder={async (updates) => {
+                            try {
+                                await updateOrder(selectedOrder.id, updates, user.id)
+                                toast.success('Orden actualizada')
+                                setSelectedOrder({ ...selectedOrder, ...updates })
+                                queryClient.invalidateQueries(['orders'])
+                            } catch (err) {
+                                toast.error('Error al actualizar')
+                            }
+                        }}
+                        onDelete={async () => {
+                            try {
+                                await deleteOrder(selectedOrder.id, user.id)
+                                toast.success('Orden eliminada')
+                                setSelectedOrder(null)
+                                queryClient.invalidateQueries(['orders'])
+                            } catch (err) {
+                                toast.error('Error al eliminar')
+                            }
+                        }}
+                    />
+                )
+            }
+        </div >
     )
 }
+

@@ -61,5 +61,25 @@
   body {
     @apply bg-background text-foreground;
     font-feature-settings: "rlig" 1, "calt" 1;
+    /* Prevent horizontal overflow on the body itself */
+    overflow-x: hidden;
+  }
+}
+
+/* ── Native App Scrollbar Utilities ───────────────────────────────────────── */
+@layer utilities {
+  /* Hide scrollbar visually but keep scroll functionality */
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  /* Minimum touch target size for accessibility */
+  .touch-target {
+    min-height: 44px;
+    min-width: 44px;
   }
 }

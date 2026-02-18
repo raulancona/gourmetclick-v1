@@ -14,28 +14,93 @@ const ORDER_STATUSES = {
     cancelled: { label: 'Cancelado', emoji: '❌', color: '#EF4444' },
 }
 
-export { ORDER_STATUSES }
+const PAYMENT_METHODS = {
+    cash: { label: 'Efectivo', icon: '💵' },
+    transfer: { label: 'Transferencia', icon: '🏦' },
+    card: { label: 'Tarjeta', icon: '💳' },
+}
 
-export async function getOrders(userId) {
-    const { data, error } = await supabase
+function getNextStatuses(current) {
+    const flow = {
+        pending: ['confirmed'],
+        confirmed: ['preparing'],
+        preparing: ['ready'],
+        ready: ['on_the_way', 'delivered'],
+        on_the_way: ['delivered'],
+    }
+    return flow[current] || []
+}
+
+export { ORDER_STATUSES, PAYMENT_METHODS, getNextStatuses }
+
+export async function getOrders(userId, { includeClosed = false, startDate = null, endDate = null } = {}) {
+    let query = supabase
         .from('orders')
         .select('*')
         .eq('user_id', userId)
         .order('created_at', { ascending: false })
 
+    if (!includeClosed) {
+        query = query.is('cash_cut_id', null)
+    }
+
+    if (startDate) {
+        query = query.gte('created_at', startDate)
+    }
+    if (endDate) {
+        query = query.lte('created_at', endDate)
+    }
+
+    const { data, error } = await query
     if (error) throw error
     return data || []
 }
 
 export async function createOrder(orderData) {
-    const { data, error } = await supabase
-        .from('orders')
-        .insert([orderData])
-        .select()
-        .single()
+    console.log('🚀 Creating Order:', orderData)
 
-    if (error) throw error
-    return data
+    // 1. Snapshotting & Data Integrity
+    // Ensure every item has fixed values at the moment of sale
+    const snapshotItems = orderData.items?.map(item => ({
+        ...item,
+        unit_price: item.unit_price !== undefined ? parseFloat(item.unit_price) : parseFloat(item.price), // Priority to unit_price, fallback to price
+        numericPrice: parseFloat(item.price), // Keep original for reference
+        name: item.name || item.product?.name || 'Item Desconocido',
+        product_id: item.product_id || item.product?.id,
+        // Calculate subtotal based on SNAPSHOTTED price
+        subtotal: (item.unit_price !== undefined ? parseFloat(item.unit_price) : parseFloat(item.price)) * item.quantity
+    })) || []
+
+    // 2. Prepare Payload
+    const payload = {
+        ...orderData,
+        items: snapshotItems,
+        // Ensure table_number is integer if present
+        table_number: orderData.table_number ? parseInt(orderData.table_number, 10) : null,
+        // Recalculate total from validated items to be safe
+        total: snapshotItems.reduce((sum, item) => sum + item.subtotal, 0)
+    }
+
+    console.log('📦 Processed Payload:', payload)
+
+    try {
+        const { data, error } = await supabase
+            .from('orders')
+            .insert([payload])
+            .select()
+            .single()
+
+        if (error) {
+            console.error('❌ Supabase Insert Error:', error)
+            throw error
+        }
+
+        console.log('✅ Order Created Successfully:', data)
+        return data
+    } catch (err) {
+        console.error('🔥 CRITICAL: Failed to create order:', err.message)
+        throw err
+    }
 }
 
 export async function updateOrderStatus(orderId, status, userId) {
@@ -74,11 +139,27 @@ export async function deleteOrder(orderId, userId) {
     if (error) throw error
 }
 
-export async function getOrderStats(userId) {
-    const { data, error } = await supabase
+export async function getOrderStats(userId, { cashCutId = null, filterByShift = true, startDate = null, endDate = null } = {}) {
+    let query = supabase
         .from('orders')
-        .select('status, total, order_type, payment_method')
+        .select('status, total, order_type, payment_method, created_at')
         .eq('user_id', userId)
+
+    if (cashCutId) {
+        query = query.eq('cash_cut_id', cashCutId)
+    } else if (filterByShift) {
+        query = query.is('cash_cut_id', null)
+    } else {
+        // Analytics Mode: Filter by date range
+        if (startDate) {
+            query = query.gte('created_at', startDate)
+        }
+        if (endDate) {
+            query = query.lte('created_at', endDate)
+        }
+    }
+
+    const { data, error } = await query
 
     if (error) throw error
 
@@ -115,12 +196,28 @@ export async function getOrderStats(userId) {
     return stats
 }
 
-export async function getSalesAnalytics(userId) {
-    const { data: orders, error } = await supabase
+export async function getSalesAnalytics(userId, { cashCutId = null, filterByShift = true, startDate = null, endDate = null } = {}) {
+    let query = supabase
         .from('orders')
-        .select('items, total, created_at')
+        .select('items, total, created_at, customer_phone, status')
         .eq('user_id', userId)
-        .neq('status', 'cancelled') // Exclude cancelled orders
+        .neq('status', 'cancelled')
+
+    if (cashCutId) {
+        query = query.eq('cash_cut_id', cashCutId)
+    } else if (filterByShift) {
+        query = query.is('cash_cut_id', null)
+    } else {
+        // Analytics Mode: Filter by date range
+        if (startDate) {
+            query = query.gte('created_at', startDate)
+        }
+        if (endDate) {
+            query = query.lte('created_at', endDate)
+        }
+    }
+
+    const { data: orders, error } = await query
 
     if (error) throw error
 
@@ -132,18 +229,22 @@ export async function getSalesAnalytics(userId) {
         // Ensure items is an array (handle potential legacy data or parse errors)
         const items = Array.isArray(order.items) ? order.items : []
         items.forEach(item => {
-            const revenue = item.price * item.quantity
+            // Use subtotal if available (best snapshot), otherwise calc from unit_price or price
+            const itemRevenue = item.subtotal !== undefined
+                ? parseFloat(item.subtotal)
+                : (item.unit_price !== undefined ? parseFloat(item.unit_price) : parseFloat(item.price)) * item.quantity
+
             if (!productSales[item.name]) {
                 productSales[item.name] = {
-                    id: item.id || item.name, // Fallback to name if id missing
+                    id: item.product_id || item.id || item.name, // Fallback to name if id missing
                     name: item.name,
                     revenue: 0,
                     quantity: 0
                 }
             }
-            productSales[item.name].revenue += revenue
+            productSales[item.name].revenue += itemRevenue
             productSales[item.name].quantity += item.quantity
-            totalRevenue += revenue
+            totalRevenue += itemRevenue
         })
     })
 
@@ -231,4 +332,76 @@ export async function getSalesAnalytics(userId) {
             recurringCustomersPercentage
         }
     }
+}
+
+/**
+ * Fetch orders pending closing (Delivered status, but no cash cut)
+ */
+export async function getUnclosedOrders(userId) {
+    // Determine the start of the current day (or further back if needed)
+    // To be safe and catch orphans, we'll look at the last 1000 delivered orders
+    // and filter in JS. This aligns logic exactly with the UI badges.
+    const { data, error } = await supabase
+        .from('orders')
+        .select('*')
+        .eq('user_id', userId)
+        .eq('status', 'delivered')
+        .order('created_at', { ascending: false })
+        .limit(1000)
+
+    if (error) throw error
+
+    // Filter client-side to match the UI's "falsy" check
+    // This catches null, undefined, and empty strings
+    return (data || []).filter(o => !o.cash_cut_id)
+}
+
+/**
+ * Create a new cash cut and link orders to it
+ */
+export async function createCashCut(userId, summary, orderIds) {
+    if (!orderIds || orderIds.length === 0) throw new Error('No hay órdenes para cerrar')
+
+    // 1. Create the cash cut record
+    const { data: cut, error: cutError } = await supabase
+        .from('cash_cuts')
+        .insert([{
+            restaurant_id: userId,
+            user_id: userId,
+            total_cash: summary.byPayment.cash,
+            total_card: summary.byPayment.card,
+            total_transfer: summary.byPayment.transfer,
+            total_amount: summary.totalSales,
+            order_count: summary.totalOrders,
+            cut_date: new Date().toISOString()
+        }])
+        .select()
+        .single()
+
+    if (cutError) throw cutError
+
+    // 2. Link orders to this cut
+    const { error: updateError } = await supabase
+        .from('orders')
+        .update({ cash_cut_id: cut.id })
+        .in('id', orderIds)
+        .eq('user_id', userId)
+
+    if (updateError) throw updateError
+
+    return cut
+}
+
+/**
+ * Fetch historical cash cuts
+ */
+export async function getCashCuts(userId) {
+    const { data, error } = await supabase
+        .from('cash_cuts')
+        .select('*')
+        .eq('restaurant_id', userId)
+        .order('cut_date', { ascending: false })
+
+    if (error) throw error
+    return data || []
 }

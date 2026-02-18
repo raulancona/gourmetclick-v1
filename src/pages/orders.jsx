@@ -9,9 +9,11 @@ import { Label } from '../components/ui/label'
 import { Textarea } from '../components/ui/textarea'
 import { Card, CardContent } from '../components/ui/card'
 import { useAuth } from '../features/auth/auth-context'
-import { getOrders, updateOrderStatus, updateOrder, deleteOrder, getOrderStats, ORDER_STATUSES } from '../lib/order-service'
+import { getOrders, updateOrderStatus, updateOrder, deleteOrder, getOrderStats, ORDER_STATUSES, PAYMENT_METHODS, getNextStatuses } from '../lib/order-service'
 import { toast } from 'sonner'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select'
+import { OrderDetailModal } from '../features/orders/order-detail-modal'
+
 
 const STATUS_FILTERS = [
     { value: 'all', label: 'Todos', icon: Package },
@@ -20,11 +22,8 @@ const STATUS_FILTERS = [
     { value: 'cancelled', label: 'Cancelados', icon: XCircle },
 ]
 
-const PAYMENT_LABELS = {
-    cash: { label: 'Efectivo', icon: '💵' },
-    transfer: { label: 'Transferencia', icon: '🏦' },
-    card: { label: 'Tarjeta', icon: '💳' },
-}
+const PAYMENT_LABELS = PAYMENT_METHODS
+
 
 export function OrdersPage() {
     const { user } = useAuth()
@@ -34,13 +33,13 @@ export function OrdersPage() {
     const [selectedOrder, setSelectedOrder] = useState(null)
     const { data: orders = [], isLoading } = useQuery({
         queryKey: ['orders'],
-        queryFn: () => getOrders(user.id),
+        queryFn: () => getOrders(user.id, { includeClosed: true }),
         enabled: !!user,
     })
 
     const { data: stats } = useQuery({
         queryKey: ['order-stats'],
-        queryFn: () => getOrderStats(user.id),
+        queryFn: () => getOrderStats(user.id, { filterByShift: false }),
         enabled: !!user,
     })
 
@@ -245,6 +244,15 @@ export function OrdersPage() {
                                             </span>
                                             {order.table_number && <span className="font-bold text-orange-600">#{order.table_number}</span>}
                                             <span>{payment.icon} {payment.label}</span>
+                                            {order.cash_cut_id ? (
+                                                <span className="text-[10px] bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded border border-gray-200">
+                                                    🔒 Corte
+                                                </span>
+                                            ) : order.status === 'delivered' ? (
+                                                <span className="text-[10px] bg-green-100 text-green-700 px-1.5 py-0.5 rounded border border-green-200 font-bold animate-pulse">
+                                                    💰 Por Cortar
+                                                </span>
+                                            ) : null}
                                             <span className="font-mono">#{order.id.slice(0, 6)}</span>
                                         </div>
                                         {items.length > 0 && (
@@ -311,293 +319,3 @@ export function OrdersPage() {
     )
 }
 
-function getNextStatuses(current) {
-    const flow = {
-        pending: ['confirmed'],
-        confirmed: ['preparing'],
-        preparing: ['ready'],
-        ready: ['on_the_way', 'delivered'],
-        on_the_way: ['delivered'],
-    }
-    return flow[current] || []
-}
-
-function OrderDetailModal({ order, onClose, onUpdateStatus, onUpdateOrder, onDelete }) {
-    const navigate = useNavigate()
-    const [isEditing, setIsEditing] = useState(false)
-    const [formData, setFormData] = useState({
-        customer_name: order.customer_name || '',
-        customer_phone: order.customer_phone || '',
-        order_type: order.order_type || 'dine_in',
-        table_number: order.table_number || '',
-        delivery_address: order.delivery_address || '',
-        notes: order.notes || ''
-    })
-
-    const statusInfo = ORDER_STATUSES[order.status] || ORDER_STATUSES.pending
-    const items = Array.isArray(order.items) ? order.items : []
-    const payment = PAYMENT_LABELS[order.payment_method] || PAYMENT_LABELS.cash
-    const statusFlow = ['pending', 'confirmed', 'preparing', 'ready', 'on_the_way', 'delivered']
-    const currentIdx = statusFlow.indexOf(order.status)
-
-    const handleSave = () => {
-        onUpdateOrder(formData)
-        setIsEditing(false)
-    }
-
-    const handleEditInPOS = () => {
-        // Save order to localStorage to be picked up by POS
-        localStorage.setItem('edit_order', JSON.stringify(order))
-        navigate('/pos')
-    }
-
-    return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={onClose}>
-            <div className="absolute inset-0 bg-black/50 backdrop-blur-sm"></div>
-            <div className="relative bg-card w-full max-w-lg rounded-2xl shadow-2xl max-h-[90vh] overflow-y-auto flex flex-col" onClick={e => e.stopPropagation()}>
-                {/* Header */}
-                <div className="sticky top-0 bg-card border-b border-border px-5 py-4 flex items-center justify-between rounded-t-2xl z-10">
-                    <div>
-                        <h2 className="font-bold text-lg">Orden #{order.id.slice(0, 8)}</h2>
-                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                            <span>{new Date(order.created_at).toLocaleString('es-MX', { dateStyle: 'medium', timeStyle: 'short' })}</span>
-                            {/* Edit in POS Link - Only for active orders */}
-                            {!['delivered', 'cancelled'].includes(order.status) && (
-                                <button
-                                    onClick={handleEditInPOS}
-                                    className="text-primary hover:underline flex items-center gap-1 ml-2 font-medium"
-                                >
-                                    <Edit2 className="w-3 h-3" />
-                                    Editar productos
-                                </button>
-                            )}
-                        </div>
-                    </div>
-                    <div className="flex gap-2">
-                        {!isEditing && order.status !== 'cancelled' && order.status !== 'delivered' && (
-                            <Button variant="ghost" size="icon" onClick={() => setIsEditing(true)} title="Editar detalles">
-                                <Edit2 className="w-4 h-4" />
-                            </Button>
-                        )}
-                        <button onClick={onClose} className="w-9 h-9 rounded-xl bg-muted flex items-center justify-center hover:bg-accent transition-colors">
-                            <X className="w-5 h-5 text-muted-foreground" />
-                        </button>
-                    </div>
-                </div>
-
-                <div className="p-5 space-y-5 flex-1 overflow-y-auto">
-                    {isEditing ? (
-                        <div className="space-y-4">
-                            <div className="space-y-2">
-                                <Label>Nombre del Cliente</Label>
-                                <Input value={formData.customer_name} onChange={e => setFormData({ ...formData, customer_name: e.target.value })} />
-                            </div>
-                            <div className="space-y-2">
-                                <Label>Teléfono</Label>
-                                <Input value={formData.customer_phone} onChange={e => setFormData({ ...formData, customer_phone: e.target.value })} />
-                            </div>
-                            <div className="space-y-2">
-                                <Label>Tipo de Orden</Label>
-                                <Select value={formData.order_type} onValueChange={v => setFormData({ ...formData, order_type: v })}>
-                                    <SelectTrigger>
-                                        <SelectValue />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="dine_in">Comer aquí (Mesa)</SelectItem>
-                                        <SelectItem value="pickup">Pasar a recoger</SelectItem>
-                                        <SelectItem value="delivery">Envío a domicilio</SelectItem>
-                                    </SelectContent>
-                                </Select>
-                            </div>
-                            {formData.order_type === 'dine_in' && (
-                                <div className="space-y-2">
-                                    <Label>Número de Mesa</Label>
-                                    <Input value={formData.table_number} onChange={e => setFormData({ ...formData, table_number: e.target.value })} />
-                                </div>
-                            )}
-                            {formData.order_type === 'delivery' && (
-                                <div className="space-y-2">
-                                    <Label>Dirección</Label>
-                                    <Input value={formData.delivery_address} onChange={e => setFormData({ ...formData, delivery_address: e.target.value })} />
-                                </div>
-                            )}
-                            <div className="space-y-2">
-                                <Label>Notas</Label>
-                                <Textarea value={formData.notes} onChange={e => setFormData({ ...formData, notes: e.target.value })} />
-                            </div>
-                            <div className="flex gap-2 pt-2">
-                                <Button className="flex-1" onClick={handleSave}>
-                                    <Save className="w-4 h-4 mr-2" /> Guardar Cambios
-                                </Button>
-                                <Button variant="outline" onClick={() => setIsEditing(false)}>
-                                    Cancelar
-                                </Button>
-                            </div>
-                        </div>
-                    ) : (
-                        <>
-                            {/* Status Timeline */}
-                            <div>
-                                <h3 className="text-sm font-semibold text-foreground mb-3">Estado del pedido</h3>
-                                <div className="flex items-center gap-1">
-                                    {statusFlow.map((s, i) => {
-                                        const info = ORDER_STATUSES[s]
-                                        const isActive = i <= currentIdx && order.status !== 'cancelled'
-                                        const isCurrent = s === order.status
-                                        return (
-                                            <div key={s} className="flex-1 flex flex-col items-center gap-1">
-                                                <div
-                                                    className={`w-full h-2 rounded-full transition-all ${i === 0 ? 'rounded-l-full' : ''} ${i === statusFlow.length - 1 ? 'rounded-r-full' : ''}`}
-                                                    style={{ background: isActive ? info.color : '#e5e7eb' }}
-                                                />
-                                                {isCurrent && (
-                                                    <span className="text-[10px] font-bold" style={{ color: info.color }}>
-                                                        {info.emoji} {info.label}
-                                                    </span>
-                                                )}
-                                            </div>
-                                        )
-                                    })}
-                                </div>
-                                {order.status === 'cancelled' && (
-                                    <p className="text-center text-sm font-bold text-red-500 mt-2">❌ Cancelado</p>
-                                )}
-                            </div>
-
-                            {/* Customer Info */}
-                            <div className="bg-muted rounded-xl p-4 space-y-2">
-                                <div className="flex items-center gap-2 text-sm">
-                                    <User className="w-4 h-4 text-muted-foreground" />
-                                    <span className="font-medium">{order.customer_name}</span>
-                                </div>
-                                {order.customer_phone && (
-                                    <div className="flex items-center gap-2 text-sm">
-                                        <Phone className="w-4 h-4 text-muted-foreground" />
-                                        <span>{order.customer_phone}</span>
-                                    </div>
-                                )}
-                                <div className="flex items-center gap-2 text-sm">
-                                    {order.order_type === 'delivery' ? (
-                                        <><Truck className="w-4 h-4 text-muted-foreground" /> <span>🛵 Envío a domicilio</span></>
-                                    ) : order.order_type === 'dine_in' ? (
-                                        <><Armchair className="w-4 h-4 text-muted-foreground" /> <span className="font-bold">🪑 Comer en el lugar (Mesa {order.table_number})</span></>
-                                    ) : (
-                                        <><Store className="w-4 h-4 text-muted-foreground" /> <span>🏪 Paso a recoger</span></>
-                                    )}
-                                </div>
-                                {order.delivery_address && (
-                                    <div className="flex items-center gap-2 text-sm">
-                                        <MapPin className="w-4 h-4 text-muted-foreground" />
-                                        <span>{order.delivery_address}</span>
-                                    </div>
-                                )}
-                                {order.location_url && (
-                                    <a href={order.location_url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-sm text-blue-600 hover:underline">
-                                        <ExternalLink className="w-4 h-4" />
-                                        Ver ubicación en Google Maps
-                                    </a>
-                                )}
-                                <div className="flex items-center gap-2 text-sm">
-                                    <CreditCard className="w-4 h-4 text-muted-foreground" />
-                                    <span>{payment.icon} {payment.label}</span>
-                                </div>
-                                <div className="pt-2 mt-2 border-t border-gray-200">
-                                    <p className="text-xs text-muted-foreground mb-1">Link de rastreo</p>
-                                    <div className="flex items-center gap-2 bg-white p-2 rounded-lg border border-gray-200">
-                                        <input
-                                            readOnly
-                                            value={`${window.location.origin}/rastreo/${order.tracking_id}`}
-                                            className="flex-1 text-xs bg-transparent border-none focus:ring-0 p-0 text-gray-600 font-mono"
-                                        />
-                                        <button
-                                            onClick={() => {
-                                                navigator.clipboard.writeText(`${window.location.origin}/rastreo/${order.tracking_id}`)
-                                                toast.success('Link copiado')
-                                            }}
-                                            className="text-primary hover:text-primary/80"
-                                            title="Copiar link"
-                                        >
-                                            <ExternalLink className="w-4 h-4" />
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Items */}
-                            <div>
-                                <h3 className="text-sm font-semibold text-foreground mb-2">Productos</h3>
-                                <div className="bg-muted rounded-xl divide-y divide-border overflow-hidden">
-                                    {items.map((item, i) => (
-                                        <div key={i} className="p-3 flex justify-between items-start">
-                                            <div>
-                                                <span className="font-medium text-sm">{item.quantity}x {item.product?.name || item.name}</span>
-                                                {item.modifiers?.length > 0 && (
-                                                    <div className="flex flex-wrap gap-1 mt-1">
-                                                        {item.modifiers.map((m, j) => (
-                                                            <span key={j} className="text-[11px] px-1.5 py-0.5 bg-background rounded text-muted-foreground">
-                                                                {m.name}
-                                                            </span>
-                                                        ))}
-                                                    </div>
-                                                )}
-                                            </div>
-                                            <span className="font-bold text-sm">${parseFloat(item.subtotal || 0).toFixed(2)}</span>
-                                        </div>
-                                    ))}
-                                    <div className="p-3 flex justify-between bg-background">
-                                        <span className="font-bold">Total</span>
-                                        <span className="font-bold text-lg">${parseFloat(order.total).toFixed(2)}</span>
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Notes */}
-                            {order.notes && (
-                                <div className="bg-amber-50 border border-amber-200 rounded-xl p-3">
-                                    <p className="text-sm text-amber-900"><strong>📝 Notas:</strong> {order.notes}</p>
-                                </div>
-                            )}
-
-                            {/* Status Actions */}
-                            {order.status !== 'delivered' && order.status !== 'cancelled' && (
-                                <div>
-                                    <h3 className="text-sm font-semibold text-foreground mb-2">Cambiar estado</h3>
-                                    <div className="grid grid-cols-2 gap-2">
-                                        {Object.entries(ORDER_STATUSES).map(([key, info]) => {
-                                            if (key === order.status) return null
-                                            return (
-                                                <button
-                                                    key={key}
-                                                    onClick={() => onUpdateStatus(key)}
-                                                    className={`p-3 rounded-xl border-2 text-left text-sm font-medium transition-all hover:shadow-sm ${key === 'cancelled'
-                                                        ? 'border-red-200 hover:border-red-400 text-red-700 bg-red-50'
-                                                        : 'border-gray-200 hover:border-gray-300'
-                                                        }`}
-                                                >
-                                                    {info.emoji} {info.label}
-                                                </button>
-                                            )
-                                        })}
-                                    </div>
-                                </div>
-                            )}
-                        </>
-                    )}
-
-                    {/* Delete */}
-                    {!isEditing && (
-                        <div className="pt-2 border-t border-border">
-                            <button
-                                onClick={onDelete}
-                                className="w-full py-3 rounded-xl text-sm font-medium text-red-600 bg-red-50 hover:bg-red-100 transition-colors flex items-center justify-center gap-2"
-                            >
-                                <Trash2 className="w-4 h-4" />
-                                Eliminar orden
-                            </button>
-                        </div>
-                    )}
-                </div>
-            </div>
-        </div >
-    )
-}

@@ -1,16 +1,18 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Plus, Upload, Search, Trash2 } from 'lucide-react'
+import { Plus, Upload, Search, Trash2, Images } from 'lucide-react'
 import { useAuth } from '../features/auth/auth-context'
 import { getProducts, createProduct, updateProduct, deleteProduct } from '../lib/product-service'
 import { deleteProductImage } from '../lib/image-service'
 import { ProductCard } from '../features/products/product-card'
 import { ProductForm } from '../features/products/product-form'
 import { CSVUpload } from '../features/products/csv-upload'
+import { BulkImageUpload } from '../features/dashboard/BulkImageUpload'
 import { Modal } from '../components/ui/modal'
 import { Button } from '../components/ui/button'
 import { Input } from '../components/ui/input'
 import { toast } from 'sonner'
+
 
 export function ProductsPage() {
     const { user } = useAuth()
@@ -21,8 +23,10 @@ export function ProductsPage() {
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
     const [isEditModalOpen, setIsEditModalOpen] = useState(false)
     const [isCSVModalOpen, setIsCSVModalOpen] = useState(false)
+    const [isBulkImageModalOpen, setIsBulkImageModalOpen] = useState(false)
     const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
     const [selectedProduct, setSelectedProduct] = useState(null)
+
 
     // Fetch products
     const { data: products = [], isLoading } = useQuery({
@@ -135,6 +139,14 @@ export function ProductsPage() {
                     <div className="flex gap-3">
                         <Button
                             variant="outline"
+                            onClick={() => setIsBulkImageModalOpen(true)}
+                            className="hidden md:flex"
+                        >
+                            <Images className="w-4 h-4 mr-2" />
+                            Carga Masiva de Fotos
+                        </Button>
+                        <Button
+                            variant="outline"
                             onClick={() => setIsCSVModalOpen(true)}
                         >
                             <Upload className="w-4 h-4 mr-2" />
@@ -145,6 +157,7 @@ export function ProductsPage() {
                             Nuevo Producto
                         </Button>
                     </div>
+
                 </div>
 
                 {/* Search */}
@@ -254,6 +267,24 @@ export function ProductsPage() {
                     onCancel={() => setIsCSVModalOpen(false)}
                 />
             </Modal>
+
+            {/* Bulk Image Upload Modal */}
+            <Modal
+                isOpen={isBulkImageModalOpen}
+                onClose={() => setIsBulkImageModalOpen(false)}
+                title="Carga Masiva de Fotos"
+                size="lg"
+            >
+                <div className="p-4">
+                    <BulkImageUpload />
+                    <div className="mt-6 flex justify-end">
+                        <Button variant="outline" onClick={() => setIsBulkImageModalOpen(false)}>
+                            Cerrar
+                        </Button>
+                    </div>
+                </div>
+            </Modal>
+
 
             {/* Delete Confirmation Dialog */}
             <Modal

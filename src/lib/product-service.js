@@ -15,6 +15,7 @@ export async function getProducts(userId) {
         .from('products')
         .select('*')
         .eq('user_id', userId)
+        .eq('is_active', true) // Only fetch active products
         .order('created_at', { ascending: false })
 
     if (error) throw error
@@ -97,7 +98,7 @@ export async function deleteProduct(id, userId) {
 
     const { error } = await supabase
         .from('products')
-        .delete()
+        .update({ is_active: false }) // Soft delete
         .eq('id', id)
         .eq('user_id', userId)
 

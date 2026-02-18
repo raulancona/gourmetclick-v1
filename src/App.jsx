@@ -10,6 +10,10 @@ import { ProductsPage } from './pages/products'
 import { CategoriesPage } from './pages/categories'
 import { OrdersPage } from './pages/orders'
 import POSPage from './pages/pos'
+import { LinkCardConfigPage } from './pages/link-card-config'
+import { PublicLinkCardPage } from './pages/public-link-card'
+import { CashClosingPage } from './pages/cash-closing'
+import { ReportsPage } from './pages/reports'
 import { PublicMenuPage } from './pages/public-menu'
 import { TrackingPage } from './pages/tracking'
 import { Toaster } from 'sonner'
@@ -21,6 +25,7 @@ function App() {
         <Routes>
           {/* Public menu route - NO AUTH REQUIRED */}
           <Route path="/m/:slug" element={<PublicMenuPage />} />
+          <Route path="/l/:slug" element={<PublicLinkCardPage />} />
           <Route path="/rastreo/:tracking_id" element={<TrackingPage />} />
 
           {/* Public routes */}
@@ -43,6 +48,9 @@ function App() {
             <Route path="settings" element={<SettingsPage />} />
             <Route path="orders" element={<OrdersPage />} />
             <Route path="pos" element={<POSPage />} />
+            <Route path="menu-links" element={<LinkCardConfigPage />} />
+            <Route path="caja" element={<CashClosingPage />} />
+            <Route path="reportes" element={<ReportsPage />} />
           </Route>
 
           {/* Catch all */}

@@ -1,15 +1,17 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom'
-import { LayoutDashboard, UtensilsCrossed, FolderTree, ClipboardList, Settings, LogOut, Calculator, ChefHat, Home, Grid, Package, Sun, Moon } from 'lucide-react'
+import { LayoutDashboard, UtensilsCrossed, FolderTree, ClipboardList, Settings, LogOut, Calculator, ChefHat, Home, Grid, Package, Sun, Moon, Globe, BarChart3 } from 'lucide-react'
 import { useAuth } from '../auth/auth-context'
 import { useTheme } from '../../components/theme-provider'
 import { toast } from 'sonner'
-
 const navigation = [
     { name: 'Inicio', href: '/dashboard', icon: Home },
     { name: 'POS', href: '/pos', icon: Grid },
     { name: 'Órdenes', href: '/orders', icon: ClipboardList },
     { name: 'Menú', href: '/products', icon: Package },
     { name: 'Categorías', href: '/categories', icon: FolderTree },
+    { name: 'Caja', href: '/caja', icon: Calculator },
+    { name: 'Reportes', href: '/reportes', icon: BarChart3 },
+    { name: 'LinkCard', href: '/menu-links', icon: Globe },
     { name: 'Ajustes', href: '/settings', icon: Settings },
 ]
 

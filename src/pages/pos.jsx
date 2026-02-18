@@ -147,18 +147,27 @@ export default function POSPage() {
                 setFetchingModifiers(true)
                 const { data: groups, error: groupError } = await supabase
                     .from('modifier_groups')
-                    .select('id, name')
+                    .select('id, name, min_selection')
                     .eq('product_id', product.id)
 
                 if (groupError) throw groupError
+
                 if (groups && groups.length > 0) {
+                    // ✅ FIX: Fetch modifiers from ALL groups, not just groups[0]
+                    const groupIds = groups.map(g => g.id)
                     const { data: options, error: optError } = await supabase
                         .from('modifier_options')
-                        .select('id, name, extra_price')
-                        .eq('group_id', groups[0].id)
+                        .select('id, name, extra_price, group_id')
+                        .in('group_id', groupIds)
 
                     if (optError) throw optError
-                    setAvailableModifiers(options || [])
+
+                    // Attach group info to each option for display
+                    const optionsWithGroup = (options || []).map(opt => ({
+                        ...opt,
+                        groupName: groups.find(g => g.id === opt.group_id)?.name || 'Extras'
+                    }))
+                    setAvailableModifiers(optionsWithGroup)
                 } else {
                     setAvailableModifiers([])
                 }
@@ -178,7 +187,7 @@ export default function POSPage() {
             // For products with extras, we might want to treat them as unique entries even if it's the same product
             // but with different customizations.
             if (product.has_extras) {
-                return [...prev, { ...product, quantity: 1, modifiers, id: `${product.id}-${Date.now()}` }]
+                return [...prev, { ...product, product_id: product.id, quantity: 1, modifiers, id: `${product.id}-${Date.now()}` }]
             }
 
             const existing = prev.find(item => item.id === product.id)
@@ -187,7 +196,7 @@ export default function POSPage() {
                     item.id === product.id ? { ...item, quantity: item.quantity + 1 } : item
                 )
             }
-            return [...prev, { ...product, quantity: 1, modifiers: [] }]
+            return [...prev, { ...product, product_id: product.id, quantity: 1, modifiers: [] }]
         })
     }
 
@@ -255,15 +264,18 @@ export default function POSPage() {
                 customer_name: customerName || 'Cliente General',
                 order_type: orderType,
                 payment_method: paymentMethod,
-                status: editingOrder ? editingOrder.status : 'confirmed',
+                status: editingOrder ? editingOrder.status : 'pending', // Default to pending for kitchen flow
                 total: cartTotal,
                 items: cart.map(item => ({
-                    id: item.id,
+                    id: item.id, // Cart Item ID
+                    product_id: item.product_id || item.id, // Original Product ID (fallback for legacy items)
                     name: item.name,
                     price: item.price,
+                    unit_price: item.price, // Snapshot price
                     image_url: item.image_url,
                     quantity: item.quantity,
-                    modifiers: item.modifiers
+                    modifiers: item.modifiers,
+                    subtotal: item.price * item.quantity
                 })),
                 delivery_address: orderType === 'delivery' ? deliveryAddress : null,
                 table_number: orderType === 'dine_in' ? tableNumber : null,
@@ -517,7 +529,16 @@ export default function POSPage() {
                             </div>
                             <div className="flex-1 min-w-0 flex flex-col justify-center">
                                 <h4 className="font-semibold text-sm text-foreground truncate">{item.name}</h4>
-                                <p className="text-xs text-muted-foreground">{formatCurrency(item.price)}</p>
+                                {item.modifiers && item.modifiers.length > 0 && (
+                                    <div className="flex flex-wrap gap-1 mt-1">
+                                        {item.modifiers.map((mod, i) => (
+                                            <span key={i} className="text-[9px] font-bold px-1.5 py-0.5 rounded-md bg-primary/10 text-primary">
+                                                {mod.name}
+                                            </span>
+                                        ))}
+                                    </div>
+                                )}
+                                <p className="text-xs text-muted-foreground mt-0.5">{formatCurrency(item.price)}</p>
                             </div>
                             <div className="flex flex-col items-end justify-center gap-1">
                                 <span className="font-bold text-sm text-foreground">{formatCurrency(item.price * item.quantity)}</span>
@@ -611,7 +632,7 @@ export default function POSPage() {
                 onClose={() => setIsOptionsModalOpen(false)}
                 title={`Opciones: ${selectedProduct?.name}`}
             >
-                <div className="space-y-6">
+                <div className="space-y-5">
                     {fetchingModifiers ? (
                         <div className="py-8 flex flex-col items-center justify-center gap-3">
                             <Loader2 className="w-8 h-8 animate-spin text-primary" />
@@ -619,47 +640,72 @@ export default function POSPage() {
                         </div>
                     ) : (
                         <>
-                            {availableModifiers.length > 0 && (
-                                <div className="space-y-3">
-                                    <h4 className="text-sm font-semibold text-foreground uppercase tracking-wider">Extras disponibles</h4>
-                                    <div className="grid grid-cols-1 gap-2">
-                                        {availableModifiers.map(mod => (
-                                            <label
-                                                key={mod.id}
-                                                className={`flex items-center justify-between p-3 rounded-xl border-2 cursor-pointer transition-all ${selectedModifiers.find(m => m.id === mod.id)
-                                                    ? 'border-primary bg-primary/5'
-                                                    : 'border-border hover:border-primary/50'
-                                                    }`}
-                                            >
-                                                <div className="flex items-center gap-3">
-                                                    <input
-                                                        type="checkbox"
-                                                        className="w-5 h-5 rounded border-input text-primary focus:ring-primary"
-                                                        checked={!!selectedModifiers.find(m => m.id === mod.id)}
-                                                        onChange={() => toggleModifier(mod)}
-                                                    />
-                                                    <span className="font-medium text-foreground">{mod.name}</span>
-                                                </div>
-                                                <span className="text-sm font-bold text-primary">+{formatCurrency(mod.extra_price)}</span>
-                                            </label>
-                                        ))}
+                            {availableModifiers.length > 0 ? (() => {
+                                // Group modifiers by their groupName
+                                const groups = availableModifiers.reduce((acc, mod) => {
+                                    const key = mod.groupName || 'Extras'
+                                    if (!acc[key]) acc[key] = []
+                                    acc[key].push(mod)
+                                    return acc
+                                }, {})
+
+                                return Object.entries(groups).map(([groupName, mods]) => (
+                                    <div key={groupName} className="space-y-2">
+                                        <div className="flex items-center gap-2">
+                                            <div className="h-px flex-1 bg-border" />
+                                            <span className="text-[11px] font-black text-muted-foreground uppercase tracking-widest px-2">{groupName}</span>
+                                            <div className="h-px flex-1 bg-border" />
+                                        </div>
+                                        <div className="grid grid-cols-1 gap-2">
+                                            {mods.map(mod => {
+                                                const isSelected = !!selectedModifiers.find(m => m.id === mod.id)
+                                                return (
+                                                    <button
+                                                        key={mod.id}
+                                                        onClick={() => toggleModifier(mod)}
+                                                        className={`flex items-center justify-between p-3.5 rounded-xl border-2 cursor-pointer transition-all text-left ${isSelected
+                                                            ? 'border-primary bg-primary/5 shadow-sm'
+                                                            : 'border-border hover:border-primary/40 bg-card'
+                                                            }`}
+                                                    >
+                                                        <div className="flex items-center gap-3">
+                                                            <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 transition-all ${isSelected ? 'border-primary bg-primary' : 'border-muted-foreground/40'}`}>
+                                                                {isSelected && <Check className="w-3 h-3 text-primary-foreground" />}
+                                                            </div>
+                                                            <span className={`font-semibold text-sm ${isSelected ? 'text-foreground' : 'text-muted-foreground'}`}>{mod.name}</span>
+                                                        </div>
+                                                        {parseFloat(mod.extra_price) > 0 && (
+                                                            <span className={`text-sm font-black shrink-0 ml-2 ${isSelected ? 'text-primary' : 'text-muted-foreground'}`}>
+                                                                +{formatCurrency(mod.extra_price)}
+                                                            </span>
+                                                        )}
+                                                    </button>
+                                                )
+                                            })}
+                                        </div>
                                     </div>
-                                </div>
+                                ))
+                            })() : (
+                                <p className="text-sm text-muted-foreground text-center py-2">No hay extras configurados para este producto.</p>
                             )}
 
-                            <div className="space-y-3">
-                                <h4 className="text-sm font-semibold text-foreground uppercase tracking-wider">Instrucciones especiales</h4>
+                            <div className="space-y-2">
+                                <div className="flex items-center gap-2">
+                                    <div className="h-px flex-1 bg-border" />
+                                    <span className="text-[11px] font-black text-muted-foreground uppercase tracking-widest px-2">Instrucciones especiales</span>
+                                    <div className="h-px flex-1 bg-border" />
+                                </div>
                                 <Textarea
                                     placeholder="Ej: Sin cebolla, poco picante, etc..."
                                     value={customizations}
                                     onChange={(e) => setCustomizations(e.target.value)}
-                                    className="min-h-[100px] rounded-xl border-input bg-background"
+                                    className="min-h-[80px] rounded-xl border-input bg-background"
                                 />
                             </div>
                         </>
                     )}
                 </div>
-                <ModalFooter className="mt-8">
+                <ModalFooter className="mt-6">
                     <Button variant="ghost" onClick={() => setIsOptionsModalOpen(false)} className="rounded-xl">
                         Cancelar
                     </Button>

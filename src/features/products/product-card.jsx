@@ -27,46 +27,51 @@ export function ProductCard({ product, onEdit, onDelete }) {
                     </div>
                 )}
 
-                {/* Action buttons - visible on hover */}
-                <div className="absolute top-2 right-2 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                {/* Action buttons - visible on hover or always on mobile touch? */}
+                <div className="absolute top-2 right-2 flex gap-2 opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity duration-200">
                     <Button
                         size="sm"
-                        variant="outline"
-                        onClick={() => onEdit(product)}
-                        className="bg-white/90 backdrop-blur-sm hover:bg-white"
+                        variant="secondary"
+                        onClick={(e) => { e.stopPropagation(); onEdit(product); }}
+                        className="h-8 w-8 p-0 bg-white/90 dark:bg-gray-800/90 backdrop-blur-md hover:bg-blue-600 hover:text-white border-border shadow-sm text-blue-600 transition-colors"
                     >
                         <Edit2 className="w-4 h-4" />
                     </Button>
                     <Button
                         size="sm"
-                        variant="outline"
-                        onClick={() => onDelete(product)}
-                        className="bg-white/90 backdrop-blur-sm hover:bg-red-50 hover:text-red-600 hover:border-red-300"
+                        variant="destructive"
+                        onClick={(e) => { e.stopPropagation(); onDelete(product); }}
+                        className="h-8 w-8 p-0 bg-red-50 dark:bg-red-950/40 backdrop-blur-md hover:bg-red-600 border-red-200 dark:border-red-900 shadow-sm text-red-600 hover:text-white transition-colors"
                     >
                         <Trash2 className="w-4 h-4" />
                     </Button>
                 </div>
+
             </div>
 
             {/* Content */}
-            <div className="p-4 space-y-2">
+            <div className="p-4 space-y-2 bg-card">
                 <div className="flex items-start justify-between gap-2">
-                    <h3 className="font-semibold text-gray-900 line-clamp-1">{product.name}</h3>
+                    <h3 className="font-bold text-foreground line-clamp-1">{product.name}</h3>
                     {product.sku && (
-                        <Badge variant="default" className="shrink-0">
+                        <Badge variant="outline" className="shrink-0 text-[10px] font-bold border-muted-foreground/30 text-muted-foreground">
                             {product.sku}
                         </Badge>
                     )}
                 </div>
 
                 {product.description && (
-                    <p className="text-sm text-gray-600 line-clamp-2">{product.description}</p>
+                    <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed">{product.description}</p>
                 )}
 
-                <div className="pt-2">
-                    <p className="text-2xl font-bold text-blue-600">{formatPrice(product.price)}</p>
+                <div className="pt-2 flex items-center justify-between">
+                    <p className="text-xl font-black text-primary">{formatPrice(product.price)}</p>
+                    {!product.is_available && (
+                        <span className="text-[10px] font-black text-red-500 uppercase tracking-tighter">No disponible</span>
+                    )}
                 </div>
             </div>
+
         </Card>
     )
 }

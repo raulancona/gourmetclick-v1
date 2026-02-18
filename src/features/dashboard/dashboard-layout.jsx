@@ -24,7 +24,7 @@ export function DashboardLayout() {
 
             <Sidebar isOpen={isSidebarOpen} onClose={() => setIsSidebarOpen(false)} />
 
-            <main className="flex-1 overflow-y-auto bg-background p-0 w-full">
+            <main className="flex-1 overflow-y-auto scrollbar-hide bg-background p-0 w-full">
                 <Outlet />
             </main>
         </div>

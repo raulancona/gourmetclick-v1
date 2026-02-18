@@ -213,8 +213,10 @@ export function ProductForm({ product, onSubmit, onCancel, isLoading }) {
                         id="name"
                         {...register('name', { required: 'El nombre es requerido' })}
                         placeholder="Ej: Hamburguesa Clásica"
+                        className="text-foreground bg-background"
                         error={errors.name?.message}
                     />
+
                 </div>
 
                 {/* Description */}
@@ -224,8 +226,10 @@ export function ProductForm({ product, onSubmit, onCancel, isLoading }) {
                         id="description"
                         {...register('description')}
                         placeholder="Descripción del producto..."
+                        className="text-foreground bg-background"
                         rows={2}
                     />
+
                 </div>
 
                 {/* Price and SKU */}
@@ -244,12 +248,14 @@ export function ProductForm({ product, onSubmit, onCancel, isLoading }) {
                                 min: { value: 0, message: 'El precio debe ser mayor a 0' }
                             })}
                             placeholder="0.00"
+                            className="text-foreground bg-white dark:bg-gray-800 border-border"
                         />
                     </div>
                     <div>
-                        <Label htmlFor="sku">SKU</Label>
-                        <Input id="sku" {...register('sku')} placeholder="Ej: PROD-001" />
+                        <Label htmlFor="sku" className="text-foreground">SKU</Label>
+                        <Input id="sku" {...register('sku')} placeholder="Ej: PROD-001" className="text-foreground bg-white dark:bg-gray-800 border-border" />
                     </div>
+
                 </div>
 
                 {/* Discount + Badges Row */}
@@ -263,6 +269,7 @@ export function ProductForm({ product, onSubmit, onCancel, isLoading }) {
                             max="100"
                             {...register('discount_percent')}
                             placeholder="0"
+                            className="bg-white dark:bg-gray-800 border-border"
                         />
                     </div>
                     <div>
@@ -271,72 +278,93 @@ export function ProductForm({ product, onSubmit, onCancel, isLoading }) {
                             id="badge_text"
                             {...register('badge_text')}
                             placeholder="🔥 Top"
+                            className="bg-white dark:bg-gray-800 border-border"
                         />
                     </div>
                     <div className="flex flex-col justify-end">
                         <label className="flex items-center gap-2 py-2.5 cursor-pointer">
-                            <input type="checkbox" {...register('is_vegan')} className="w-4 h-4 rounded border-gray-300 text-green-600 focus:ring-green-500" />
-                            <span className="text-sm font-medium text-green-700">🌱 Vegano</span>
+                            <input type="checkbox" {...register('is_vegan')} className="w-5 h-5 rounded border-gray-300 dark:border-gray-600 text-green-600 focus:ring-green-500 bg-background" />
+                            <span className="text-sm font-bold text-green-600 dark:text-green-400">🌱 Vegano</span>
                         </label>
                     </div>
                 </div>
 
                 {/* Available toggle */}
-                <label className="flex items-center gap-2 cursor-pointer">
-                    <input type="checkbox" {...register('is_available')} className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
-                    <span className="text-sm font-medium text-gray-700">Disponible en el menú</span>
+                <label className="flex items-center gap-2 cursor-pointer bg-muted/30 p-3 rounded-xl border border-border/50">
+                    <input type="checkbox" {...register('is_available')} className="w-5 h-5 rounded border-gray-300 dark:border-gray-600 text-primary focus:ring-primary bg-background" />
+                    <span className="text-sm font-bold text-foreground">Producto disponible para la venta</span>
                 </label>
 
+
                 {/* Modifiers Section */}
-                <div className="border border-gray-200 rounded-xl p-4 space-y-3">
+                <div className="border border-border rounded-2xl p-5 space-y-4 bg-muted/20">
                     <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
-                            <Puzzle className="w-4 h-4 text-purple-600" />
-                            <Label className="mb-0">Extras / Complementos</Label>
+                            <div className="w-8 h-8 rounded-lg bg-purple-500/10 flex items-center justify-center">
+                                <Puzzle className="w-5 h-5 text-purple-600 dark:text-purple-400" />
+                            </div>
+                            <div>
+                                <h3 className="text-sm font-bold text-foreground">Extras / Complementos</h3>
+                                <p className="text-[10px] text-muted-foreground uppercase font-semibold">Opciones adicionales del producto</p>
+                            </div>
                         </div>
-                        <Button type="button" variant="outline" size="sm" onClick={addModifier}>
-                            <Plus className="w-3.5 h-3.5 mr-1" /> Agregar
+                        <Button type="button" variant="outline" size="sm" onClick={addModifier} className="rounded-xl border-purple-500/20 text-purple-600 hover:bg-purple-50 dark:hover:bg-purple-900/20 transition-all">
+                            <Plus className="w-4 h-4 mr-1" /> Agregar
                         </Button>
                     </div>
 
                     {loadingModifiers && (
-                        <p className="text-xs text-gray-500 text-center py-2">Cargando extras...</p>
+                        <p className="text-xs text-muted-foreground text-center py-4 italic">Cargando extras...</p>
                     )}
 
                     {visibleModifiers.length === 0 && !loadingModifiers && (
-                        <p className="text-xs text-gray-400 text-center py-3">
-                            Sin extras. Agrega extras como "Queso extra", "Doble carne", etc.
-                        </p>
+                        <div className="text-center py-8 border-2 border-dashed border-border rounded-xl">
+                            <p className="text-sm text-muted-foreground font-medium">No hay extras configurados</p>
+                            <p className="text-[11px] text-muted-foreground/60 max-w-[200px] mx-auto mt-1">
+                                Agrega opciones como "Queso extra", "Doble carne", "Tipo de término", etc.
+                            </p>
+                        </div>
                     )}
 
-                    {visibleModifiers.map((mod, index) => {
-                        const realIndex = modifiers.indexOf(mod)
-                        return (
-                            <div key={realIndex} className="flex items-center gap-2">
-                                <Input
-                                    value={mod.name}
-                                    onChange={e => updateModifier(realIndex, 'name', e.target.value)}
-                                    placeholder="Nombre del extra"
-                                    className="flex-1 h-9 text-sm"
-                                />
-                                <div className="relative w-24">
-                                    <span className="absolute left-2 top-1/2 -translate-y-1/2 text-xs text-gray-400">+$</span>
-                                    <Input
-                                        type="number"
-                                        step="0.01"
-                                        min="0"
-                                        value={mod.extra_price}
-                                        onChange={e => updateModifier(realIndex, 'extra_price', e.target.value)}
-                                        className="pl-7 h-9 text-sm"
-                                    />
+                    <div className="space-y-2">
+                        {visibleModifiers.map((mod, index) => {
+                            const realIndex = modifiers.indexOf(mod)
+                            return (
+                                <div key={realIndex} className="flex items-center gap-3 p-3 rounded-xl bg-card border border-border/60 shadow-sm group hover:border-purple-500/30 transition-all">
+                                    <div className="flex-1">
+                                        <Input
+                                            value={mod.name}
+                                            onChange={e => updateModifier(realIndex, 'name', e.target.value)}
+                                            placeholder="Nombre: Ej. Queso extra"
+                                            className="h-9 border-none bg-transparent focus-visible:ring-0 p-0 text-sm font-bold placeholder:text-muted-foreground/40"
+                                        />
+                                    </div>
+                                    <div className="relative w-28">
+                                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[10px] font-black text-muted-foreground/50 underline decoration-primary/30 decoration-2">PRECIO</span>
+                                        <Input
+                                            type="number"
+                                            step="0.01"
+                                            min="0"
+                                            value={mod.extra_price}
+                                            onChange={e => updateModifier(realIndex, 'extra_price', e.target.value)}
+                                            className="pl-14 h-9 text-xs font-black text-right bg-muted/30 border-none focus-visible:ring-0 rounded-lg"
+                                        />
+                                    </div>
+                                    <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="icon"
+                                        onClick={() => removeModifier(realIndex)}
+                                        className="text-red-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 h-9 w-9 p-0 rounded-lg transition-colors opacity-40 group-hover:opacity-100"
+                                    >
+                                        <Trash2 className="w-4 h-4" />
+                                    </Button>
                                 </div>
-                                <Button type="button" variant="ghost" size="sm" onClick={() => removeModifier(realIndex)} className="text-red-400 hover:text-red-600 h-9 w-9 p-0">
-                                    <Trash2 className="w-3.5 h-3.5" />
-                                </Button>
-                            </div>
-                        )
-                    })}
+                            )
+                        })}
+                    </div>
                 </div>
+
             </div>
 
             {/* Footer */}

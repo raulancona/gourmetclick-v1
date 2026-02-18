@@ -80,3 +80,33 @@ export function sendWhatsAppOrder(phone, message) {
     const whatsappUrl = `https://api.whatsapp.com/send?phone=${phone}&text=${encodedMessage}`
     window.open(whatsappUrl, '_blank')
 }
+
+/**
+ * Generate WhatsApp message for Daily Cash Close (Corte de Caja)
+ */
+export function generateClosingSummary(restaurantName, summaryData) {
+    const { totalSales, totalOrders, byPayment, date } = summaryData
+    const formattedDate = new Date(date).toLocaleDateString('es-MX', {
+        weekday: 'long',
+        day: 'numeric',
+        month: 'long',
+        year: 'numeric'
+    })
+
+    let message = `*📊 CORTE DE CAJA - ${restaurantName}*\n`
+    message += `📅 ${formattedDate}\n`
+    message += '━━━━━━━━━━━━━━━━━━━━━━━━\n\n'
+
+    message += `💰 *Ventas Totales:* $${totalSales.toFixed(2)}\n`
+    message += `🧾 *Órdenes Totales:* ${totalOrders}\n\n`
+
+    message += '*Detalle por Método de Pago:*\n'
+    if (byPayment.cash) message += `💵 *Efectivo:* $${byPayment.cash.toFixed(2)}\n`
+    if (byPayment.card) message += `💳 *Tarjeta:* $${byPayment.card.toFixed(2)}\n`
+    if (byPayment.transfer) message += `🏦 *Transferencia:* $${byPayment.transfer.toFixed(2)}\n`
+
+    message += '\n━━━━━━━━━━━━━━━━━━━━━━━━\n'
+    message += '✨ _Gourmet Click Pro - Reporte Generado_'
+
+    return message
+}
