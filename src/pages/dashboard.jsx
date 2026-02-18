@@ -17,7 +17,8 @@ import {
     Clock,
     Tag,
     BarChart3,
-    LineChart as LineChartIcon
+    LineChart as LineChartIcon,
+    Users
 } from 'lucide-react'
 import {
     BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -85,49 +86,49 @@ export function DashboardPage() {
     return (
         <div className="p-8 pb-16 space-y-8 max-w-7xl mx-auto">
             <div>
-                <h1 className="text-3xl font-black tracking-tight text-gray-900 mb-1">Resumen del Negocio</h1>
+                <h1 className="text-3xl font-black tracking-tight text-foreground mb-1">Resumen del Negocio</h1>
                 <p className="text-muted-foreground">Analítica detallada y estado actual de tu restaurante</p>
             </div>
 
             {/* Main Metrics */}
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
                 {/* ... existing cards ... */}
-                <Card className="border-none shadow-sm bg-blue-50/50">
+                <Card className="border-none shadow-sm bg-blue-50/50 dark:bg-blue-900/20">
                     <CardHeader className="pb-2">
-                        <CardDescription className="text-blue-600 font-semibold flex items-center gap-2">
+                        <CardDescription className="text-blue-600 dark:text-blue-400 font-semibold flex items-center gap-2">
                             <TrendingUp className="w-4 h-4" /> Ventas Totales
                         </CardDescription>
                     </CardHeader>
                     <CardContent>
-                        <div className="text-3xl font-black text-blue-900">{formatCurrency(stats?.revenue || 0)}</div>
+                        <div className="text-3xl font-black text-blue-900 dark:text-blue-100">{formatCurrency(stats?.revenue || 0)}</div>
                     </CardContent>
                 </Card>
 
-                <Card className="border-none shadow-sm bg-orange-50/50">
+                <Card className="border-none shadow-sm bg-orange-50/50 dark:bg-orange-900/20">
                     <CardHeader className="pb-2">
-                        <CardDescription className="text-orange-600 font-semibold flex items-center gap-2">
+                        <CardDescription className="text-orange-600 dark:text-orange-400 font-semibold flex items-center gap-2">
                             <ShoppingBag className="w-4 h-4" /> Órdenes Totales
                         </CardDescription>
                     </CardHeader>
                     <CardContent>
-                        <div className="text-3xl font-black text-orange-900">{stats?.total || 0}</div>
+                        <div className="text-3xl font-black text-orange-900 dark:text-orange-100">{stats?.total || 0}</div>
                     </CardContent>
                 </Card>
 
-                <Card className="border-none shadow-sm bg-purple-50/50">
+                <Card className="border-none shadow-sm bg-purple-50/50 dark:bg-purple-900/20">
                     <CardHeader className="pb-2">
-                        <CardDescription className="text-purple-600 font-semibold flex items-center gap-2">
+                        <CardDescription className="text-purple-600 dark:text-purple-400 font-semibold flex items-center gap-2">
                             <Package className="w-4 h-4" /> Productos
                         </CardDescription>
                     </CardHeader>
                     <CardContent>
-                        <div className="text-3xl font-black text-purple-900">{productCount}</div>
+                        <div className="text-3xl font-black text-purple-900 dark:text-purple-100">{productCount}</div>
                     </CardContent>
                 </Card>
 
-                <Card className="border-none shadow-sm bg-green-50/50">
+                <Card className="border-none shadow-sm bg-green-50/50 dark:bg-green-900/20">
                     <CardHeader className="pb-2">
-                        <CardDescription className="text-green-600 font-semibold flex items-center gap-2">
+                        <CardDescription className="text-green-600 dark:text-green-400 font-semibold flex items-center gap-2">
                             <BadgeDollarSign className="w-4 h-4" /> Cobro más utilizado
                         </CardDescription>
                     </CardHeader>
@@ -136,10 +137,10 @@ export function DashboardPage() {
                             {topPayment ? (
                                 <>
                                     <topPayment.icon className="w-6 h-6" style={{ color: topPayment.color }} />
-                                    <div className="text-2xl font-black text-green-900">{topPayment.label}</div>
+                                    <div className="text-2xl font-black text-green-900 dark:text-green-100">{topPayment.label}</div>
                                 </>
                             ) : (
-                                <div className="text-2xl font-black text-gray-400">N/A</div>
+                                <div className="text-2xl font-black text-muted-foreground">N/A</div>
                             )}
                         </div>
                     </CardContent>
@@ -149,10 +150,10 @@ export function DashboardPage() {
             {/* Analytics Section - Charts */}
             <div className="grid gap-6 md:grid-cols-2">
                 {/* Sales Trend Chart */}
-                <Card className="shadow-sm border-gray-100">
+                <Card className="shadow-sm border-border bg-card">
                     <CardHeader>
-                        <CardTitle className="flex items-center gap-2">
-                            <LineChartIcon className="w-5 h-5 text-gray-500" />
+                        <CardTitle className="flex items-center gap-2 text-foreground">
+                            <LineChartIcon className="w-5 h-5 text-muted-foreground" />
                             Tendencia de Ventas
                         </CardTitle>
                         <CardDescription>Ingresos de los últimos 7 días</CardDescription>
@@ -160,30 +161,33 @@ export function DashboardPage() {
                     <CardContent className="h-[300px]">
                         <ResponsiveContainer width="100%" height="100%">
                             <LineChart data={analytics?.salesTrend || []}>
-                                <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
                                 <XAxis
                                     dataKey="date"
                                     tickFormatter={(val) => new Date(val).toLocaleDateString('es-MX', { day: 'numeric', month: 'short' })}
                                     fontSize={12}
                                     tickLine={false}
                                     axisLine={false}
+                                    stroke="hsl(var(--muted-foreground))"
                                 />
                                 <YAxis
                                     fontSize={12}
                                     tickLine={false}
                                     axisLine={false}
                                     tickFormatter={(val) => `$${val}`}
+                                    stroke="hsl(var(--muted-foreground))"
                                 />
                                 <Tooltip
                                     formatter={(value) => formatCurrency(value)}
                                     labelFormatter={(label) => new Date(label).toLocaleDateString('es-MX', { weekday: 'long', day: 'numeric', month: 'long' })}
+                                    contentStyle={{ backgroundColor: 'hsl(var(--card))', borderColor: 'hsl(var(--border))', color: 'hsl(var(--foreground))' }}
                                 />
                                 <Line
                                     type="monotone"
                                     dataKey="revenue"
-                                    stroke="#2563eb"
+                                    stroke="#d4af37"
                                     strokeWidth={3}
-                                    dot={{ r: 4, fill: "#2563eb" }}
+                                    dot={{ r: 4, fill: "#d4af37" }}
                                     activeDot={{ r: 6 }}
                                 />
                             </LineChart>
@@ -192,10 +196,10 @@ export function DashboardPage() {
                 </Card>
 
                 {/* Top Products Chart */}
-                <Card className="shadow-sm border-gray-100">
+                <Card className="shadow-sm border-border bg-card">
                     <CardHeader>
-                        <CardTitle className="flex items-center gap-2">
-                            <BarChart3 className="w-5 h-5 text-gray-500" />
+                        <CardTitle className="flex items-center gap-2 text-foreground">
+                            <BarChart3 className="w-5 h-5 text-muted-foreground" />
                             Top 5 Productos
                         </CardTitle>
                         <CardDescription>Productos con mayores ingresos</CardDescription>
@@ -203,7 +207,7 @@ export function DashboardPage() {
                     <CardContent className="h-[300px]">
                         <ResponsiveContainer width="100%" height="100%">
                             <BarChart data={analytics?.topProducts || []} layout="vertical" margin={{ left: 0 }}>
-                                <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} />
+                                <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} stroke="hsl(var(--border))" />
                                 <XAxis type="number" hide />
                                 <YAxis
                                     dataKey="name"
@@ -212,54 +216,76 @@ export function DashboardPage() {
                                     fontSize={12}
                                     tickLine={false}
                                     axisLine={false}
+                                    stroke="hsl(var(--muted-foreground))"
                                 />
-                                <Tooltip formatter={(value) => formatCurrency(value)} cursor={{ fill: 'transparent' }} />
-                                <Bar dataKey="revenue" fill="#3b82f6" radius={[0, 4, 4, 0]} barSize={20} />
+                                <Tooltip
+                                    formatter={(value) => formatCurrency(value)}
+                                    cursor={{ fill: 'transparent' }}
+                                    contentStyle={{ backgroundColor: 'hsl(var(--card))', borderColor: 'hsl(var(--border))', color: 'hsl(var(--foreground))' }}
+                                />
+                                <Bar dataKey="revenue" fill="#d4af37" radius={[0, 4, 4, 0]} barSize={20} />
                             </BarChart>
                         </ResponsiveContainer>
                     </CardContent>
                 </Card>
             </div>
 
-            {/* ABC Analysis Summary */}
+            {/* Secondary Metrics */}
             <div className="grid gap-6 md:grid-cols-3">
-                <Card className="bg-emerald-50/50 border-emerald-100">
+                <Card className="bg-emerald-50/50 border-emerald-100 dark:bg-emerald-900/20 dark:border-emerald-900/50">
                     <CardHeader className="pb-2">
-                        <CardTitle className="text-emerald-700 text-lg">Productos Tipo A</CardTitle>
-                        <CardDescription className="text-emerald-600/80">80% de tus ingresos</CardDescription>
+                        <CardTitle className="text-emerald-700 dark:text-emerald-400 text-lg flex items-center gap-2">
+                            <Banknote className="w-5 h-5" />
+                            Ticket Promedio
+                        </CardTitle>
+                        <CardDescription className="text-emerald-600/80 dark:text-emerald-400/80">Promedio por orden</CardDescription>
                     </CardHeader>
                     <CardContent>
-                        <div className="text-3xl font-black text-emerald-900 mb-1">{productsA.length}</div>
-                        <p className="text-xs text-emerald-700 font-medium">Son tus productos estrella. ¡Nunca te quedes sin stock de ellos!</p>
+                        <div className="text-3xl font-black text-emerald-900 dark:text-emerald-100 mb-1">
+                            {formatCurrency(analytics?.metrics?.averageTicket || 0)}
+                        </div>
+                        <p className="text-xs text-emerald-700 dark:text-emerald-300 font-medium">Promedio de venta en órdenes completadas.</p>
                     </CardContent>
                 </Card>
-                <Card className="bg-blue-50/50 border-blue-100">
+
+                <Card className="bg-blue-50/50 border-blue-100 dark:bg-blue-900/20 dark:border-blue-900/50">
                     <CardHeader className="pb-2">
-                        <CardTitle className="text-blue-700 text-lg">Productos Tipo B</CardTitle>
-                        <CardDescription className="text-blue-600/80">Siguientes 15%</CardDescription>
+                        <CardTitle className="text-blue-700 dark:text-blue-400 text-lg flex items-center gap-2">
+                            <Clock className="w-5 h-5" />
+                            Tiempo de Preparación
+                        </CardTitle>
+                        <CardDescription className="text-blue-600/80 dark:text-blue-400/80">Promedio cocina &rarr; listo</CardDescription>
                     </CardHeader>
                     <CardContent>
-                        <div className="text-3xl font-black text-blue-900 mb-1">{productsB.length}</div>
-                        <p className="text-xs text-blue-700 font-medium">Productos con rotación moderada. Mantén un stock equilibrado.</p>
+                        <div className="text-3xl font-black text-blue-900 dark:text-blue-100 mb-1">
+                            {analytics?.metrics?.preparationTime || 'N/A'}
+                        </div>
+                        <p className="text-xs text-blue-700 dark:text-blue-300 font-medium">Tiempo promedio de procesamiento.</p>
                     </CardContent>
                 </Card>
-                <Card className="bg-amber-50/50 border-amber-100">
+
+                <Card className="bg-amber-50/50 border-amber-100 dark:bg-amber-900/20 dark:border-amber-900/50">
                     <CardHeader className="pb-2">
-                        <CardTitle className="text-amber-700 text-lg">Productos Tipo C</CardTitle>
-                        <CardDescription className="text-amber-600/80">Último 5%</CardDescription>
+                        <CardTitle className="text-amber-700 dark:text-amber-400 text-lg flex items-center gap-2">
+                            <Users className="w-5 h-5" />
+                            Clientes Recurrentes
+                        </CardTitle>
+                        <CardDescription className="text-amber-600/80 dark:text-amber-400/80">Fidelización</CardDescription>
                     </CardHeader>
                     <CardContent>
-                        <div className="text-3xl font-black text-amber-900 mb-1">{productsC.length}</div>
-                        <p className="text-xs text-amber-700 font-medium">Baja rotación. Considera promociones o reducir inventario.</p>
+                        <div className="text-3xl font-black text-amber-900 dark:text-amber-100 mb-1">
+                            {Math.round(analytics?.metrics?.recurringCustomersPercentage || 0)}%
+                        </div>
+                        <p className="text-xs text-amber-700 dark:text-amber-300 font-medium">Porcentaje de órdenes de clientes frecuentes.</p>
                     </CardContent>
                 </Card>
             </div>
 
             <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-7">
                 {/* Order Type Distribution */}
-                <Card className="lg:col-span-3 border-gray-100 shadow-sm overflow-hidden">
+                <Card className="lg:col-span-3 border-border bg-card shadow-sm overflow-hidden">
                     <CardHeader>
-                        <CardTitle className="text-lg">Distribución de Ventas</CardTitle>
+                        <CardTitle className="text-lg text-foreground">Distribución de Ventas</CardTitle>
                         <CardDescription>Por tipo de servicio</CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-6">
@@ -275,11 +301,11 @@ export function DashboardPage() {
                                         <div className="flex items-center justify-between text-sm">
                                             <div className="flex items-center gap-2">
                                                 <item.icon className="w-4 h-4" style={{ color: item.color }} />
-                                                <span className="font-medium">{item.label}</span>
+                                                <span className="font-medium text-foreground">{item.label}</span>
                                             </div>
-                                            <span className="font-black">{item.value}</span>
+                                            <span className="font-black text-foreground">{item.value}</span>
                                         </div>
-                                        <div className="h-2 w-full bg-gray-100 rounded-full overflow-hidden">
+                                        <div className="h-2 w-full bg-muted rounded-full overflow-hidden">
                                             <div
                                                 className="h-full transition-all duration-1000"
                                                 style={{ width: `${percentage}%`, backgroundColor: item.color }}
@@ -293,36 +319,36 @@ export function DashboardPage() {
                 </Card>
 
                 {/* Recent Activity */}
-                <Card className="lg:col-span-4 border-gray-100 shadow-sm">
+                <Card className="lg:col-span-4 border-border bg-card shadow-sm">
                     <CardHeader>
-                        <CardTitle className="text-lg">Órdenes Recientes</CardTitle>
+                        <CardTitle className="text-lg text-foreground">Órdenes Recientes</CardTitle>
                         <CardDescription>Últimos pedidos del sistema</CardDescription>
                     </CardHeader>
                     <CardContent>
                         {recentOrders.length === 0 ? (
                             <div className="py-8 text-center text-muted-foreground italic">No hay actividad reciente</div>
                         ) : (
-                            <div className="divide-y divide-gray-100">
+                            <div className="divide-y divide-border">
                                 {recentOrders.map(order => (
                                     <div key={order.id} className="py-3 flex items-center justify-between">
                                         <div className="flex items-center gap-3">
-                                            <div className="w-10 h-10 rounded-xl bg-gray-50 flex items-center justify-center">
-                                                <Clock className="w-5 h-5 text-gray-400" />
+                                            <div className="w-10 h-10 rounded-xl bg-muted flex items-center justify-center">
+                                                <Clock className="w-5 h-5 text-muted-foreground" />
                                             </div>
                                             <div>
-                                                <p className="text-sm font-bold text-gray-900">{order.customer_name}</p>
+                                                <p className="text-sm font-bold text-foreground">{order.customer_name}</p>
                                                 <p className="text-xs text-muted-foreground">
                                                     {order.order_type === 'delivery' ? '🛵 Envío' : order.order_type === 'dine_in' ? '🪑 Mesa' : '🏪 Recoger'}
                                                 </p>
                                             </div>
                                         </div>
                                         <div className="text-right">
-                                            <p className="text-sm font-black text-gray-900">{formatCurrency(order.total)}</p>
+                                            <p className="text-sm font-black text-foreground">{formatCurrency(order.total)}</p>
                                             <div className="mt-1">
-                                                <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase transition-colors ${order.status === 'delivered' ? 'bg-green-100 text-green-700' :
-                                                    order.status === 'pending' ? 'bg-amber-100 text-amber-700' :
-                                                        order.status === 'cancelled' ? 'bg-red-100 text-red-700' :
-                                                            'bg-blue-100 text-blue-700'
+                                                <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase transition-colors ${order.status === 'delivered' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' :
+                                                    order.status === 'pending' ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400' :
+                                                        order.status === 'cancelled' ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' :
+                                                            'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
                                                     }`}>
                                                     {order.status}
                                                 </span>

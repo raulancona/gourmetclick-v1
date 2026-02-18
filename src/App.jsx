@@ -11,6 +11,7 @@ import { CategoriesPage } from './pages/categories'
 import { OrdersPage } from './pages/orders'
 import POSPage from './pages/pos'
 import { PublicMenuPage } from './pages/public-menu'
+import { TrackingPage } from './pages/tracking'
 import { Toaster } from 'sonner'
 
 function App() {
@@ -20,6 +21,7 @@ function App() {
         <Routes>
           {/* Public menu route - NO AUTH REQUIRED */}
           <Route path="/m/:slug" element={<PublicMenuPage />} />
+          <Route path="/rastreo/:tracking_id" element={<TrackingPage />} />
 
           {/* Public routes */}
           <Route path="/login" element={<LoginPage />} />

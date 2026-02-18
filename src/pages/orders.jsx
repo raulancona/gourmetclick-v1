@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { supabase } from '../lib/supabase'
 import { useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Search, Filter, Package, Clock, ChefHat, Truck, CheckCircle2, XCircle, Eye, ChevronDown, MapPin, Phone, User, CreditCard, Banknote, Building2, ExternalLink, Trash2, RefreshCw, Armchair, Store, Edit2, Save, X } from 'lucide-react'
@@ -31,12 +32,10 @@ export function OrdersPage() {
     const [statusFilter, setStatusFilter] = useState('all')
     const [searchTerm, setSearchTerm] = useState('')
     const [selectedOrder, setSelectedOrder] = useState(null)
-
     const { data: orders = [], isLoading } = useQuery({
         queryKey: ['orders'],
         queryFn: () => getOrders(user.id),
         enabled: !!user,
-        refetchInterval: 30000,
     })
 
     const { data: stats } = useQuery({
@@ -44,6 +43,37 @@ export function OrdersPage() {
         queryFn: () => getOrderStats(user.id),
         enabled: !!user,
     })
+
+    // Realtime Subscription
+    useEffect(() => {
+        if (!user?.id) return
+
+        console.log('Setting up orders subscription for user:', user.id)
+
+        const channel = supabase
+            .channel('orders-list-changes')
+            .on(
+                'postgres_changes',
+                {
+                    event: '*',
+                    schema: 'public',
+                    table: 'orders',
+                    filter: `user_id=eq.${user.id}`
+                },
+                (payload) => {
+                    console.log('Realtime update received:', payload)
+                    queryClient.invalidateQueries(['orders'])
+                    queryClient.invalidateQueries(['order-stats'])
+                }
+            )
+            .subscribe((status) => {
+                console.log('Subscription status:', status)
+            })
+
+        return () => {
+            supabase.removeChannel(channel)
+        }
+    }, [user?.id, queryClient])
 
     const updateStatusMutation = useMutation({
         mutationFn: ({ orderId, status }) => updateOrderStatus(orderId, status, user.id),
@@ -471,6 +501,26 @@ function OrderDetailModal({ order, onClose, onUpdateStatus, onUpdateOrder, onDel
                                     <CreditCard className="w-4 h-4 text-muted-foreground" />
                                     <span>{payment.icon} {payment.label}</span>
                                 </div>
+                                <div className="pt-2 mt-2 border-t border-gray-200">
+                                    <p className="text-xs text-muted-foreground mb-1">Link de rastreo</p>
+                                    <div className="flex items-center gap-2 bg-white p-2 rounded-lg border border-gray-200">
+                                        <input
+                                            readOnly
+                                            value={`${window.location.origin}/rastreo/${order.tracking_id}`}
+                                            className="flex-1 text-xs bg-transparent border-none focus:ring-0 p-0 text-gray-600 font-mono"
+                                        />
+                                        <button
+                                            onClick={() => {
+                                                navigator.clipboard.writeText(`${window.location.origin}/rastreo/${order.tracking_id}`)
+                                                toast.success('Link copiado')
+                                            }}
+                                            className="text-primary hover:text-primary/80"
+                                            title="Copiar link"
+                                        >
+                                            <ExternalLink className="w-4 h-4" />
+                                        </button>
+                                    </div>
+                                </div>
                             </div>
 
                             {/* Items */}
@@ -548,6 +598,6 @@ function OrderDetailModal({ order, onClose, onUpdateStatus, onUpdateOrder, onDel
                     )}
                 </div>
             </div>
-        </div>
+        </div >
     )
 }

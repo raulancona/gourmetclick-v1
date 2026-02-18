@@ -166,7 +166,8 @@ export function ProductForm({ product, onSubmit, onCancel, isLoading }) {
                 discount_percent: parseInt(data.discount_percent) || 0,
                 is_vegan: data.is_vegan,
                 badge_text: data.badge_text?.trim() || null,
-                is_available: data.is_available
+                is_available: data.is_available,
+                has_extras: modifiers.some(m => !m._delete && m.name.trim())
             }
 
             // Submit the product first

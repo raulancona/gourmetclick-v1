@@ -162,15 +162,51 @@ export async function getSalesAnalytics(userId) {
         return { ...p, category, percentage: (p.revenue / totalRevenue) * 100 }
     })
 
-    // 3. Prepare Chart Data
+    // 3. New Metrics Calculation
+
+    // Average Ticket (Total stats are already filtered by neq cancelled in this query?)
+    // The current query filters neq 'cancelled'.
+    const validOrdersCount = orders.length
+    const averageTicket = validOrdersCount > 0 ? totalRevenue / validOrdersCount : 0
+
+    // Preparation Time (Placeholder as per request)
+    const preparationTime = "Calculando..."
+
+    // Recurring Customers
+    const phoneCounts = {}
+    let recurringOrdersCount = 0
+
+    orders.forEach(order => {
+        if (order.customer_phone) {
+            // Normalize phone (simple trim)
+            const phone = order.customer_phone.trim()
+            if (phone) {
+                phoneCounts[phone] = (phoneCounts[phone] || 0) + 1
+            }
+        }
+    })
+
+    // Count orders that belong to a recurring phone (appears > 1 time)
+    orders.forEach(order => {
+        const phone = order.customer_phone?.trim()
+        if (phone && phoneCounts[phone] > 1) {
+            recurringOrdersCount++
+        }
+    })
+
+    const recurringCustomersPercentage = validOrdersCount > 0
+        ? (recurringOrdersCount / validOrdersCount) * 100
+        : 0
+
+
+    // 4. Prepare Chart Data
     // Top 5 Products
     const topProducts = sortedProducts.slice(0, 5).map(p => ({
         name: p.name,
         revenue: p.revenue
     }))
 
-    // Sales Trend (Last 7 days) - Simplified
-    // This would ideally be a separate DB query for performance if data grows large
+    // Sales Trend (Last 7 days)
     const last7Days = [...Array(7)].map((_, i) => {
         const d = new Date()
         d.setDate(d.getDate() - i)
@@ -185,9 +221,14 @@ export async function getSalesAnalytics(userId) {
     })
 
     return {
-        abcAnalysis: abcData,
+        abcAnalysis: abcData, // Keeping this if needed elsewhere, but UI will ignore it
         topProducts,
         salesTrend,
-        totalRevenue
+        totalRevenue,
+        metrics: {
+            averageTicket,
+            preparationTime,
+            recurringCustomersPercentage
+        }
     }
 }
