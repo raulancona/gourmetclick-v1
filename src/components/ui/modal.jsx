@@ -40,17 +40,18 @@ export function Modal({ isOpen, onClose, title, children, size = 'md' }) {
             {/* Modal */}
             <div
                 className={cn(
-                    'relative w-full mx-4 bg-white rounded-xl shadow-2xl animate-in zoom-in-95 fade-in duration-200',
+                    'relative w-full mx-4 bg-background border border-border rounded-xl shadow-2xl animate-in zoom-in-95 fade-in duration-200 flex flex-col',
                     sizeClasses[size]
                 )}
+                style={{ maxHeight: '90vh' }}
             >
                 {/* Header */}
                 {title && (
-                    <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
-                        <h2 className="text-xl font-semibold text-gray-900">{title}</h2>
+                    <div className="flex items-center justify-between px-6 py-4 border-b border-border shrink-0">
+                        <h2 className="text-xl font-semibold text-foreground">{title}</h2>
                         <button
                             onClick={onClose}
-                            className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+                            className="p-2 text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg transition-colors"
                         >
                             <X className="w-5 h-5" />
                         </button>
@@ -58,7 +59,7 @@ export function Modal({ isOpen, onClose, title, children, size = 'md' }) {
                 )}
 
                 {/* Content */}
-                <div className="px-6 py-4 max-h-[calc(100vh-200px)] overflow-y-auto">
+                <div className="px-6 py-4 overflow-y-auto custom-scrollbar">
                     {children}
                 </div>
             </div>
@@ -68,7 +69,7 @@ export function Modal({ isOpen, onClose, title, children, size = 'md' }) {
 
 export function ModalFooter({ children, className }) {
     return (
-        <div className={cn('flex items-center justify-end gap-3 px-6 py-4 border-t border-gray-200 bg-gray-50 rounded-b-xl', className)}>
+        <div className={cn('flex items-center justify-end gap-3 px-6 py-4 border-t border-border bg-muted/30 rounded-b-xl shrink-0', className)}>
             {children}
         </div>
     )
