@@ -205,15 +205,15 @@ export function AdvancedCSVUpload({ onImport, onCancel, userId }) {
                         className={cn(
                             'border-2 border-dashed rounded-lg p-12 text-center cursor-pointer transition-all',
                             isDragging
-                                ? 'border-blue-500 bg-blue-50'
-                                : 'border-gray-300 hover:border-gray-400 hover:bg-gray-50'
+                                ? 'border-primary bg-primary/5'
+                                : 'border-border hover:border-primary/50 hover:bg-muted/50'
                         )}
                     >
-                        <Upload className="w-12 h-12 mx-auto mb-4 text-gray-400" />
-                        <p className="text-sm text-gray-600 mb-2">
-                            <span className="font-medium text-blue-600">Haz clic para subir</span> o arrastra tu archivo CSV
+                        <Upload className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
+                        <p className="text-sm text-muted-foreground mb-2">
+                            <span className="font-medium text-primary">Haz clic para subir</span> o arrastra tu archivo CSV
                         </p>
-                        <p className="text-xs text-gray-500">
+                        <p className="text-xs text-muted-foreground">
                             Soporta productos con modificadores
                         </p>
                     </div>
@@ -227,9 +227,9 @@ export function AdvancedCSVUpload({ onImport, onCancel, userId }) {
                     />
 
                     {/* CSV Format Example */}
-                    <div className="mt-4 p-4 bg-gray-50 rounded-lg">
-                        <p className="text-sm font-medium text-gray-700 mb-2">Formato esperado:</p>
-                        <pre className="text-xs text-gray-600 overflow-x-auto">
+                    <div className="mt-4 p-4 bg-muted rounded-lg">
+                        <p className="text-sm font-medium text-foreground mb-2">Formato esperado:</p>
+                        <pre className="text-xs text-muted-foreground overflow-x-auto">
                             {`name,description,price,sku,category,modifier_group,modifier_name,modifier_price
 Hamburguesa Especial,Deliciosa hamburguesa,120,BURG-01,Platos Fuertes,Proteína,Carne Extra,20
 Hamburguesa Especial,Deliciosa hamburguesa,120,BURG-01,Platos Fuertes,Proteína,Pollo,0
@@ -240,11 +240,11 @@ Hamburguesa Especial,Deliciosa hamburguesa,120,BURG-01,Platos Fuertes,Extras,Que
             ) : (
                 <div className="space-y-4">
                     {/* File Info */}
-                    <div className="flex items-center gap-3 p-4 bg-gray-50 rounded-lg">
-                        <FileText className="w-8 h-8 text-blue-600" />
+                    <div className="flex items-center gap-3 p-4 bg-muted rounded-lg">
+                        <FileText className="w-8 h-8 text-primary" />
                         <div className="flex-1">
-                            <p className="font-medium text-gray-900">{file.name}</p>
-                            <p className="text-sm text-gray-600">
+                            <p className="font-medium text-foreground">{file.name}</p>
+                            <p className="text-sm text-muted-foreground">
                                 {processedData?.length || 0} productos únicos, {parsedData.length} filas procesadas
                             </p>
                         </div>
@@ -302,18 +302,18 @@ Hamburguesa Especial,Deliciosa hamburguesa,120,BURG-01,Platos Fuertes,Extras,Que
                             <h4 className="font-medium mb-3">Vista previa de productos:</h4>
                             <div className="space-y-3 max-h-64 overflow-y-auto">
                                 {processedData.slice(0, 5).map((product, index) => (
-                                    <div key={index} className="p-3 bg-gray-50 rounded">
-                                        <p className="font-medium">{product.name}</p>
-                                        <p className="text-sm text-gray-600">${product.price} • {product.sku}</p>
+                                    <div key={index} className="p-3 bg-muted rounded">
+                                        <p className="font-medium text-foreground">{product.name}</p>
+                                        <p className="text-sm text-muted-foreground">${product.price} • {product.sku}</p>
                                         {product.category && (
-                                            <p className="text-xs text-gray-500">Categoría: {product.category}</p>
+                                            <p className="text-xs text-muted-foreground">Categoría: {product.category}</p>
                                         )}
                                         {product.modifierGroups.size > 0 && (
                                             <div className="mt-2 text-xs">
-                                                <p className="font-medium text-gray-700">Modificadores:</p>
+                                                <p className="font-medium text-muted-foreground">Modificadores:</p>
                                                 {Array.from(product.modifierGroups.values()).map((group, gi) => (
                                                     <div key={gi} className="ml-2 mt-1">
-                                                        <p className="text-gray-600">• {group.name}: {group.options.map(o => o.name).join(', ')}</p>
+                                                        <p className="text-muted-foreground">• {group.name}: {group.options.map(o => o.name).join(', ')}</p>
                                                     </div>
                                                 ))}
                                             </div>
@@ -321,7 +321,7 @@ Hamburguesa Especial,Deliciosa hamburguesa,120,BURG-01,Platos Fuertes,Extras,Que
                                     </div>
                                 ))}
                                 {processedData.length > 5 && (
-                                    <p className="text-xs text-gray-500 text-center">
+                                    <p className="text-xs text-muted-foreground text-center">
                                         ... y {processedData.length - 5} productos más
                                     </p>
                                 )}
@@ -332,7 +332,7 @@ Hamburguesa Especial,Deliciosa hamburguesa,120,BURG-01,Platos Fuertes,Extras,Que
             )}
 
             {/* Footer */}
-            <div className="flex items-center justify-end gap-3 pt-4 border-t border-gray-200">
+            <div className="flex items-center justify-end gap-3 pt-4 border-t border-border">
                 <Button variant="outline" onClick={onCancel} disabled={isImporting}>
                     Cancelar
                 </Button>

@@ -83,7 +83,17 @@ export function PublicMenuPage() {
 
     useEffect(() => {
         loadMenu()
+        initGuestId()
     }, [slug])
+
+    const initGuestId = () => {
+        let guestId = localStorage.getItem('gc_guest_id')
+        if (!guestId) {
+            guestId = crypto.randomUUID()
+            localStorage.setItem('gc_guest_id', guestId)
+        }
+        return guestId
+    }
 
     const loadMenu = async () => {
         try {
@@ -901,6 +911,7 @@ function CheckoutFlow({ restaurant, primaryColor, secondaryColor, onClose, onBac
 
         const orderData = {
             user_id: restaurant.id,
+            guest_id: localStorage.getItem('gc_guest_id'),
             customer_name: formData.name,
             customer_phone: formData.phone,
             order_type: formData.orderType,
@@ -914,13 +925,15 @@ function CheckoutFlow({ restaurant, primaryColor, secondaryColor, onClose, onBac
                 name: item.product.name,
                 unit_price: parseFloat(item.product.price),
                 price: parseFloat(item.product.price),
+                costo: parseFloat(item.product.costo || 0), // Include cost for snapshotting in order-service
                 quantity: item.quantity,
                 subtotal: item.subtotal,
                 modifiers: item.modifiers, // Pass full modifiers array
                 product: { // Keep legacy structure just in case, but rely on top-level fields
                     id: item.product.id,
                     name: item.product.name,
-                    price: item.product.price
+                    price: item.product.price,
+                    costo: item.product.costo
                 }
             })),
             total: getTotal(),

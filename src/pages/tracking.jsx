@@ -38,12 +38,14 @@ export function TrackingPage() {
         fetchOrder()
 
         // Realtime Subscription
+        const statusChangeSound = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3')
+
         const channel = supabase
             .channel(`order-${tracking_id}`)
             .on(
                 'postgres_changes',
                 {
-                    event: '*',
+                    event: 'UPDATE',
                     schema: 'public',
                     table: 'orders',
                     filter: `tracking_id=eq.${tracking_id}`
@@ -51,7 +53,17 @@ export function TrackingPage() {
                 (payload) => {
                     console.log('Realtime update for tracking:', payload)
                     if (payload.new) {
+                        const oldStatus = order?.status
+                        const newStatus = payload.new.status
+
                         setOrder(payload.new)
+
+                        // Play sound if status changed
+                        if (oldStatus && oldStatus !== newStatus) {
+                            statusChangeSound.play().catch(e => {
+                                console.warn('Audio play blocked by browser. User interaction required:', e)
+                            })
+                        }
                     }
                 }
             )
@@ -62,7 +74,11 @@ export function TrackingPage() {
         return () => {
             supabase.removeChannel(channel)
         }
-    }, [tracking_id])
+    }, [tracking_id, order?.status])
+
+    const handlePrint = () => {
+        window.print()
+    }
 
     if (loading) {
         return (
@@ -124,6 +140,12 @@ export function TrackingPage() {
                     {theme === 'dark' ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
                 </Button>
             </div>
+
+            {/* Hidden Interaction for Audio Unlock */}
+            <button id="audio-unlock" className="hidden" onClick={() => {
+                const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3')
+                audio.play().then(() => audio.pause()).catch(() => { })
+            }} />
 
             <div className="max-w-xl mx-auto">
                 {/* Header */}
@@ -204,8 +226,108 @@ export function TrackingPage() {
                             <span>{formatCurrency(order.total)}</span>
                         </div>
                     </div>
+
+                    {/* Download/Print Note Button - Conditional */}
+                    {(order.status === 'delivered' || order.status === 'completed') && (
+                        <div className="mt-8 pt-6 border-t border-border no-print">
+                            <Button
+                                onClick={handlePrint}
+                                className="w-full py-6 rounded-2xl bg-primary/10 text-primary hover:bg-primary hover:text-primary-foreground transition-all font-bold gap-2"
+                            >
+                                <Package className="w-5 h-5" />
+                                Descargar Nota de Venta
+                            </Button>
+                        </div>
+                    )}
                 </div>
             </div>
+
+            {/* Print-only Invoice/Receipt Layout */}
+            <div className="hidden print:block print:w-full print:p-8 print:bg-white print:text-black">
+                <div className="text-center mb-8">
+                    <h1 className="text-2xl font-black uppercase tracking-widest mb-2">Gourmet click pro</h1>
+                    <p className="text-sm opacity-60 mb-4">Nota de Venta</p>
+                    <div className="border-t border-b border-black/10 py-4 my-4">
+                        <p className="text-lg font-bold">Orden #{order.id.slice(0, 8)}</p>
+                        <p className="text-sm">{new Date(order.created_at).toLocaleString()}</p>
+                    </div>
+                </div>
+
+                <div className="mb-8">
+                    <table className="w-full text-left text-sm">
+                        <thead>
+                            <tr className="border-b border-black">
+                                <th className="py-2">Cant</th>
+                                <th className="py-2">Producto</th>
+                                <th className="py-2 text-right">Importe</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {order.items?.map((item, idx) => (
+                                <tr key={idx} className="border-b border-black/10">
+                                    <td className="py-2 font-bold">{item.quantity}</td>
+                                    <td className="py-2">
+                                        {item.name}
+                                        {((item.modifiers && item.modifiers.length > 0) || (item.extras && item.extras.length > 0) || (item.variantes && item.variantes.length > 0)) && (
+                                            <div className="text-xs opacity-60 ml-2 mt-1">
+                                                {[
+                                                    ...(item.modifiers || []),
+                                                    ...(item.extras || []),
+                                                    ...(item.variantes || [])
+                                                ].map((mod, i) => (
+                                                    <div key={i}>+ {mod.name}</div>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </td>
+                                    <td className="py-2 text-right">{formatCurrency(item.price * item.quantity)}</td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+
+                <div className="flex justify-end mb-12">
+                    <div className="text-right">
+                        <div className="flex justify-between gap-8 mb-2">
+                            <span>Subtotal</span>
+                            <span>{formatCurrency(order.total)}</span>
+                        </div>
+                        <div className="flex justify-between gap-8 text-xl font-black border-t border-black pt-2">
+                            <span>Total</span>
+                            <span>{formatCurrency(order.total)}</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div className="text-center text-xs opacity-50">
+                    <p>Gracias por su preferencia</p>
+                    <p>Comprobante generado digitalmente</p>
+                </div>
+            </div>
+
+            {/* Global Print Styles */}
+            <style dangerouslySetInnerHTML={{
+                __html: `
+                @media print {
+                    body * {
+                        visibility: hidden;
+                    }
+                    .print\\:block, .print\\:block * {
+                        visibility: visible;
+                    }
+                    .print\\:block {
+                        position: absolute;
+                        left: 0;
+                        top: 0;
+                        width: 100%;
+                    }
+                    @page {
+                        margin: 0;
+                        size: auto;
+                    }
+                }
+            `}} />
         </div>
     )
 }

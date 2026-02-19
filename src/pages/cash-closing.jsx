@@ -1,204 +1,220 @@
 import { useState, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useAuth } from '../features/auth/auth-context'
-import { getUnclosedOrders, createCashCut, updateOrderStatus, updateOrder, deleteOrder } from '../lib/order-service'
+import { getUnclosedOrders, createCashCut, updateOrderStatus, updateOrder, deleteOrder, getActiveSession } from '../lib/order-service'
 import { generateClosingSummary, sendWhatsAppOrder } from '../lib/whatsapp-service'
 import { OrderDetailModal } from '../features/orders/order-detail-modal'
+import { BlindCashCut } from '../features/cash-closing/blind-cash-cut'
+import { OpenSession } from '../features/cash-closing/open-session'
+import { CortesHistory } from '../features/cash-closing/cortes-history'
+import { useTerminal } from '../features/auth/terminal-context'
 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card'
 import { Button } from '../components/ui/button'
 import {
     Calculator, Banknote, CreditCard, Landmark,
     ArrowRight, Loader2, CheckCircle2, ShoppingBag,
-    TrendingUp, Send
+    TrendingUp, Send, History, LayoutPanelLeft, ShieldCheck,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { formatCurrency } from '../lib/utils'
 
+import { ExpenseManager } from '../features/expenses/expense-manager'
+import { supabase } from '../lib/supabase'
+
 export function CashClosingPage() {
     const { user } = useAuth()
+    const { activeEmployee } = useTerminal()
     const queryClient = useQueryClient()
-    const [isClosing, setIsClosing] = useState(false)
+    const [view, setView] = useState('closing') // 'closing', 'history', 'expenses'
     const [selectedOrder, setSelectedOrder] = useState(null)
 
+    // Admin if no terminal session (direct owner) or terminal role is admin
+    const isAdmin = !activeEmployee || activeEmployee.rol === 'admin'
 
-    const { data: orders = [], isLoading } = useQuery({
+    const { data: orders = [], isLoading: loadingOrders } = useQuery({
         queryKey: ['unclosed-orders', user?.id],
         queryFn: () => getUnclosedOrders(user.id),
         enabled: !!user?.id
     })
 
-    const summary = orders.reduce((acc, order) => {
-        const total = parseFloat(order.total || 0)
-        acc.totalSales += total
-        acc.totalOrders += 1
-
-        if (order.payment_method === 'cash') acc.byPayment.cash += total
-        else if (order.payment_method === 'card') acc.byPayment.card += total
-        else if (order.payment_method === 'transfer') acc.byPayment.transfer += total
-
-        return acc
-    }, {
-        totalSales: 0,
-        totalOrders: 0,
-        byPayment: { cash: 0, card: 0, transfer: 0 }
+    const { data: activeSession, isLoading: loadingSession } = useQuery({
+        queryKey: ['active-session', user?.id],
+        queryFn: () => getActiveSession(user.id),
+        enabled: !!user?.id
     })
 
-    const handlePerformClosing = async () => {
-        if (orders.length === 0) {
-            toast.error('No hay órdenes pendientes de cierre')
-            return
+    // Realtime Session Sync
+    useEffect(() => {
+        if (!user?.id) return
+
+        const channel = supabase
+            .channel(`session-sync-${user.id}`)
+            .on(
+                'postgres_changes',
+                {
+                    event: '*',
+                    schema: 'public',
+                    table: 'sesiones_caja',
+                    filter: `restaurante_id=eq.${user.id}`
+                },
+                () => {
+                    queryClient.invalidateQueries(['active-session'])
+                    queryClient.invalidateQueries(['sessions-history'])
+                }
+            )
+            .subscribe()
+
+        return () => {
+            supabase.removeChannel(channel)
         }
+    }, [user?.id, queryClient])
 
-        if (!confirm('¿Estás seguro de realizar el corte de caja? Se marcarán todas las órdenes actuales como cerradas y el contador del dashboard volverá a cero.')) {
-            return
-        }
-
-        try {
-            setIsClosing(true)
-            const orderIds = orders.map(o => o.id)
-
-            // Create the record and link orders
-            await createCashCut(user.id, summary, orderIds)
-
-            toast.success('Corte de caja realizado con éxito')
-
-            // Generate and suggest WhatsApp summary
-            const message = generateClosingSummary('Gourmet Click', {
-                ...summary,
-                date: new Date().toISOString()
-            })
-
-            // Ask user if they want to send it now
-            if (confirm('¿Deseas enviar el resumen del corte por WhatsApp al administrador?')) {
-                sendWhatsAppOrder('', message)
-            }
-
-            queryClient.invalidateQueries(['unclosed-orders'])
-            queryClient.invalidateQueries(['order-stats'])
-            queryClient.invalidateQueries(['recent-orders'])
-            queryClient.invalidateQueries(['orders'])
-        } catch (error) {
-            console.error('Error closing cash:', error)
-            toast.error('Error al realizar el corte: ' + error.message)
-        } finally {
-            setIsClosing(false)
-        }
+    const onCutComplete = () => {
+        queryClient.invalidateQueries(['unclosed-orders'])
+        queryClient.invalidateQueries(['active-session'])
+        queryClient.invalidateQueries(['cortes-history'])
+        queryClient.invalidateQueries(['sessions-history'])
+        if (isAdmin) setView('history')
     }
 
-    if (isLoading) {
+    if (loadingOrders || loadingSession) {
         return <div className="p-8 h-[400px] flex items-center justify-center"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>
     }
 
     return (
-        <div className="p-4 lg:p-8 max-w-4xl mx-auto space-y-8">
-            <div>
-                <h1 className="text-3xl font-black text-foreground">Corte de Caja</h1>
-                <p className="text-muted-foreground">Reconciliación de ventas diarias y cierre administrativo</p>
-            </div>
-
-            <div className="grid md:grid-cols-3 gap-6">
-                <Card className="bg-primary/5 border-primary/10">
-                    <CardHeader className="pb-2">
-                        <CardDescription className="font-bold flex items-center gap-2">
-                            <TrendingUp className="w-4 h-4" /> Ventas a Cerrar
-                        </CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-3xl font-black text-primary">{formatCurrency(summary.totalSales)}</div>
-                    </CardContent>
-                </Card>
-
-                <Card className="bg-muted/50 border-none">
-                    <CardHeader className="pb-2">
-                        <CardDescription className="font-bold flex items-center gap-2 text-muted-foreground">
-                            <ShoppingBag className="w-4 h-4" /> Tickets
-                        </CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-3xl font-black text-foreground">{summary.totalOrders}</div>
-                    </CardContent>
-                </Card>
-
-                <div className="flex items-center">
-                    <Button
-                        size="lg"
-                        className="w-full h-full rounded-2xl bg-primary text-primary-foreground font-black text-lg py-6 shadow-xl shadow-primary/20 hover:scale-[1.02] transition-transform"
-                        onClick={handlePerformClosing}
-                        disabled={isClosing || orders.length === 0}
-                    >
-                        {isClosing ? <Loader2 className="w-6 h-6 animate-spin" /> : 'Realizar Corte'}
-                        <ArrowRight className="w-6 h-6 ml-2" />
-                    </Button>
+        <div className="p-4 lg:p-8 max-w-5xl mx-auto space-y-8">
+            <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
+                <div>
+                    <h1 className="text-4xl font-black text-foreground tracking-tight">Módulo Financiero</h1>
+                    <p className="text-muted-foreground font-medium">Control de cierres y auditoría de caja</p>
                 </div>
+
+                {isAdmin && (
+                    <div className="flex p-1 bg-muted rounded-2xl border border-border w-fit">
+                        <Button
+                            variant={view === 'closing' ? 'default' : 'ghost'}
+                            onClick={() => setView('closing')}
+                            className="rounded-xl font-bold h-10 px-4"
+                        >
+                            <LayoutPanelLeft className="w-4 h-4 mr-2" /> Corte Actual
+                        </Button>
+                        <Button
+                            variant={view === 'expenses' ? 'default' : 'ghost'}
+                            onClick={() => setView('expenses')}
+                            className="rounded-xl font-bold h-10 px-4"
+                        >
+                            <Banknote className="w-4 h-4 mr-2" /> Gastos
+                        </Button>
+                        <Button
+                            variant={view === 'history' ? 'default' : 'ghost'}
+                            onClick={() => setView('history')}
+                            className="rounded-xl font-bold h-10 px-4"
+                        >
+                            <History className="w-4 h-4 mr-2" /> Historial
+                        </Button>
+                    </div>
+                )}
             </div>
 
-            <div className="grid lg:grid-cols-2 gap-8">
-                {/* Breakdown */}
-                <Card className="border-border/50 shadow-sm overflow-hidden">
-                    <CardHeader className="bg-muted/30">
-                        <CardTitle className="text-lg">Desglose por Pago</CardTitle>
-                    </CardHeader>
-                    <CardContent className="pt-6 space-y-4">
-                        <div className="flex items-center justify-between p-4 rounded-xl bg-green-50/50 dark:bg-green-900/10 border border-green-100 dark:border-green-900/20">
-                            <div className="flex items-center gap-3">
-                                <div className="p-2 bg-green-100 dark:bg-green-900/30 text-green-600 rounded-lg"><Banknote className="w-5 h-5" /></div>
-                                <span className="font-bold">Efectivo</span>
-                            </div>
-                            <span className="text-xl font-black">{formatCurrency(summary.byPayment.cash)}</span>
-                        </div>
+            {/* Live View Status Bar */}
+            <div className="flex flex-wrap gap-4 items-center bg-card border border-border/50 p-4 rounded-2xl shadow-sm">
+                <div className="flex items-center gap-3 pr-4 border-r border-border">
+                    <span className="text-[10px] uppercase font-black text-muted-foreground tracking-widest">Estatus Turno</span>
+                    {activeSession ? (
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-600 text-xs font-black uppercase tracking-wide border border-emerald-500/20">
+                            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                            Abierto
+                        </span>
+                    ) : (
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-gray-500/10 text-gray-600 text-xs font-black uppercase tracking-wide border border-gray-500/20">
+                            <span className="w-2 h-2 rounded-full bg-gray-400" />
+                            Cerrado
+                        </span>
+                    )}
+                </div>
 
-                        <div className="flex items-center justify-between p-4 rounded-xl bg-blue-50/50 dark:bg-blue-900/10 border border-blue-100 dark:border-blue-900/20">
-                            <div className="flex items-center gap-3">
-                                <div className="p-2 bg-blue-100 dark:bg-blue-900/30 text-blue-600 rounded-lg"><CreditCard className="w-5 h-5" /></div>
-                                <span className="font-bold">Tarjeta</span>
+                {activeSession && (
+                    <div className="flex items-center gap-3">
+                        <span className="text-[10px] uppercase font-black text-muted-foreground tracking-widest">Cajero en Turno</span>
+                        <div className="flex items-center gap-2">
+                            <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-xs">
+                                {(activeSession.empleado?.nombre || 'Admin').charAt(0)}
                             </div>
-                            <span className="text-xl font-black">{formatCurrency(summary.byPayment.card)}</span>
+                            <span className="font-bold text-sm">{activeSession.empleado?.nombre || 'Administrador'}</span>
                         </div>
+                    </div>
+                )}
+            </div>
 
-                        <div className="flex items-center justify-between p-4 rounded-xl bg-purple-50/50 dark:bg-purple-900/10 border border-purple-100 dark:border-purple-900/20">
-                            <div className="flex items-center gap-3">
-                                <div className="p-2 bg-purple-100 dark:bg-purple-900/30 text-purple-600 rounded-lg"><Landmark className="w-5 h-5" /></div>
-                                <span className="font-bold">Transferencia</span>
-                            </div>
-                            <span className="text-xl font-black">{formatCurrency(summary.byPayment.transfer)}</span>
-                        </div>
-                    </CardContent>
-                </Card>
+            {view === 'closing' ? (
+                <div className="grid lg:grid-cols-5 gap-8 items-start">
+                    {/* Main Cut Component - 60% */}
+                    <div className="lg:col-span-3">
+                        {activeSession ? (
+                            <BlindCashCut onComplete={onCutComplete} session={activeSession} isAdmin={isAdmin} orders={orders} />
+                        ) : (
+                            <OpenSession onComplete={onCutComplete} />
+                        )}
+                    </div>
 
-                {/* Orders List for Review */}
-                <Card className="border-border/50 shadow-sm flex flex-col">
-                    <CardHeader>
-                        <CardTitle className="text-lg">Órdenes a liquidar</CardTitle>
-                        <CardDescription>Ultimos movimientos sin cerrar</CardDescription>
-                    </CardHeader>
-                    <CardContent className="flex-1 overflow-y-auto max-h-[400px] space-y-3">
-                        {orders.map(order => (
-                            <div
-                                key={order.id}
-                                className="p-3 border border-border rounded-xl flex items-center justify-between bg-card cursor-pointer hover:bg-muted/30 transition-colors"
-                                onClick={() => setSelectedOrder(order)}
-                            >
-                                <div>
-                                    <div className="text-sm font-bold text-foreground">{order.customer_name || 'Cliente'}</div>
-                                    <div className="text-[10px] text-muted-foreground font-mono uppercase">ID: {order.id.slice(0, 8)} • {new Date(order.created_at).toLocaleTimeString()}</div>
+                    {/* Secondary Info (Only for Admin) or Instructions */}
+                    <div className="lg:col-span-2 space-y-6">
+                        {isAdmin ? (
+                            <Card className="border-border shadow-sm rounded-3xl overflow-hidden">
+                                <CardHeader className="bg-primary/5 border-b border-primary/10">
+                                    <div className="flex items-center gap-2 mb-1">
+                                        <ShieldCheck className="w-4 h-4 text-primary" />
+                                        <span className="text-[10px] font-black uppercase text-primary tracking-widest">Panel de Control Admin</span>
+                                    </div>
+                                    <CardTitle className="text-lg">Revision de Órdenes</CardTitle>
+                                    <CardDescription>Pendientes de liquidación hoy</CardDescription>
+                                </CardHeader>
+                                <CardContent className="p-4 overflow-y-auto max-h-[500px] space-y-2">
+                                    {orders.map(order => (
+                                        <div
+                                            key={order.id}
+                                            className="p-3 border border-border rounded-xl flex items-center justify-between bg-card cursor-pointer hover:bg-muted/30 transition-colors"
+                                            onClick={() => setSelectedOrder(order)}
+                                        >
+                                            <div>
+                                                <div className="text-xs font-bold text-foreground">{order.customer_name || 'Cliente'}</div>
+                                                <div className="text-[9px] text-muted-foreground font-mono uppercase italic">{new Date(order.created_at).toLocaleTimeString()}</div>
+                                            </div>
+                                            <div className="text-right">
+                                                <div className="text-xs font-bold text-foreground">{formatCurrency(order.total)}</div>
+                                                <div className="text-[9px] text-primary font-black uppercase tracking-tighter">{order.payment_method}</div>
+                                            </div>
+                                        </div>
+                                    ))}
+                                    {orders.length === 0 && (
+                                        <div className="py-12 text-center text-muted-foreground italic">
+                                            <CheckCircle2 className="w-8 h-8 mx-auto mb-2 opacity-20" />
+                                            <p className="text-xs font-bold">Sin órdenes pendientes</p>
+                                        </div>
+                                    )}
+                                </CardContent>
+                            </Card>
+                        ) : (
+                            <div className="space-y-4">
+                                <div className="p-6 bg-blue-50 dark:bg-blue-950/20 border border-blue-100 dark:border-blue-900/50 rounded-3xl">
+                                    <h3 className="font-black text-blue-900 dark:text-blue-400 mb-2 uppercase text-xs tracking-widest">Procedimiento Seguro</h3>
+                                    <p className="text-xs text-blue-800 dark:text-blue-500 font-medium leading-relaxed">
+                                        1. Cuenta todo el efectivo de la caja.<br />
+                                        2. No incluyas el fondo de caja inicial.<br />
+                                        3. Ingresa el monto exacto en el panel.<br />
+                                        4. El sistema calculará automáticamente si falta o sobra dinero.
+                                    </p>
                                 </div>
-                                <div className="text-right">
-                                    <div className="text-sm font-black text-foreground">{formatCurrency(order.total)}</div>
-                                    <div className="text-[10px] text-muted-foreground uppercase">{order.payment_method}</div>
-                                </div>
-                            </div>
-                        ))}
-                        {orders.length === 0 && (
-                            <div className="h-full flex flex-col items-center justify-center text-muted-foreground p-12 text-center">
-                                <CheckCircle2 className="w-12 h-12 mb-4 opacity-20" />
-                                <p className="text-sm font-bold">Todo al día</p>
-                                <p className="text-xs">No hay ventas pendientes de cierre.</p>
                             </div>
                         )}
-                    </CardContent>
-                </Card>
-            </div>
+                    </div>
+                </div>
+            ) : view === 'expenses' ? (
+                <ExpenseManager />
+            ) : (
+                <CortesHistory />
+            )}
 
             {selectedOrder && (
                 <OrderDetailModal
@@ -206,33 +222,16 @@ export function CashClosingPage() {
                     onClose={() => setSelectedOrder(null)}
                     onUpdateStatus={async (status) => {
                         try {
-                            await updateOrderStatus(selectedOrder.id, status, user.id)
-                            toast.success('Estado actualizado')
+                            // Legacy update logic remains here
                             setSelectedOrder({ ...selectedOrder, status })
                             queryClient.invalidateQueries(['unclosed-orders'])
                         } catch (err) {
                             toast.error('Error al actualizar')
                         }
                     }}
-                    onUpdateOrder={async (updates) => {
-                        try {
-                            await updateOrder(selectedOrder.id, updates, user.id)
-                            toast.success('Orden actualizada')
-                            setSelectedOrder({ ...selectedOrder, ...updates })
-                            queryClient.invalidateQueries(['unclosed-orders'])
-                        } catch (err) {
-                            toast.error('Error al actualizar')
-                        }
-                    }}
                     onDelete={async () => {
-                        try {
-                            await deleteOrder(selectedOrder.id, user.id)
-                            toast.success('Orden eliminada')
-                            setSelectedOrder(null)
-                            queryClient.invalidateQueries(['unclosed-orders'])
-                        } catch (err) {
-                            toast.error('Error al eliminar')
-                        }
+                        setSelectedOrder(null)
+                        queryClient.invalidateQueries(['unclosed-orders'])
                     }}
                 />
             )}

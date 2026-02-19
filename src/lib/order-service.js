@@ -11,6 +11,7 @@ const ORDER_STATUSES = {
     ready: { label: 'Listo', emoji: '📦', color: '#10B981' },
     on_the_way: { label: 'En camino', emoji: '🛵', color: '#6366F1' },
     delivered: { label: 'Entregado', emoji: '🎉', color: '#22C55E' },
+    completed: { label: 'Completado', emoji: '🏁', color: '#111827' },
     cancelled: { label: 'Cancelado', emoji: '❌', color: '#EF4444' },
 }
 
@@ -41,7 +42,8 @@ export async function getOrders(userId, { includeClosed = false, startDate = nul
         .order('created_at', { ascending: false })
 
     if (!includeClosed) {
-        query = query.is('cash_cut_id', null)
+        // Exclude both legacy closed (cash_cut_id) and new closed (completed)
+        query = query.is('cash_cut_id', null).neq('status', 'completed')
     }
 
     if (startDate) {
@@ -67,6 +69,9 @@ export async function createOrder(orderData) {
         numericPrice: parseFloat(item.price), // Keep original for reference
         name: item.name || item.product?.name || 'Item Desconocido',
         product_id: item.product_id || item.product?.id,
+        // Snapshots for database
+        precio_unitario_snap: item.unit_price !== undefined ? parseFloat(item.unit_price) : parseFloat(item.price),
+        costo_unitario_snap: item.product?.costo || item.costo || 0,
         // Calculate subtotal based on SNAPSHOTTED price
         subtotal: (item.unit_price !== undefined ? parseFloat(item.unit_price) : parseFloat(item.price)) * item.quantity
     })) || []
@@ -74,19 +79,32 @@ export async function createOrder(orderData) {
     // 2. Prepare Payload
     const payload = {
         ...orderData,
-        items: snapshotItems,
-        // Ensure table_number is integer if present
-        table_number: orderData.table_number ? parseInt(orderData.table_number, 10) : null,
-        // Recalculate total from validated items to be safe
-        total: snapshotItems.reduce((sum, item) => sum + item.subtotal, 0)
+        items: snapshotItems
     }
 
-    console.log('📦 Processed Payload:', payload)
+    // Check for an active session to link this order
+    const { data: activeSession } = await supabase
+        .from('sesiones_caja')
+        .select('id')
+        .eq('restaurante_id', orderData.user_id)
+        .eq('estado', 'abierta')
+        .maybeSingle()
+
+    if (!activeSession) {
+        throw new Error('No es posible crear la orden: No hay una sesión de caja abierta.')
+    }
+
+    const finalPayload = {
+        ...payload,
+        sesion_caja_id: activeSession.id
+    }
+
+    console.log('📦 Processed Payload with Session:', finalPayload)
 
     try {
         const { data, error } = await supabase
             .from('orders')
-            .insert([payload])
+            .insert([finalPayload])
             .select()
             .single()
 
@@ -104,9 +122,19 @@ export async function createOrder(orderData) {
 }
 
 export async function updateOrderStatus(orderId, status, userId) {
+    const updates = {
+        status,
+        updated_at: new Date().toISOString()
+    }
+
+    // Set closing date if order is completed
+    if (status === 'delivered' || status === 'completed') {
+        updates.fecha_cierre = new Date().toISOString()
+    }
+
     const { data, error } = await supabase
         .from('orders')
-        .update({ status, updated_at: new Date().toISOString() })
+        .update(updates)
         .eq('id', orderId)
         .eq('user_id', userId)
         .select()
@@ -393,14 +421,213 @@ export async function createCashCut(userId, summary, orderIds) {
 }
 
 /**
- * Fetch historical cash cuts
+ * Fetch all cash cuts for reports
  */
 export async function getCashCuts(userId) {
     const { data, error } = await supabase
         .from('cash_cuts')
         .select('*')
-        .eq('restaurant_id', userId)
+        .eq('user_id', userId)
         .order('cut_date', { ascending: false })
+
+    if (error) throw error
+    return data || []
+}
+
+/**
+ * Financial Summary for a specific Session
+ */
+export async function getSessionFinancialSummary(sessionId) {
+    // 1. Get session info so we know the time range
+    const { data: session, error: sessionError } = await supabase
+        .from('sesiones_caja')
+        .select('opened_at, closed_at, restaurante_id')
+        .eq('id', sessionId)
+        .single()
+
+    if (sessionError) throw sessionError
+
+    const startTime = session.opened_at
+    const endTime = session.closed_at || new Date().toISOString()
+
+    // 2. Get ALL delivered orders for this restaurant in the session's time range
+    //    (covers both linked orders via sesion_caja_id AND legacy orders without it)
+    const { data: orders, error: ordersError } = await supabase
+        .from('orders')
+        .select('total, payment_method, id')
+        .eq('user_id', session.restaurante_id)
+        .in('status', ['delivered', 'completed'])
+        .gte('created_at', startTime)
+        .lte('created_at', endTime)
+
+    if (ordersError) throw ordersError
+
+    // 3. Get expenses linked to this session
+    const { data: gastos, error: gastosError } = await supabase
+        .from('gastos')
+        .select('monto')
+        .eq('sesion_caja_id', sessionId)
+
+    if (gastosError) throw gastosError
+
+    const totalSales = (orders || []).reduce((sum, o) => sum + (parseFloat(o.total) || 0), 0)
+    const totalExpenses = (gastos || []).reduce((sum, g) => sum + (parseFloat(g.monto) || 0), 0)
+
+    const byPayment = (orders || []).reduce((acc, o) => {
+        const method = o.payment_method || 'cash'
+        acc[method] = (acc[method] || 0) + parseFloat(o.total || 0)
+        return acc
+    }, { cash: 0, card: 0, transfer: 0 })
+
+    return {
+        totalSales,
+        totalExpenses,
+        byPayment,
+        orderIds: (orders || []).map(o => o.id)
+    }
+}
+
+/**
+ * Perform Blind Cash Cut
+ */
+export async function createBlindCashCut(userId, montoReal) {
+    const summary = await getDailyFinancialSummary(userId)
+    const montoEsperado = summary.expectedBalance
+    const diferencia = parseFloat(montoReal) - montoEsperado
+
+    // 1. Insert into cortes_caja
+    const { data: cut, error: cutError } = await supabase
+        .from('cortes_caja')
+        .insert([{
+            usuario_id: userId,
+            monto_esperado: montoEsperado,
+            monto_real: parseFloat(montoReal),
+            diferencia: diferencia
+        }])
+        .select()
+        .single()
+
+    if (cutError) throw cutError
+
+    // 2. Mark orders as closed (using legacy cash_cut_id column for now to maintain compatibility)
+    if (summary.orderIds.length > 0) {
+        const { error: updateError } = await supabase
+            .from('orders')
+            .update({ cash_cut_id: cut.id }) // Using the new cut ID
+            .in('id', summary.orderIds)
+            .eq('user_id', userId)
+
+        if (updateError) throw updateError
+    }
+
+    return cut
+}
+
+/**
+ * Session Management
+ */
+export async function getActiveSession(userId) {
+    const { data, error } = await supabase
+        .from('sesiones_caja')
+        .select('*, empleado:empleado_id(nombre)')
+        .eq('restaurante_id', userId)
+        .eq('estado', 'abierta')
+        .maybeSingle()
+
+    if (error) throw error
+    return data
+}
+
+export async function openSession(userId, employeeId, initialAmount) {
+    const { data, error } = await supabase
+        .from('sesiones_caja')
+        .insert([{
+            restaurante_id: userId,
+            empleado_id: employeeId,
+            fondo_inicial: parseFloat(initialAmount),
+            estado: 'abierta',
+            opened_at: new Date().toISOString()
+        }])
+        .select()
+        .single()
+
+    if (error) throw error
+    return data
+}
+
+export async function closeSession(sessionId, montoReal, userId) {
+    // 1. Get session details and financial summary
+    const { data: session, error: sessionError } = await supabase
+        .from('sesiones_caja')
+        .select('*')
+        .eq('id', sessionId)
+        .single()
+
+    if (sessionError) throw sessionError
+
+    // 2. Calculate totals for THIS session
+    const { data: orders, error: ordersError } = await supabase
+        .from('orders')
+        .select('total')
+        .eq('sesion_caja_id', sessionId)
+        .eq('status', 'delivered')
+
+    if (ordersError) throw ordersError
+
+    const { data: gastos, error: gastosError } = await supabase
+        .from('gastos')
+        .select('monto')
+        .eq('sesion_caja_id', sessionId)
+
+    if (gastosError) throw gastosError
+
+    const totalSales = (orders || []).reduce((sum, o) => sum + (parseFloat(o.total) || 0), 0)
+    const totalExpenses = (gastos || []).reduce((sum, g) => sum + (parseFloat(g.monto) || 0), 0)
+    const currentInventory = parseFloat(session.fondo_inicial) + totalSales - totalExpenses
+    const diferencia = parseFloat(montoReal) - currentInventory
+
+    // 3. Update session
+    const { data: closedSession, error: updateError } = await supabase
+        .from('sesiones_caja')
+        .update({
+            estado: 'cerrada',
+            monto_esperado: currentInventory,
+            monto_real: parseFloat(montoReal),
+            diferencia: diferencia,
+            closed_at: new Date().toISOString()
+        })
+        .eq('id', sessionId)
+        .select()
+        .single()
+
+    if (updateError) throw updateError
+
+    // 4. Close orders (Mark as completed)
+    const { error: closeOrdersError } = await supabase
+        .from('orders')
+        .update({
+            status: 'completed',
+            fecha_cierre: new Date().toISOString()
+        })
+        .eq('sesion_caja_id', sessionId)
+        .eq('status', 'delivered')
+
+    if (closeOrdersError) {
+        console.error('Error closing orders:', closeOrdersError)
+        // We don't throw here to avoid failing the session close if just status update fails, 
+        // but it's important. ideally we should transaction.
+        // For now logging is safer than rolling back session close manually.
+    }
+
+    return closedSession
+}
+
+export async function getSessionsHistory(userId) {
+    const { data, error } = await supabase
+        .from('sesiones_caja')
+        .select('*, empleado:empleado_id(nombre)')
+        .eq('restaurante_id', userId)
+        .order('opened_at', { ascending: false })
 
     if (error) throw error
     return data || []

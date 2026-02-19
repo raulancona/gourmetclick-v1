@@ -47,10 +47,13 @@ export function OrdersPage() {
     useEffect(() => {
         if (!user?.id) return
 
-        console.log('Setting up orders subscription for user:', user.id)
+        // Notification sound (Standard clean "ping")
+        const newOrderSound = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3')
+
+        console.log('Setting up robust orders subscription for user:', user.id)
 
         const channel = supabase
-            .channel('orders-list-changes')
+            .channel(`orders-${user.id}`) // Unique channel per user
             .on(
                 'postgres_changes',
                 {
@@ -60,13 +63,28 @@ export function OrdersPage() {
                     filter: `user_id=eq.${user.id}`
                 },
                 (payload) => {
-                    console.log('Realtime update received:', payload)
+                    console.log('🔔 Realtime update:', payload.eventType)
+
+                    // Invalidate caches to show new data
                     queryClient.invalidateQueries(['orders'])
                     queryClient.invalidateQueries(['order-stats'])
+
+                    // Play sound only on new orders
+                    if (payload.eventType === 'INSERT') {
+                        newOrderSound.play().catch(e => {
+                            console.warn('Audio play blocked by browser. User interaction required:', e)
+                        })
+                        toast.success('¡Nuevo pedido recibido!', {
+                            icon: '🔔',
+                            duration: 5000
+                        })
+                    }
                 }
             )
             .subscribe((status) => {
-                console.log('Subscription status:', status)
+                if (status === 'SUBSCRIBED') {
+                    console.log('✅ Realtime orders active')
+                }
             })
 
         return () => {

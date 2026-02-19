@@ -85,16 +85,16 @@ export function ImageUpload({ value, onChange, error }) {
                     className={cn(
                         'border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-all',
                         isDragging
-                            ? 'border-blue-500 bg-blue-50'
-                            : 'border-gray-300 hover:border-gray-400 hover:bg-gray-50',
-                        error && 'border-red-300'
+                            ? 'border-primary bg-primary/5'
+                            : 'border-border hover:border-primary/50 hover:bg-muted/50',
+                        error && 'border-destructive'
                     )}
                 >
-                    <ImageIcon className="w-12 h-12 mx-auto mb-3 text-gray-400" />
-                    <p className="text-sm text-gray-600 mb-1">
-                        <span className="font-medium text-blue-600">Haz clic para subir</span> o arrastra una imagen
+                    <ImageIcon className="w-12 h-12 mx-auto mb-3 text-muted-foreground" />
+                    <p className="text-sm text-muted-foreground mb-1">
+                        <span className="font-medium text-primary">Haz clic para subir</span> o arrastra una imagen
                     </p>
-                    <p className="text-xs text-gray-500">PNG, JPG, WebP o GIF (máx. 5MB)</p>
+                    <p className="text-xs text-muted-foreground">PNG, JPG, WebP o GIF (máx. 5MB)</p>
                 </div>
             )}
 

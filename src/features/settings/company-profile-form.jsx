@@ -222,7 +222,7 @@ export function CompanyProfileForm() {
                                         </div>
                                     </div>
                                 ) : (
-                                    <div className="w-full h-24 rounded-xl bg-gray-100 border-2 border-dashed flex flex-col items-center justify-center text-gray-400">
+                                    <div className="w-full h-24 rounded-xl bg-muted border-2 border-dashed border-border flex flex-col items-center justify-center text-muted-foreground">
                                         <Image className="w-8 h-8 mb-1" />
                                         <span className="text-xs">Sin portada</span>
                                     </div>
@@ -254,13 +254,13 @@ export function CompanyProfileForm() {
                                 URL de tu Menú Digital
                             </Label>
                             <div className="flex items-center gap-0 border rounded-md overflow-hidden">
-                                <span className="text-sm text-gray-500 bg-gray-50 px-3 py-2 border-r whitespace-nowrap">{window.location.origin}/m/</span>
+                                <span className="text-sm text-muted-foreground bg-muted px-3 py-2 border-r border-border whitespace-nowrap">{window.location.origin}/m/</span>
                                 <Input id="slug" {...register('slug', { pattern: { value: /^[a-z0-9-]+$/, message: 'Solo letras minúsculas, números y guiones' } })} placeholder="mi-restaurante" className="border-0 focus-visible:ring-0" />
                             </div>
                             {errors.slug && <p className="text-sm text-red-600">{errors.slug.message}</p>}
                             {profile?.slug && (
-                                <div className="flex items-center justify-between p-3 bg-blue-50 rounded-lg">
-                                    <p className="text-sm text-blue-900 truncate">🔗 {window.location.origin}/m/{profile.slug}</p>
+                                <div className="flex items-center justify-between p-3 bg-primary/5 rounded-lg border border-primary/10">
+                                    <p className="text-sm text-foreground truncate">🔗 {window.location.origin}/m/{profile.slug}</p>
                                     <div className="flex items-center gap-1 shrink-0">
                                         <Button type="button" variant="ghost" size="sm" onClick={() => { navigator.clipboard.writeText(`${window.location.origin}/m/${profile.slug}`); toast.success('URL copiada') }}>
                                             <Copy className="w-4 h-4" />

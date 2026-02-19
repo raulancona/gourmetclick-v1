@@ -19,6 +19,7 @@ export function ProductForm({ product, onSubmit, onCancel, isLoading }) {
     const {
         register,
         handleSubmit,
+        watch,
         formState: { errors }
     } = useForm({
         defaultValues: {
@@ -28,6 +29,7 @@ export function ProductForm({ product, onSubmit, onCancel, isLoading }) {
             sku: product?.sku || '',
             image_url: product?.image_url || '',
             discount_percent: product?.discount_percent || 0,
+            costo: product?.costo || 0,
             is_vegan: product?.is_vegan || false,
             badge_text: product?.badge_text || '',
             is_available: product?.is_available !== undefined ? product.is_available : true
@@ -164,6 +166,7 @@ export function ProductForm({ product, onSubmit, onCancel, isLoading }) {
                 sku: data.sku || null,
                 image_url: imageUrl || null,
                 discount_percent: parseInt(data.discount_percent) || 0,
+                costo: parseFloat(data.costo) || 0,
                 is_vegan: data.is_vegan,
                 badge_text: data.badge_text?.trim() || null,
                 is_available: data.is_available,
@@ -233,7 +236,7 @@ export function ProductForm({ product, onSubmit, onCancel, isLoading }) {
                 </div>
 
                 {/* Price and SKU */}
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-3 gap-4">
                     <div>
                         <Label htmlFor="price">
                             Precio <span className="text-red-500">*</span>
@@ -252,11 +255,61 @@ export function ProductForm({ product, onSubmit, onCancel, isLoading }) {
                         />
                     </div>
                     <div>
+                        <Label htmlFor="costo">Costo</Label>
+                        <Input
+                            id="costo"
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            {...register('costo')}
+                            placeholder="0.00"
+                            className="text-foreground bg-white dark:bg-gray-800 border-border"
+                        />
+                    </div>
+                    <div>
                         <Label htmlFor="sku" className="text-foreground">SKU</Label>
                         <Input id="sku" {...register('sku')} placeholder="Ej: PROD-001" className="text-foreground bg-white dark:bg-gray-800 border-border" />
                     </div>
-
                 </div>
+
+                {/* Profitability Indicator */}
+                {(() => {
+                    const price = parseFloat(watch('price'))
+                    const cost = parseFloat(watch('costo'))
+
+                    if (!price || !cost || price <= 0) return null
+
+                    const profit = price - cost
+                    const margin = (profit / price) * 100
+
+                    let bgColor = 'bg-red-500/10 text-red-600 border-red-200'
+                    if (margin >= 65) bgColor = 'bg-emerald-500/10 text-emerald-600 border-emerald-200'
+                    else if (margin >= 35) bgColor = 'bg-amber-500/10 text-amber-600 border-amber-200'
+
+                    const currencyFormatter = new Intl.NumberFormat('es-MX', {
+                        style: 'currency',
+                        currency: 'MXN'
+                    })
+
+                    return (
+                        <div className={`p-3 rounded-xl border ${bgColor} flex items-center justify-between animate-in fade-in slide-in-from-top-2 duration-300`}>
+                            <div className="flex items-center gap-2">
+                                <div className={`w-2 h-2 rounded-full animate-pulse ${margin >= 65 ? 'bg-emerald-500' : margin >= 35 ? 'bg-amber-500' : 'bg-red-500'}`} />
+                                <span className="text-[10px] font-black uppercase tracking-widest">Análisis de Rentabilidad</span>
+                            </div>
+                            <div className="flex items-center gap-4">
+                                <div className="text-right">
+                                    <p className="text-[8px] font-bold uppercase opacity-60 leading-none mb-0.5">Utilidad</p>
+                                    <p className="text-sm font-black italic">{currencyFormatter.format(profit)}</p>
+                                </div>
+                                <div className="text-right border-l border-current/20 pl-4">
+                                    <p className="text-[8px] font-bold uppercase opacity-60 leading-none mb-0.5">Margen</p>
+                                    <p className="text-sm font-black italic">{margin.toFixed(1)}%</p>
+                                </div>
+                            </div>
+                        </div>
+                    )
+                })()}
 
                 {/* Discount + Badges Row */}
                 <div className="grid grid-cols-3 gap-3">

@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
     X, Edit2, Save, User, Phone, MapPin, Truck, Armchair, Store,
-    CreditCard, ExternalLink, Trash2
+    CreditCard, ExternalLink, Trash2, Clock, CheckCircle2
 } from 'lucide-react'
 import { Button } from '../../components/ui/button'
 import { Input } from '../../components/ui/input'
@@ -54,12 +54,21 @@ export function OrderDetailModal({ order, onClose, onUpdateStatus, onUpdateOrder
                 <div className="sticky top-0 bg-card border-b border-border px-5 py-4 flex items-center justify-between rounded-t-2xl z-10">
                     <div>
                         <h2 className="font-bold text-lg text-foreground">Orden #{order.id.slice(0, 8)}</h2>
-                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                            <span>{new Date(order.created_at).toLocaleString('es-MX', { dateStyle: 'medium', timeStyle: 'short' })}</span>
+                        <div className="flex flex-col gap-1 text-xs text-muted-foreground mt-1">
+                            <span className="flex items-center gap-1">
+                                <Clock className="w-3 h-3" />
+                                Creada: {new Date(order.fecha_creacion || order.created_at).toLocaleString('es-MX', { dateStyle: 'medium', timeStyle: 'short' })}
+                            </span>
+                            {order.fecha_cierre && (
+                                <span className="flex items-center gap-1 text-green-600 dark:text-green-400 font-medium">
+                                    <CheckCircle2 className="w-3 h-3" />
+                                    Cerrada: {new Date(order.fecha_cierre).toLocaleString('es-MX', { dateStyle: 'medium', timeStyle: 'short' })}
+                                </span>
+                            )}
                             {!['delivered', 'cancelled'].includes(order.status) && (
                                 <button
                                     onClick={handleEditInPOS}
-                                    className="text-primary hover:underline flex items-center gap-1 ml-2 font-medium"
+                                    className="text-primary hover:underline flex items-center gap-1 mt-1 font-medium"
                                 >
                                     <Edit2 className="w-3 h-3" />
                                     Editar productos
@@ -221,23 +230,40 @@ export function OrderDetailModal({ order, onClose, onUpdateStatus, onUpdateOrder
                             <div>
                                 <h3 className="text-sm font-bold text-foreground mb-2">Productos</h3>
                                 <div className="bg-muted/30 rounded-xl divide-y divide-border overflow-hidden border border-border">
-                                    {items.map((item, i) => (
-                                        <div key={i} className="p-3 flex justify-between items-start bg-card/50">
-                                            <div>
-                                                <span className="font-bold text-sm text-foreground">{item.quantity}x {item.product?.name || item.name}</span>
-                                                {item.modifiers?.length > 0 && (
-                                                    <div className="flex flex-wrap gap-1 mt-1">
-                                                        {item.modifiers.map((m, j) => (
-                                                            <span key={j} className="text-[10px] px-1.5 py-0.5 bg-muted rounded text-muted-foreground font-medium border border-border/50">
-                                                                {m.name}
-                                                            </span>
+                                    {items.map((item, i) => {
+                                        // Detect any form of extras/modifiers
+                                        const extras = item.modifiers || item.extras || item.variantes || item.modificadores || []
+
+                                        return (
+                                            <div key={i} className="bg-card/50">
+                                                <div className="p-3 flex justify-between items-start">
+                                                    <div>
+                                                        <span className="font-bold text-sm text-foreground">{item.quantity}x {item.product?.name || item.name}</span>
+                                                    </div>
+                                                    <span className="font-black text-sm text-foreground">
+                                                        ${parseFloat((item.unit_price || item.price) * item.quantity).toFixed(2)}
+                                                    </span>
+                                                </div>
+
+                                                {/* Extras Hierarchical Rendering */}
+                                                {extras.length > 0 && (
+                                                    <div className="px-3 pb-3 ml-4 space-y-1 border-l-2 border-primary/10">
+                                                        {extras.map((ext, j) => (
+                                                            <div key={j} className="flex justify-between items-center text-[11px] text-muted-foreground font-medium">
+                                                                <div className="flex items-center gap-1.5">
+                                                                    <span className="w-1.5 h-1.5 rounded-full bg-primary/20" />
+                                                                    <span>{ext.name || ext.nombre}</span>
+                                                                </div>
+                                                                {ext.price > 0 && (
+                                                                    <span>+${parseFloat(ext.price * item.quantity).toFixed(2)}</span>
+                                                                )}
+                                                            </div>
                                                         ))}
                                                     </div>
                                                 )}
                                             </div>
-                                            <span className="font-black text-sm text-foreground"> ${parseFloat(item.price * item.quantity).toFixed(2)}</span>
-                                        </div>
-                                    ))}
+                                        )
+                                    })}
                                     <div className="p-4 flex justify-between bg-muted/50 items-center">
                                         <span className="font-bold text-foreground">Total</span>
                                         <span className="font-black text-xl text-primary">${parseFloat(order.total).toFixed(2)}</span>

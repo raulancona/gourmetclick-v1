@@ -1,25 +1,36 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom'
-import { LayoutDashboard, UtensilsCrossed, FolderTree, ClipboardList, Settings, LogOut, Calculator, ChefHat, Home, Grid, Package, Sun, Moon, Globe, BarChart3 } from 'lucide-react'
+import { LayoutDashboard, UtensilsCrossed, FolderTree, ClipboardList, Settings, LogOut, Calculator, ChefHat, Home, Grid, Package, Sun, Moon, Globe, BarChart3, Receipt, Lock } from 'lucide-react'
 import { useAuth } from '../auth/auth-context'
+import { useTerminal } from '../auth/terminal-context'
 import { useTheme } from '../../components/theme-provider'
 import { toast } from 'sonner'
-const navigation = [
-    { name: 'Inicio', href: '/dashboard', icon: Home },
-    { name: 'POS', href: '/pos', icon: Grid },
-    { name: 'Órdenes', href: '/orders', icon: ClipboardList },
-    { name: 'Menú', href: '/products', icon: Package },
-    { name: 'Categorías', href: '/categories', icon: FolderTree },
-    { name: 'Caja', href: '/caja', icon: Calculator },
-    { name: 'Reportes', href: '/reportes', icon: BarChart3 },
-    { name: 'LinkCard', href: '/menu-links', icon: Globe },
-    { name: 'Ajustes', href: '/settings', icon: Settings },
-]
 
 export function Sidebar({ isOpen, onClose }) {
     const location = useLocation()
     const navigate = useNavigate()
     const { user, signOut } = useAuth()
+    const { activeEmployee, logout: terminalLock } = useTerminal()
     const { theme, setTheme } = useTheme()
+
+    const isAdmin = !activeEmployee // For now, if no employee is active, we are in Admin mode (the direct user)
+    const isCajero = activeEmployee?.rol === 'cajero'
+    const isMesero = activeEmployee?.rol === 'mesero'
+
+    const navigation = [
+        { name: 'Inicio', href: '/dashboard', icon: Home, roles: ['admin'] },
+        { name: 'POS', href: '/pos', icon: Grid, roles: ['admin', 'cajero', 'mesero'] },
+        { name: 'Órdenes', href: '/orders', icon: ClipboardList, roles: ['admin', 'cajero'] },
+        { name: 'Menú', href: '/products', icon: Package, roles: ['admin'] },
+        { name: 'Categorías', href: '/categories', icon: FolderTree, roles: ['admin'] },
+        { name: 'Caja', href: '/caja', icon: Calculator, roles: ['admin', 'cajero'] },
+        { name: 'Gastos', href: '/expenses', icon: Receipt, roles: ['admin'] },
+        { name: 'Reportes', href: '/reportes', icon: BarChart3, roles: ['admin'] },
+        { name: 'Personal', href: '/staff', icon: Settings, roles: ['admin'] }, // Placeholder for staff management link
+        { name: 'Settings', href: '/settings', icon: Settings, roles: ['admin'] },
+    ].filter(item => {
+        if (isAdmin) return true // Admin sees everything
+        return item.roles.includes(activeEmployee?.rol)
+    })
 
     const handleLogout = async () => {
         try {
@@ -30,6 +41,13 @@ export function Sidebar({ isOpen, onClose }) {
             toast.error('Error al cerrar sesión')
         }
     }
+
+    const handleLock = () => {
+        terminalLock()
+        toast.info('Terminal bloqueado')
+    }
+
+    if (isMesero) return null // Strict rule: Waiters only see POS, no sidebar. We handle POS full view.
 
     return (
         <>
@@ -83,21 +101,45 @@ export function Sidebar({ isOpen, onClose }) {
                 </nav>
 
                 {/* User section */}
-                <div className="mt-auto pt-4 shrink-0 flex flex-col gap-2">
-                    <button
-                        onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-                        title="Cambiar tema"
-                        className="w-10 h-10 flex items-center justify-center text-muted-foreground hover:text-primary hover:bg-primary/10 rounded-xl transition-all"
-                    >
-                        {theme === 'dark' ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
-                    </button>
-                    <button
-                        onClick={handleLogout}
-                        title="Cerrar sesión"
-                        className="w-10 h-10 flex items-center justify-center text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-xl transition-all"
-                    >
-                        <LogOut className="w-5 h-5" />
-                    </button>
+                <div className="mt-auto px-4 w-full space-y-4">
+                    {activeEmployee && (
+                        <div className="bg-muted/50 p-3 rounded-2xl flex items-center gap-3 border border-border">
+                            <div className="w-8 h-8 bg-primary/20 text-primary rounded-lg flex items-center justify-center font-black text-xs">
+                                {activeEmployee.nombre[0]}
+                            </div>
+                            <div className="flex flex-col overflow-hidden">
+                                <span className="text-[10px] font-black uppercase tracking-widest text-primary leading-tight">{activeEmployee.rol}</span>
+                                <span className="text-xs font-bold text-foreground truncate">{activeEmployee.nombre}</span>
+                            </div>
+                        </div>
+                    )}
+
+                    <div className="flex items-center justify-between gap-2">
+                        <button
+                            onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+                            className="flex-1 h-11 flex items-center justify-center text-muted-foreground hover:text-primary hover:bg-primary/10 rounded-xl transition-all border border-transparent"
+                        >
+                            {theme === 'dark' ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
+                        </button>
+
+                        {activeEmployee ? (
+                            <button
+                                onClick={handleLock}
+                                title="Bloquear Terminal"
+                                className="flex-1 h-11 flex items-center justify-center text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-950/30 rounded-xl transition-all border border-amber-200/50"
+                            >
+                                <Lock className="w-5 h-5" />
+                            </button>
+                        ) : (
+                            <button
+                                onClick={handleLogout}
+                                title="Cerrar sesión"
+                                className="flex-1 h-11 flex items-center justify-center text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-xl transition-all"
+                            >
+                                <LogOut className="w-5 h-5" />
+                            </button>
+                        )}
+                    </div>
                 </div>
             </aside>
         </>

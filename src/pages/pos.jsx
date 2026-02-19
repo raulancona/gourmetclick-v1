@@ -6,6 +6,7 @@ import {
 } from 'lucide-react'
 import { Button } from '../components/ui/button'
 import { Input } from '../components/ui/input'
+import { Label } from '../components/ui/label'
 import { Textarea } from '../components/ui/textarea'
 import { getProducts } from '../lib/product-service'
 import { getCategories } from '../lib/category-service'
@@ -16,9 +17,14 @@ import { useAuth } from '../features/auth/auth-context'
 import { supabase } from '../lib/supabase'
 import { useCategorySubscription } from '../hooks/use-category-subscription'
 import { Modal, ModalFooter } from '../components/ui/modal'
+import { useTerminal } from '../features/auth/terminal-context'
+import { useQueryClient } from '@tanstack/react-query'
 
 export default function POSPage() {
-    const { user, signOut } = useAuth()
+    const { user } = useAuth()
+    const { activeEmployee } = useTerminal()
+    const isMesero = activeEmployee?.rol === 'mesero'
+    const queryClient = useQueryClient()
     const [loading, setLoading] = useState(true)
     const [products, setProducts] = useState([])
     const [categories, setCategories] = useState([])
@@ -33,6 +39,7 @@ export default function POSPage() {
     const [deliveryAddress, setDeliveryAddress] = useState('')
     const [notes, setNotes] = useState('')
     const [isSubmitting, setIsSubmitting] = useState(false)
+    const [montoRecibido, setMontoRecibido] = useState('')
 
     const [editingOrder, setEditingOrder] = useState(null)
     const [selectedProduct, setSelectedProduct] = useState(null)
@@ -298,6 +305,7 @@ export default function POSPage() {
             setTableNumber('')
             setDeliveryAddress('')
             setNotes('')
+            setMontoRecibido('')
             setShowMobileCart(false)
         } catch (error) {
             console.error(error)
@@ -584,6 +592,58 @@ export default function POSPage() {
                         />
                     </div>
 
+                    {/* Payment Method Selector */}
+                    <div className="space-y-2">
+                        <Label className="text-[10px] uppercase font-bold text-muted-foreground ml-1">Método de Pago</Label>
+                        <div className="grid grid-cols-3 gap-2">
+                            {[
+                                { id: 'cash', label: 'Efectivo', icon: Banknote },
+                                { id: 'card', label: 'Tarjeta', icon: CreditCard },
+                                { id: 'transfer', label: 'Transf.', icon: Landmark },
+                            ].map((method) => (
+                                <button
+                                    key={method.id}
+                                    onClick={() => setPaymentMethod(method.id)}
+                                    className={`flex flex-col items-center justify-center p-2 rounded-xl border-2 transition-all gap-1 ${paymentMethod === method.id
+                                        ? 'border-primary bg-primary/5 text-primary'
+                                        : 'border-transparent bg-muted/50 text-muted-foreground hover:bg-muted'
+                                        }`}
+                                >
+                                    <method.icon className="w-4 h-4" />
+                                    <span className="text-[10px] font-bold">{method.label}</span>
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+
+                    {/* Cash Calculation UI */}
+                    {paymentMethod === 'cash' && (
+                        <div className="grid grid-cols-2 gap-3 pt-2">
+                            <div className="space-y-1.5">
+                                <Label className="text-[10px] uppercase font-bold text-muted-foreground ml-1">Monto Recibido</Label>
+                                <div className="relative">
+                                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">$</span>
+                                    <Input
+                                        type="number"
+                                        placeholder="0.00"
+                                        value={montoRecibido}
+                                        onChange={(e) => setMontoRecibido(e.target.value)}
+                                        className="pl-6 bg-muted/30 border-none rounded-xl h-10 font-bold"
+                                    />
+                                </div>
+                            </div>
+                            <div className="space-y-1.5">
+                                <Label className="text-[10px] uppercase font-bold text-muted-foreground ml-1">Cambio</Label>
+                                <div className="h-10 px-3 flex items-center bg-primary/5 text-primary font-black rounded-xl border border-primary/20">
+                                    {montoRecibido && parseFloat(montoRecibido) >= cartTotal
+                                        ? formatCurrency(parseFloat(montoRecibido) - cartTotal)
+                                        : '$0.00'
+                                    }
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
                     {/* Totals */}
                     <div className="space-y-2 py-2">
                         <div className="flex justify-between text-sm text-muted-foreground">
@@ -600,7 +660,11 @@ export default function POSPage() {
                     <Button
                         className="w-full h-12 rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 transition-all shadow-lg shadow-primary/20"
                         onClick={handleCreateOrder}
-                        disabled={cart.length === 0 || isSubmitting}
+                        disabled={
+                            cart.length === 0 ||
+                            isSubmitting ||
+                            (paymentMethod === 'cash' && (!montoRecibido || parseFloat(montoRecibido) < cartTotal))
+                        }
                     >
                         {isSubmitting ? (<Loader2 className="w-5 h-5 animate-spin" />) : (
                             <div className="flex items-center justify-between w-full px-2">
