@@ -2,24 +2,26 @@ import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { getSessionsHistory, getOrderStats } from '../../lib/order-service'
 import { useAuth } from '../auth/auth-context'
+import { useTenant } from '../auth/tenant-context'
 import { formatCurrency } from '../../lib/utils'
 import { TrendingUp, TrendingDown, CheckCircle2, Calendar, User, Clock, Shield } from 'lucide-react'
 import { SessionDetailModal } from './session-detail-modal'
 
 export function CortesHistory() {
     const { user } = useAuth()
+    const { tenant } = useTenant()
     const [selectedSession, setSelectedSession] = useState(null)
     const { data: history = [], isLoading } = useQuery({
-        queryKey: ['sessions-history', user?.id],
-        queryFn: () => getSessionsHistory(user.id),
-        enabled: !!user?.id
+        queryKey: ['sessions-history', tenant?.id],
+        queryFn: () => getSessionsHistory(tenant.id),
+        enabled: !!tenant?.id
     })
 
     // Fetch active session current total to avoid "Calculando..."
     const { data: activeStats } = useQuery({
-        queryKey: ['active-session-stats', user?.id],
-        queryFn: () => getOrderStats(user.id, { filterByShift: true }), // Current open session stats
-        enabled: !!user?.id && history.some(s => s.estado === 'abierta'),
+        queryKey: ['active-session-stats', tenant?.id],
+        queryFn: () => getOrderStats(tenant.id, { filterByShift: true }), // Current open session stats
+        enabled: !!tenant?.id && history.some(s => s.estado === 'abierta'),
         refetchInterval: 30000 // Update every 30s
     })
 

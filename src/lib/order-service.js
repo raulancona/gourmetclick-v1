@@ -54,7 +54,7 @@ export async function getOrders(restaurantId, { includeClosed = false, startDate
     let query = supabase
         .from('orders')
         .select('*', { count: 'exact' }) // Request count for pagination metadata
-        .eq('user_id', restaurantId)
+        .or(`restaurant_id.eq.${restaurantId},user_id.eq.${restaurantId}`)
         .order('created_at', { ascending: false })
         .range(from, to)
 
@@ -161,7 +161,7 @@ export async function updateOrderStatus(orderId, status, restaurantId) {
         .from('orders')
         .update(updates)
         .eq('id', orderId)
-        .eq('user_id', restaurantId)
+        .or(`restaurant_id.eq.${restaurantId},user_id.eq.${restaurantId}`)
         .select()
         .single()
 
@@ -174,7 +174,7 @@ export async function updateOrder(orderId, updates, restaurantId) {
         .from('orders')
         .update({ ...updates, updated_at: new Date().toISOString() })
         .eq('id', orderId)
-        .eq('user_id', userId)
+        .or(`restaurant_id.eq.${restaurantId},user_id.eq.${restaurantId}`)
         .select()
         .single()
 
@@ -187,7 +187,7 @@ export async function deleteOrder(orderId, restaurantId) {
         .from('orders')
         .delete()
         .eq('id', orderId)
-        .eq('user_id', userId)
+        .or(`restaurant_id.eq.${restaurantId},user_id.eq.${restaurantId}`)
 
     if (error) throw error
 }
@@ -196,7 +196,7 @@ export async function getOrderStats(restaurantId, { cashCutId = null, filterBySh
     let query = supabase
         .from('orders')
         .select('status, total, order_type, payment_method, created_at')
-        .eq('user_id', restaurantId)
+        .or(`restaurant_id.eq.${restaurantId},user_id.eq.${restaurantId}`)
 
     if (cashCutId) {
         query = query.eq('cash_cut_id', cashCutId)
@@ -260,7 +260,7 @@ export async function getSalesAnalytics(restaurantId, { cashCutId = null, filter
     let query = supabase
         .from('orders')
         .select('items, total, created_at, customer_phone, status')
-        .eq('user_id', restaurantId)
+        .or(`restaurant_id.eq.${restaurantId},user_id.eq.${restaurantId}`)
         .neq('status', 'cancelled')
 
     if (cashCutId) {
@@ -413,7 +413,7 @@ export async function getUnclosedOrders(restaurantId) {
     const { data, error } = await supabase
         .from('orders')
         .select('*')
-        .eq('user_id', restaurantId)
+        .or(`restaurant_id.eq.${restaurantId},user_id.eq.${restaurantId}`)
         .eq('sesion_caja_id', activeSession.id)
         .neq('status', 'completed')
         .neq('status', 'cancelled')
@@ -434,7 +434,6 @@ export async function createCashCut(restaurantId, summary, orderIds) {
         .from('cash_cuts')
         .insert([{
             restaurant_id: restaurantId,
-            user_id: restaurantId, // Legacy user_id support
             total_cash: summary.byPayment.cash,
             total_card: summary.byPayment.card,
             total_transfer: summary.byPayment.transfer,
@@ -452,7 +451,7 @@ export async function createCashCut(restaurantId, summary, orderIds) {
         .from('orders')
         .update({ cash_cut_id: cut.id })
         .in('id', orderIds)
-        .eq('user_id', restaurantId)
+        .or(`restaurant_id.eq.${restaurantId},user_id.eq.${restaurantId}`)
 
     if (updateError) throw updateError
 
@@ -466,7 +465,7 @@ export async function getCashCuts(restaurantId) {
     const { data, error } = await supabase
         .from('cash_cuts')
         .select('*')
-        .eq('user_id', restaurantId)
+        .eq('restaurant_id', restaurantId)
         .order('cut_date', { ascending: false })
 
     if (error) throw error
@@ -493,7 +492,7 @@ export async function getSessionFinancialSummary(sessionId) {
     const { data: orders, error: ordersError } = await supabase
         .from('orders')
         .select('id, folio, total, payment_method, status, customer_name, order_type, table_number, items, created_at')
-        .eq('user_id', session.restaurante_id)
+        .or(`restaurant_id.eq.${session.restaurante_id},user_id.eq.${session.restaurante_id}`)
         .in('status', ['delivered', 'completed'])
         .gte('created_at', startTime)
         .lte('created_at', endTime)
@@ -539,7 +538,6 @@ export async function createBlindCashCut(restaurantId, montoReal) {
     const { data: cut, error: cutError } = await supabase
         .from('cortes_caja')
         .insert([{
-            usuario_id: restaurantId,
             monto_esperado: montoEsperado,
             monto_real: parseFloat(montoReal),
             diferencia: diferencia
@@ -555,7 +553,7 @@ export async function createBlindCashCut(restaurantId, montoReal) {
             .from('orders')
             .update({ cash_cut_id: cut.id }) // Using the new cut ID
             .in('id', summary.orderIds)
-            .eq('user_id', restaurantId)
+            .or(`restaurant_id.eq.${restaurantId},user_id.eq.${restaurantId}`)
 
         if (updateError) throw updateError
     }
@@ -572,6 +570,8 @@ export async function getActiveSession(restaurantId) {
         .select('*, empleado:empleado_id(nombre)')
         .eq('restaurante_id', restaurantId)
         .eq('estado', 'abierta')
+        .order('opened_at', { ascending: false })
+        .limit(1)
         .maybeSingle()
 
     if (error) throw error

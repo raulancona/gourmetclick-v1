@@ -13,33 +13,69 @@ export const useAuth = () => {
 
 export function AuthProvider({ children }) {
     const [user, setUser] = useState(null)
+    const [profile, setProfile] = useState(null)
     const [loading, setLoading] = useState(true)
 
-    useEffect(() => {
-        // Get initial session
-        supabase.auth.getSession().then(({ data: { session } }) => {
-            setUser(session?.user ?? null)
-            setLoading(false)
+    const loadProfileFromSession = (sessionUser) => {
+        if (!sessionUser) {
+            setProfile(null)
+            return
+        }
+
+        // Extraer rol directamente del metadata del JWT (Phase 2/4)
+        const role = sessionUser.app_metadata?.role || 'staff'
+        setProfile({
+            id: sessionUser.id,
+            role: role
         })
+    }
+
+    useEffect(() => {
+        const initSession = async () => {
+            try {
+                const { data: { session } } = await supabase.auth.getSession()
+                const currentUser = session?.user ?? null
+                setUser(currentUser)
+                loadProfileFromSession(currentUser)
+            } catch (err) {
+                console.error('Error in initSession:', err)
+            } finally {
+                setLoading(false)
+            }
+        }
+
+        initSession()
 
         // Listen for auth changes
         const {
             data: { subscription },
-        } = supabase.auth.onAuthStateChange((_event, session) => {
-            setUser(session?.user ?? null)
-            setLoading(false)
+        } = supabase.auth.onAuthStateChange(async (_event, session) => {
+            try {
+                const currentUser = session?.user ?? null
+                setUser(currentUser)
+                loadProfileFromSession(currentUser)
+            } catch (err) {
+                console.error('Error in onAuthStateChange:', err)
+            } finally {
+                setLoading(false)
+            }
         })
 
         return () => subscription.unsubscribe()
     }, [])
 
     const signIn = async (email, password) => {
-        const { data, error } = await supabase.auth.signInWithPassword({
-            email,
-            password,
-        })
-        if (error) throw error
-        return data
+        try {
+            setLoading(true)
+            const { data, error } = await supabase.auth.signInWithPassword({
+                email,
+                password,
+            })
+            if (error) throw error
+            return data
+        } finally {
+            setLoading(false)
+        }
     }
 
     const signUp = async (email, password) => {
@@ -52,12 +88,15 @@ export function AuthProvider({ children }) {
     }
 
     const signOut = async () => {
+        setProfile(null)
+        setUser(null)
         const { error } = await supabase.auth.signOut()
         if (error) throw error
     }
 
     const value = {
         user,
+        profile,
         loading,
         signIn,
         signUp,

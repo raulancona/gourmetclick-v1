@@ -1,5 +1,6 @@
-import { createContext, useContext, useMemo } from 'react'
+import { createContext, useContext, useEffect, useState } from 'react'
 import { useAuth } from './auth-context'
+import { supabase } from '../../lib/supabase'
 
 const TenantContext = createContext({
     tenant: null,
@@ -15,21 +16,63 @@ export const useTenant = () => {
 }
 
 export function TenantProvider({ children }) {
-    const { user, loading: authLoading } = useAuth()
+    const { user, profile, loading: authLoading } = useAuth()
+    const [tenant, setTenant] = useState(null)
+    const [loading, setLoading] = useState(true)
 
-    const tenant = useMemo(() => {
-        if (!user) return null
-        return {
-            id: user.id,
-            email: user.email,
-            // Future: Fetch restaurant details from DB using user.id
-            // For now, user.id IS the tenant ID (Owner-based model)
+    useEffect(() => {
+        const fetchTenant = async () => {
+            if (!user || !profile) {
+                setTenant(null)
+                setLoading(false)
+                return
+            }
+
+            // Timeout de seguridad
+            const timeout = setTimeout(() => {
+                setLoading(false)
+            }, 5000)
+
+            try {
+                // Fetch the first restaurant the user has access to
+                const { data, error } = await supabase
+                    .from('restaurants')
+                    .select('id, name')
+                    .limit(1)
+                    .maybeSingle()
+
+                if (error) throw error
+
+                if (data) {
+                    setTenant({
+                        id: data.id,
+                        name: data.name,
+                        role: profile.role
+                    })
+                } else {
+                    // Fallback para usuarios legacy que no tienen registro en "restaurants"
+                    setTenant({
+                        id: user.id,
+                        name: profile.name || 'Mi Restaurante',
+                        role: profile.role
+                    })
+                }
+            } catch (err) {
+                console.error('Error fetching tenant:', err)
+            } finally {
+                clearTimeout(timeout)
+                setLoading(false)
+            }
         }
-    }, [user])
+
+        if (!authLoading) {
+            fetchTenant()
+        }
+    }, [user, profile, authLoading])
 
     const value = {
         tenant,
-        loading: authLoading
+        loading: loading || authLoading
     }
 
     return (

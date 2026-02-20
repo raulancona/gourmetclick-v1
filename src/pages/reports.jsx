@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { useAuth } from '../features/auth/auth-context'
+import { useTenant } from '../features/auth/tenant-context'
 import { getSessionsHistory } from '../lib/order-service'
 import { formatCurrency } from '../lib/utils'
 import { Loader2, TrendingUp, TrendingDown, CheckCircle2, Clock, User, Shield } from 'lucide-react'
@@ -7,11 +8,12 @@ import { CortesHistory } from '../features/cash-closing/cortes-history'
 
 export function ReportsPage() {
     const { user } = useAuth()
+    const { tenant } = useTenant()
 
     const { data: history = [], isLoading } = useQuery({
-        queryKey: ['sessions-history', user?.id],
-        queryFn: () => getSessionsHistory(user.id),
-        enabled: !!user?.id
+        queryKey: ['sessions-history', tenant?.id],
+        queryFn: () => getSessionsHistory(tenant.id),
+        enabled: !!tenant?.id
     })
 
     const closedSessions = history.filter(s => s.estado === 'cerrada')

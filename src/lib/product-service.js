@@ -17,7 +17,7 @@ export async function getProducts(userId, { page = 1, pageSize = 50 } = {}) {
     const { data, error, count } = await supabase
         .from('products')
         .select('*', { count: 'exact' })
-        .eq('user_id', userId)
+        .or(`restaurant_id.eq.${userId},user_id.eq.${userId}`)
         .eq('is_active', true) // Only fetch active products
         .order('created_at', { ascending: false })
         .range(from, to)
@@ -37,7 +37,7 @@ export async function getProductById(id, userId) {
         .from('products')
         .select('*')
         .eq('id', id)
-        .eq('user_id', userId)
+        .or(`restaurant_id.eq.${userId},user_id.eq.${userId}`)
         .single()
 
     if (error) throw error
@@ -55,7 +55,7 @@ export async function createProduct(productData, userId) {
         .from('products')
         .insert([{
             ...productData,
-            user_id: userId
+            restaurant_id: userId
         }])
         .select()
         .single()
@@ -82,7 +82,7 @@ export async function updateProduct(id, productData, userId) {
             updated_at: new Date().toISOString()
         })
         .eq('id', id)
-        .eq('user_id', userId)
+        .or(`restaurant_id.eq.${userId},user_id.eq.${userId}`)
         .select()
         .single()
 
@@ -104,7 +104,7 @@ export async function deleteProduct(id, userId) {
         .from('products')
         .update({ is_active: false }) // Soft delete
         .eq('id', id)
-        .eq('user_id', userId)
+        .or(`restaurant_id.eq.${userId},user_id.eq.${userId}`)
 
     if (error) throw error
 }
@@ -118,7 +118,7 @@ export async function deleteProduct(id, userId) {
 export async function bulkCreateProducts(productsArray, userId) {
     const productsWithUserId = productsArray.map(product => ({
         ...product,
-        user_id: userId
+        restaurant_id: userId
     }))
 
     const { data, error } = await supabase
@@ -139,7 +139,7 @@ export async function getProductCount(userId) {
     const { count, error } = await supabase
         .from('products')
         .select('*', { count: 'exact', head: true })
-        .eq('user_id', userId)
+        .or(`restaurant_id.eq.${userId},user_id.eq.${userId}`)
 
     if (error) throw error
     return count || 0

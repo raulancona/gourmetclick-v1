@@ -11,8 +11,11 @@ export function Sidebar({ isOpen, onClose }) {
     const { user, signOut } = useAuth()
     const { activeEmployee, logout: terminalLock } = useTerminal()
     const { theme, setTheme } = useTheme()
+    const { profile } = useAuth()
 
-    const isAdmin = !activeEmployee // For now, if no employee is active, we are in Admin mode (the direct user)
+    const isSuperAdmin = profile?.role === 'superadmin'
+    const isOwner = profile?.role === 'owner'
+    const isAdmin = (isOwner || isSuperAdmin) && !activeEmployee
     const isCajero = activeEmployee?.rol === 'cajero'
     const isMesero = activeEmployee?.rol === 'mesero'
 
@@ -70,7 +73,10 @@ export function Sidebar({ isOpen, onClose }) {
                     </div>
                     <div className="flex flex-col">
                         <span className="font-black text-foreground text-lg leading-none tracking-tight">Gourmet</span>
-                        <span className="font-bold text-primary text-sm leading-none tracking-wider">CLICK</span>
+                        <div className="flex items-center gap-1">
+                            <span className="font-bold text-primary text-sm leading-none tracking-wider">CLICK</span>
+                            {isSuperAdmin && <span className="text-[10px] bg-red-500 text-white px-1 rounded font-black leading-none">PRO</span>}
+                        </div>
                     </div>
                 </div>
 

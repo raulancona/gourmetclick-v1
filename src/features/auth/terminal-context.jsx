@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from './auth-context'
+import { useTenant } from './tenant-context'
 import { useNavigate } from 'react-router-dom'
 
 const TerminalContext = createContext({})
@@ -15,6 +16,7 @@ export const useTerminal = () => {
 
 export function TerminalProvider({ children }) {
     const { user } = useAuth()
+    const { tenant } = useTenant()
     const navigate = useNavigate()
     const [activeEmployee, setActiveEmployee] = useState(() => {
         const saved = localStorage.getItem('pos_session')
@@ -31,11 +33,12 @@ export function TerminalProvider({ children }) {
 
     const login = async (pin) => {
         if (!user) throw new Error('Usuario no autenticado')
+        if (!tenant) throw new Error('Cargando local...')
 
         const { data, error } = await supabase
             .from('empleados')
             .select('*')
-            .eq('restaurante_id', user.id)
+            .eq('restaurante_id', tenant.id)
             .eq('pin', pin)
             .eq('activo', true)
             .single()

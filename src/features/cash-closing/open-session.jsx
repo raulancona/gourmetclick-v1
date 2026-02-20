@@ -7,9 +7,11 @@ import { toast } from 'sonner'
 import { openSession } from '../../lib/order-service'
 import { useAuth } from '../auth/auth-context'
 import { useTerminal } from '../auth/terminal-context'
+import { useTenant } from '../auth/tenant-context'
 
 export function OpenSession({ onComplete }) {
     const { user } = useAuth()
+    const { tenant } = useTenant()
     const { activeEmployee } = useTerminal()
     const [fondoInicial, setFondoInicial] = useState('')
     const [isLoading, setIsLoading] = useState(false)
@@ -23,7 +25,7 @@ export function OpenSession({ onComplete }) {
 
         try {
             setIsLoading(true)
-            await openSession(user.id, activeEmployee?.id || null, fondoInicial)
+            await openSession(tenant.id, activeEmployee?.id || null, fondoInicial)
             toast.success('Sesión de caja abierta con éxito')
             if (onComplete) onComplete()
         } catch (error) {

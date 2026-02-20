@@ -27,7 +27,7 @@ export async function getTotalVisits(restaurantId) {
     const { count, error } = await supabase
         .from('analytics')
         .select('*', { count: 'exact', head: true })
-        .eq('restaurant_id', restaurantId)
+        .or(`restaurant_id.eq.${restaurantId},user_id.eq.${restaurantId}`)
 
     if (error) throw error
     return count || 0
@@ -40,7 +40,7 @@ export async function getVisitsByPeriod(restaurantId, startDate, endDate) {
     const { data, error } = await supabase
         .from('analytics')
         .select('visited_at')
-        .eq('restaurant_id', restaurantId)
+        .or(`restaurant_id.eq.${restaurantId},user_id.eq.${restaurantId}`)
         .gte('visited_at', startDate.toISOString())
         .lte('visited_at', endDate.toISOString())
         .order('visited_at', { ascending: true })
@@ -59,7 +59,7 @@ export async function getVisitsThisWeek(restaurantId) {
     const { count, error } = await supabase
         .from('analytics')
         .select('*', { count: 'exact', head: true })
-        .eq('restaurant_id', restaurantId)
+        .or(`restaurant_id.eq.${restaurantId},user_id.eq.${restaurantId}`)
         .gte('visited_at', weekAgo.toISOString())
 
     if (error) throw error
@@ -76,7 +76,7 @@ export async function getVisitsThisMonth(restaurantId) {
     const { count, error } = await supabase
         .from('analytics')
         .select('*', { count: 'exact', head: true })
-        .eq('restaurant_id', restaurantId)
+        .or(`restaurant_id.eq.${restaurantId},user_id.eq.${restaurantId}`)
         .gte('visited_at', monthAgo.toISOString())
 
     if (error) throw error

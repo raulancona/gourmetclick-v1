@@ -29,11 +29,14 @@ export function ProductsPage() {
 
 
     // Fetch products
-    const { data: products = [], isLoading } = useQuery({
+    const { data: productsData, isLoading } = useQuery({
         queryKey: ['products', tenant?.id],
         queryFn: () => getProducts(tenant.id),
         enabled: !!tenant?.id
     })
+
+    // Extract the actual array from the returned object { data, count }
+    const products = productsData?.data || []
 
     // Create mutation
     const createMutation = useMutation({
