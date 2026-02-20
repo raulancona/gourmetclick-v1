@@ -10,8 +10,8 @@ const ORDER_STATUSES = {
     preparing: { label: 'En preparación', emoji: '👨‍🍳', color: '#8B5CF6' },
     ready: { label: 'Listo', emoji: '📦', color: '#10B981' },
     on_the_way: { label: 'En camino', emoji: '🛵', color: '#6366F1' },
-    delivered: { label: 'Entregado (Por Cortar)', emoji: '🎉', color: '#22C55E' },
-    completed: { label: 'En Corte (Liquidada)', emoji: '🏁', color: '#111827', hidden: true },
+    delivered: { label: 'Entregado', emoji: '🎉', color: '#22C55E' },
+    completed: { label: 'Liquidada', emoji: '🏁', color: '#111827', hidden: true },
     cancelled: { label: 'Cancelado', emoji: '❌', color: '#EF4444' },
 }
 
@@ -522,6 +522,21 @@ export async function getSessionFinancialSummary(sessionId) {
         byPayment,
         orderIds: (orders || []).map(o => o.id),
         orders: orders || [],  // Full order list for detail view
+    }
+}
+
+/**
+ * Get Financial Summary for the active session (used for Blind Cut)
+ */
+export async function getDailyFinancialSummary(restaurantId) {
+    const activeSession = await getActiveSession(restaurantId)
+    if (!activeSession) return { expectedBalance: 0, orderIds: [], totalSales: 0, totalExpenses: 0 }
+
+    const summary = await getSessionFinancialSummary(activeSession.id)
+
+    return {
+        ...summary,
+        expectedBalance: parseFloat(activeSession.fondo_inicial || 0) + summary.totalSales - summary.totalExpenses
     }
 }
 

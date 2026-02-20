@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
     X, Edit2, Save, User, Phone, MapPin, Truck, Armchair, Store,
-    CreditCard, ExternalLink, Trash2, Clock, CheckCircle2
+    CreditCard, ExternalLink, Trash2, Clock, CheckCircle2, Lock
 } from 'lucide-react'
 import { Button } from '../../components/ui/button'
 import { Input } from '../../components/ui/input'
@@ -59,6 +59,12 @@ export function OrderDetailModal({ order, onClose, onUpdateStatus, onUpdateOrder
                                 <Clock className="w-3 h-3" />
                                 Creada: {new Date(order.fecha_creacion || order.created_at).toLocaleString('es-MX', { dateStyle: 'medium', timeStyle: 'short' })}
                             </span>
+                            {order.status === 'delivered' && !order.cash_cut_id && (
+                                <span className="flex items-center gap-1 text-amber-600 dark:text-amber-400 font-bold bg-amber-50 dark:bg-amber-900/20 px-2 py-0.5 rounded-lg border border-amber-200/50 w-fit mt-1">
+                                    <Lock className="w-3 h-3" />
+                                    Por Cortar (Pendiente de Cierre)
+                                </span>
+                            )}
                             {order.fecha_cierre && (
                                 <span className="flex items-center gap-1 text-green-600 dark:text-green-400 font-medium">
                                     <CheckCircle2 className="w-3 h-3" />

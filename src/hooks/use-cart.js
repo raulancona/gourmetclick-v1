@@ -52,29 +52,52 @@ export function useCart() {
         checkEditMode()
     }, [])
 
-    const addToCart = useCallback((product, modifiers = []) => {
-        setCart(prev => {
-            // For products with extras, we might want to treat them as unique entries even if it's the same product
-            // but with different customizations.
-            if (product.has_extras) {
-                return [...prev, { ...product, product_id: product.id, quantity: 1, modifiers, id: `${product.id}-${Date.now()}` }]
-            }
+    const areModifiersEqual = (m1, m2) => {
+        if (!m1 && !m2) return true
+        if (!m1 || !m2) return false
+        if (m1.length !== m2.length) return false
 
-            const existing = prev.find(item => item.id === product.id)
-            if (existing) {
-                return prev.map(item =>
-                    item.id === product.id ? { ...item, quantity: item.quantity + 1 } : item
+        // Sort both arrays to ensure order doesn't matter (though usually they are added in order)
+        const sorted1 = [...m1].sort((a, b) => (a.name || '').localeCompare(b.name || ''))
+        const sorted2 = [...m2].sort((a, b) => (a.name || '').localeCompare(b.name || ''))
+
+        return sorted1.every((mod, index) => {
+            const other = sorted2[index]
+            return mod.name === other.name && mod.extra_price === other.extra_price && mod.value === other.value
+        })
+    }
+
+    const addToCart = useCallback((product, modifiers = [], quantity = 1) => {
+        setCart(prev => {
+            // Find an existing item that matches product_id, modifiers AND current price
+            // We use item.product_id || item.id to support legacy and new structure
+            const existingIndex = prev.findIndex(item =>
+                (item.product_id === product.id || item.id === product.id) &&
+                areModifiersEqual(item.modifiers, modifiers) &&
+                parseFloat(item.price) === parseFloat(product.price)
+            )
+
+            if (existingIndex > -1) {
+                return prev.map((item, idx) =>
+                    idx === existingIndex ? { ...item, quantity: item.quantity + quantity } : item
                 )
             }
-            return [...prev, { ...product, product_id: product.id, quantity: 1, modifiers: [] }]
+
+            // New item
+            const newItem = {
+                ...product,
+                id: `${product.id}-${Date.now()}-${Math.random()}`, // Unique ID for this specific customization group
+                product_id: product.id,
+                quantity,
+                modifiers
+            }
+            return [...prev, newItem]
         })
     }, [])
 
-    // Add multiple items at once (e.g. from quantity modal)
+    // Add multiple items at once
     const addMultipleToCart = useCallback((product, modifiers = [], quantity = 1) => {
-        for (let i = 0; i < quantity; i++) {
-            addToCart(product, modifiers)
-        }
+        addToCart(product, modifiers, quantity)
     }, [addToCart])
 
     const removeFromCart = useCallback((productId) => {

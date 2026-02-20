@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../auth/auth-context'
+import { useTenant } from '../auth/tenant-context'
 import {
     Users, Plus, Trash2, Shield, UserCircle,
     Lock, CheckCircle2, XCircle, Loader2
@@ -13,29 +14,34 @@ import { toast } from 'sonner'
 
 export function StaffManagement() {
     const { user } = useAuth()
+    const { tenant } = useTenant()
     const queryClient = useQueryClient()
     const [isAdding, setIsAdding] = useState(false)
     const [formData, setFormData] = useState({ nombre: '', pin: '', rol: 'mesero' })
 
     const { data: staff = [], isLoading } = useQuery({
-        queryKey: ['staff', user?.id],
+        queryKey: ['staff', tenant?.id],
         queryFn: async () => {
             const { data, error } = await supabase
                 .from('empleados')
                 .select('*')
-                .eq('restaurante_id', user.id)
+                .eq('restaurant_id', tenant.id)
                 .order('created_at', { ascending: false })
             if (error) throw error
             return data
         },
-        enabled: !!user?.id
+        enabled: !!tenant?.id
     })
 
     const addMutation = useMutation({
         mutationFn: async (newStaff) => {
             const { data, error } = await supabase
                 .from('empleados')
-                .insert([{ ...newStaff, restaurante_id: user.id }])
+                .insert([{
+                    ...newStaff,
+                    restaurant_id: tenant.id,
+                    restaurante_id: user.id // Keeping for legacy RLS if needed, but primary is restaurant_id
+                }])
             if (error) throw error
             return data
         },

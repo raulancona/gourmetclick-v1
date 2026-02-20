@@ -23,7 +23,8 @@ import {
     Tag,
     BarChart3,
     LineChart as LineChartIcon,
-    Users
+    Users,
+    Lock
 } from 'lucide-react'
 import {
     BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -508,6 +509,13 @@ export function DashboardPage() {
                                             `}>
                                                 {ORDER_STATUSES[order.status]?.label || order.status}
                                             </span>
+                                            {order.status === 'delivered' && !order.cash_cut_id && (
+                                                <div className="flex items-center justify-end gap-1 mt-1">
+                                                    <span className="inline-flex items-center px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 text-[9px] font-bold border border-amber-200">
+                                                        <Lock className="w-2.5 h-2.5 mr-0.5" /> Por Cortar
+                                                    </span>
+                                                </div>
+                                            )}
                                         </div>
                                     </div>
                                 ))}

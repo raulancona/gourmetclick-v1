@@ -1,14 +1,18 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useTerminal } from '../features/auth/terminal-context'
-import { ChefHat, Delete, Lock, ShieldAlert, Loader2 } from 'lucide-react'
+import { ChefHat, Delete, Lock, ShieldAlert, Loader2, Store } from 'lucide-react'
 import { Button } from '../components/ui/button'
 import { toast } from 'sonner'
+import { useParams } from 'react-router-dom'
+import { useTenant } from '../features/auth/tenant-context'
 
 export function TerminalAccessPage() {
     const [pin, setPin] = useState('')
     const [isLoading, setIsLoading] = useState(false)
     const { login, isAuthenticated, activeEmployee } = useTerminal()
+    const { tenant, loading: tenantLoading } = useTenant()
+    const { slug } = useParams()
     const navigate = useNavigate()
 
     useEffect(() => {
@@ -59,8 +63,12 @@ export function TerminalAccessPage() {
                         <ChefHat className="w-10 h-10" />
                     </div>
                     <div className="space-y-1">
-                        <h1 className="text-2xl font-black text-foreground tracking-tight uppercase">Terminal POS</h1>
-                        <p className="text-muted-foreground font-bold text-[10px] uppercase tracking-widest">Ingresa tu PIN de acceso</p>
+                        <h1 className="text-2xl font-black text-foreground tracking-tight uppercase">
+                            {tenant ? tenant.name : 'Terminal POS'}
+                        </h1>
+                        <p className="text-muted-foreground font-bold text-[10px] uppercase tracking-widest">
+                            {tenant ? `Sucursal: ${tenant.slug}` : 'Ingresa tu PIN de acceso'}
+                        </p>
                     </div>
                 </div>
 

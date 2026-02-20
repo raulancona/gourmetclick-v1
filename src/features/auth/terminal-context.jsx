@@ -32,25 +32,28 @@ export function TerminalProvider({ children }) {
     }, [activeEmployee])
 
     const login = async (pin) => {
-        if (!user) throw new Error('Usuario no autenticado')
-        if (!tenant) throw new Error('Cargando local...')
+        if (!tenant) throw new Error('Cargando restaurante...')
 
-        const { data, error } = await supabase
-            .from('empleados')
-            .select('*')
-            .eq('restaurante_id', tenant.id)
-            .eq('pin', pin)
-            .eq('activo', true)
-            .single()
+        const { data: result, error } = await supabase.rpc('validate_terminal_pin', {
+            p_slug: tenant.slug,
+            p_pin: pin
+        })
 
-        if (error || !data) {
-            throw new Error('PIN incorrecto o usuario inactivo')
+        if (error) {
+            console.error('RPC Error:', error)
+            throw new Error('Error al validar acceso')
         }
 
+        if (!result.success) {
+            throw new Error(result.message)
+        }
+
+        const employeeData = result.data
         const sessionData = {
-            id: data.id,
-            nombre: data.nombre,
-            rol: data.rol
+            id: employeeData.id,
+            nombre: employeeData.nombre,
+            rol: employeeData.rol,
+            restaurante_id: employeeData.restaurante_id
         }
 
         setActiveEmployee(sessionData)

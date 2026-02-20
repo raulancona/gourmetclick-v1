@@ -22,53 +22,76 @@ export function TenantProvider({ children }) {
 
     useEffect(() => {
         const fetchTenant = async () => {
-            if (!user || !profile) {
-                setTenant(null)
-                setLoading(false)
-                return
-            }
+            // Priority 1: If we have an authenticated owner/admin
+            if (user && profile) {
+                const timeout = setTimeout(() => {
+                    setLoading(false)
+                }, 5000)
 
-            // Timeout de seguridad
-            const timeout = setTimeout(() => {
-                setLoading(false)
-            }, 5000)
+                try {
+                    const { data, error } = await supabase
+                        .from('restaurants')
+                        .select('id, name, slug')
+                        .limit(1)
+                        .maybeSingle()
 
-            try {
-                // Fetch the first restaurant the user has access to
-                const { data, error } = await supabase
-                    .from('restaurants')
-                    .select('id, name')
-                    .limit(1)
-                    .maybeSingle()
+                    if (error) throw error
 
-                if (error) throw error
-
-                if (data) {
-                    setTenant({
-                        id: data.id,
-                        name: data.name,
-                        role: profile.role
-                    })
-                } else {
-                    // Fallback para usuarios legacy que no tienen registro en "restaurants"
-                    setTenant({
-                        id: user.id,
-                        name: profile.name || 'Mi Restaurante',
-                        role: profile.role
-                    })
+                    if (data) {
+                        setTenant({
+                            id: data.id,
+                            name: data.name,
+                            slug: data.slug,
+                            role: profile.role
+                        })
+                        clearTimeout(timeout)
+                        setLoading(false)
+                        return
+                    }
+                } catch (err) {
+                    console.error('Error fetching tenant for user:', err)
+                } finally {
+                    clearTimeout(timeout)
                 }
-            } catch (err) {
-                console.error('Error fetching tenant:', err)
-            } finally {
-                clearTimeout(timeout)
-                setLoading(false)
             }
+
+            // Priority 2: If we are in a public route with a slug (Terminal Access / Menu)
+            const pathParts = window.location.pathname.split('/')
+            const isTerminal = pathParts[1] === 't'
+            const isMenu = pathParts[1] === 'menu' || pathParts[1] === 'm'
+            const slug = (isTerminal || isMenu) ? pathParts[2] : null
+
+            if (slug) {
+                try {
+                    const { data, error } = await supabase
+                        .from('restaurants')
+                        .select('id, name, slug')
+                        .eq('slug', slug)
+                        .single()
+
+                    if (data) {
+                        setTenant({
+                            id: data.id,
+                            name: data.name,
+                            slug: data.slug,
+                            role: 'public' // Default for non-auth sessions
+                        })
+                        setLoading(false)
+                        return
+                    }
+                } catch (err) {
+                    console.error('Error fetching tenant by slug:', err)
+                }
+            }
+
+            setTenant(null)
+            setLoading(false)
         }
 
         if (!authLoading) {
             fetchTenant()
         }
-    }, [user, profile, authLoading])
+    }, [user, profile, authLoading, window.location.pathname])
 
     const value = {
         tenant,

@@ -29,7 +29,7 @@ export function ProtectedRoute({ children }) {
         )
     }
 
-    if (!user) {
+    if (!user && !activeEmployee) {
         return <Navigate to="/login" replace />
     }
 

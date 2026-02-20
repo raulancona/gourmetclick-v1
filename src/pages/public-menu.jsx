@@ -28,17 +28,49 @@ function CartProvider({ children }) {
 
     useEffect(() => { localStorage.setItem('gourmetclick_cart', JSON.stringify(items)) }, [items])
 
+    const areModifiersEqual = (m1, m2) => {
+        if (!m1 && !m2) return true
+        if (!m1 || !m2) return false
+        if (m1.length !== m2.length) return false
+        const sorted1 = [...m1].sort((a, b) => (a.name || '').localeCompare(b.name || ''))
+        const sorted2 = [...m2].sort((a, b) => (a.name || '').localeCompare(b.name || ''))
+        return sorted1.every((mod, index) => {
+            const other = sorted2[index]
+            return mod.name === other.name && mod.extra_price === other.extra_price && mod.value === other.value
+        })
+    }
+
     const addItem = (product, modifiers = [], quantity = 1) => {
-        const basePrice = parseFloat(product.price)
-        const modsTotal = modifiers.reduce((s, m) => s + parseFloat(m.extra_price || 0), 0)
-        // Apply discount
-        const discountPct = parseInt(product.discount_percent) || 0
-        const discountedBase = discountPct > 0 ? basePrice * (1 - discountPct / 100) : basePrice
-        setItems(prev => [...prev, {
-            id: Date.now() + Math.random(),
-            product, modifiers, quantity,
-            subtotal: (discountedBase + modsTotal) * quantity
-        }])
+        setItems(prev => {
+            const existingIndex = prev.findIndex(item =>
+                item.product.id === product.id &&
+                areModifiersEqual(item.modifiers, modifiers)
+            )
+
+            if (existingIndex > -1) {
+                return prev.map((item, idx) => {
+                    if (idx === existingIndex) {
+                        const newQuantity = item.quantity + quantity
+                        const base = parseFloat(item.product.price)
+                        const discountPct = parseInt(item.product.discount_percent) || 0
+                        const discountedBase = discountPct > 0 ? base * (1 - discountPct / 100) : base
+                        const mods = item.modifiers.reduce((s, m) => s + parseFloat(m.extra_price || 0), 0)
+                        return { ...item, quantity: newQuantity, subtotal: (discountedBase + mods) * newQuantity }
+                    }
+                    return item
+                })
+            }
+
+            const basePrice = parseFloat(product.price)
+            const modsTotal = modifiers.reduce((s, m) => s + parseFloat(m.extra_price || 0), 0)
+            const discountPct = parseInt(product.discount_percent) || 0
+            const discountedBase = discountPct > 0 ? basePrice * (1 - discountPct / 100) : basePrice
+            return [...prev, {
+                id: Date.now() + Math.random(),
+                product, modifiers, quantity,
+                subtotal: (discountedBase + modsTotal) * quantity
+            }]
+        })
     }
 
     const removeItem = (id) => setItems(prev => prev.filter(i => i.id !== id))

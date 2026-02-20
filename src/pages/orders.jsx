@@ -4,7 +4,7 @@ import { useRealtimeSubscription } from '../features/realtime/realtime-context'
 import { useTenant } from '../features/auth/tenant-context'
 import { useInfiniteQuery, useMutation, useQueryClient, useQuery } from '@tanstack/react-query'
 import { useVirtualizer } from '@tanstack/react-virtual'
-import { Search, Filter, Package, Clock, ChefHat, Truck, CheckCircle2, XCircle, Eye, ChevronDown, MapPin, Phone, User, CreditCard, Banknote, Building2, ExternalLink, Trash2, RefreshCw, Armchair, Store, Edit2, Save, X, Shield } from 'lucide-react'
+import { Search, Filter, Package, Clock, ChefHat, Truck, CheckCircle2, XCircle, Eye, ChevronDown, MapPin, Phone, User, CreditCard, Banknote, Building2, ExternalLink, Trash2, RefreshCw, Armchair, Store, Edit2, Save, X, Shield, Lock } from 'lucide-react'
 import { Button } from '../components/ui/button'
 import { Input } from '../components/ui/input'
 import { Label } from '../components/ui/label'
@@ -352,8 +352,8 @@ export function OrdersPage() {
                                                             🔒 Corte
                                                         </span>
                                                     ) : order.status === 'delivered' ? (
-                                                        <span className="text-[10px] bg-green-100 text-green-700 px-1.5 py-0.5 rounded border border-green-200 font-bold animate-pulse">
-                                                            💰 Por Cortar
+                                                        <span className="text-[10px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded border border-amber-200 font-bold flex items-center gap-1">
+                                                            <Lock className="w-2.5 h-2.5" /> Por Cortar
                                                         </span>
                                                     ) : null}
                                                     <span className="font-mono">#{order.id.slice(0, 6)}</span>

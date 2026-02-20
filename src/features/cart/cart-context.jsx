@@ -30,16 +30,50 @@ export function CartProvider({ children }) {
         localStorage.setItem('gourmetclick_cart', JSON.stringify(items))
     }, [items])
 
-    const addItem = (product, modifiers = [], quantity = 1) => {
-        const newItem = {
-            id: Date.now() + Math.random(),
-            product,
-            modifiers,
-            quantity,
-            subtotal: calculateItemSubtotal(product, modifiers, quantity)
-        }
+    const areModifiersEqual = (m1, m2) => {
+        if (!m1 && !m2) return true
+        if (!m1 || !m2) return false
+        if (m1.length !== m2.length) return false
 
-        setItems(prev => [...prev, newItem])
+        const sorted1 = [...m1].sort((a, b) => (a.name || '').localeCompare(b.name || ''))
+        const sorted2 = [...m2].sort((a, b) => (a.name || '').localeCompare(b.name || ''))
+
+        return sorted1.every((mod, index) => {
+            const other = sorted2[index]
+            return mod.name === other.name && mod.extra_price === other.extra_price && mod.value === other.value
+        })
+    }
+
+    const addItem = (product, modifiers = [], quantity = 1) => {
+        setItems(prev => {
+            const existingIndex = prev.findIndex(item =>
+                item.product.id === product.id &&
+                areModifiersEqual(item.modifiers, modifiers)
+            )
+
+            if (existingIndex > -1) {
+                return prev.map((item, idx) => {
+                    if (idx === existingIndex) {
+                        const newQuantity = item.quantity + quantity
+                        return {
+                            ...item,
+                            quantity: newQuantity,
+                            subtotal: calculateItemSubtotal(item.product, item.modifiers, newQuantity)
+                        }
+                    }
+                    return item
+                })
+            }
+
+            const newItem = {
+                id: Date.now() + Math.random(),
+                product,
+                modifiers,
+                quantity,
+                subtotal: calculateItemSubtotal(product, modifiers, quantity)
+            }
+            return [...prev, newItem]
+        })
     }
 
     const removeItem = (itemId) => {

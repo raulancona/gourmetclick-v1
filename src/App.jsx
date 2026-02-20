@@ -39,6 +39,7 @@ function App() {
 
                 {/* Operational Terminal */}
                 <Route path="/terminal" element={<ProtectedRoute><TerminalAccessPage /></ProtectedRoute>} />
+                <Route path="/t/:slug" element={<TerminalAccessPage />} />
 
                 {/* Admin/POS Layout */}
                 <Route path="/" element={<ProtectedRoute><DashboardLayout /></ProtectedRoute>}>
