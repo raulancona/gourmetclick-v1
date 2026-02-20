@@ -12,7 +12,7 @@ export async function getCategories(userId) {
     const { data, error } = await supabase
         .from('categories')
         .select('*')
-        .eq('user_id', userId)
+        .or(`user_id.eq.${userId},restaurant_id.eq.${userId}`)
         .order('sort_order', { ascending: true })
 
     if (error) throw error
@@ -27,7 +27,8 @@ export async function createCategory(categoryData, userId) {
         .from('categories')
         .insert([{
             ...categoryData,
-            user_id: userId
+            user_id: userId,
+            restaurant_id: categoryData.restaurant_id || userId // Fallback al owner ID
         }])
         .select()
         .single()
@@ -40,11 +41,13 @@ export async function createCategory(categoryData, userId) {
  * Update a category
  */
 export async function updateCategory(categoryId, updates, userId) {
+    // Si la actualización incluye cambios en los ownerships, los mantenemos
     const { data, error } = await supabase
         .from('categories')
         .update(updates)
         .eq('id', categoryId)
-        .eq('user_id', userId)
+        // Se puede actualizar si coincide el user_id o el restaurant_id (pero por seguridad el RLS lo maneja)
+        // Eliminamos .eq('user_id', userId) porque RLS ya protege y permite dualidad
         .select()
         .single()
 
@@ -60,7 +63,7 @@ export async function deleteCategory(categoryId, userId) {
         .from('categories')
         .delete()
         .eq('id', categoryId)
-        .eq('user_id', userId)
+    // Nuevamente delegamos permisos a RLS para evitar bloquear a empleados del mismo tenant
 
     if (error) throw error
 }
@@ -73,7 +76,8 @@ export async function reorderCategories(categories, userId) {
         id: cat.id,
         name: cat.name, // Required for upsert to work with non-null constraint
         sort_order: index,
-        user_id: userId,
+        user_id: cat.user_id || userId,
+        restaurant_id: cat.restaurant_id || userId,
         updated_at: new Date().toISOString()
     }))
 

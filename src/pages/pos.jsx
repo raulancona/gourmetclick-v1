@@ -8,6 +8,8 @@ import { toast } from 'sonner'
 import { useTerminal } from '../features/auth/terminal-context'
 import { supabase } from '../lib/supabase'
 import { createOrder, updateOrder } from '../lib/order-service'
+import { formatCurrency } from '../lib/utils'
+import { Button } from '../components/ui/button'
 
 // Components
 import { ProductGrid } from '../features/pos/components/product-grid'
@@ -144,7 +146,8 @@ export default function POSPage() {
         try {
             setIsSubmitting(true)
             const orderData = {
-                user_id: tenant.id,
+                user_id: user.id, // ID del propietario logueado en auth
+                restaurant_id: tenant.id, // ID del tenant
                 customer_name: customerName || 'Cliente General',
                 order_type: orderType,
                 payment_method: paymentMethod,
@@ -209,7 +212,7 @@ export default function POSPage() {
             {/* Main Product Area (Middle) */}
             <div className="flex-1 flex flex-col min-w-0 bg-background/50">
                 {/* Header */}
-                <div className="h-20 px-6 flex items-center justify-between shrink-0">
+                <div className="h-20 pl-16 pr-6 lg:px-6 flex items-center justify-between shrink-0">
                     <div>
                         <h1 className="text-xl font-bold text-foreground">
                             {editingOrder ? `Editando Orden #${editingOrder.id.slice(0, 6)}` : 'Punto de Venta'}
@@ -235,13 +238,29 @@ export default function POSPage() {
                 />
 
                 {/* Grid */}
-                <div className="flex-1 overflow-y-auto px-6 pb-6">
+                <div className="flex-1 overflow-y-auto px-6 pb-24 md:pb-6">
                     <ProductGrid
                         products={filteredProducts}
                         loading={loading}
                         onProductClick={handleProductClick}
                     />
                 </div>
+            </div>
+
+            {/* Mobile Cart Trigger Button */}
+            <div className="md:hidden fixed bottom-6 left-1/2 -translate-x-1/2 z-20 w-[90%] max-w-sm">
+                <Button
+                    className="w-full h-14 rounded-full shadow-2xl flex items-center justify-between px-6 bg-primary text-primary-foreground hover:scale-[1.02] transition-transform"
+                    onClick={() => setShowMobileCart(true)}
+                >
+                    <div className="flex items-center gap-3">
+                        <div className="bg-white/20 px-2.5 py-1 rounded-full text-xs font-bold backdrop-blur-sm">
+                            {cartItemCount}
+                        </div>
+                        <span className="font-semibold text-sm">Ver Orden</span>
+                    </div>
+                    <span className="font-bold text-lg tracking-tight">{formatCurrency(cartTotal)}</span>
+                </Button>
             </div>
 
             {/* Cart Panel (Right) */}

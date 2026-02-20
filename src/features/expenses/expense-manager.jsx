@@ -32,7 +32,7 @@ export function ExpenseManager() {
             const { data, error } = await supabase
                 .from('gastos')
                 .select('*')
-                .eq('sucursal_id', user.id)
+                .eq('restaurant_id', user.id)
                 .gte('created_at', today.toISOString())
                 .order('created_at', { ascending: false })
 
@@ -92,7 +92,7 @@ export function ExpenseManager() {
                     monto: parseFloat(formData.monto),
                     descripcion: formData.descripcion || null,
                     categoria: formData.categoria,
-                    sucursal_id: user.id,
+                    restaurant_id: user.id, // Corregido el mapeo al esquema de bd
                     sesion_caja_id: activeSession.id,
                     comprobante_url: comprobanteUrl
                 }])

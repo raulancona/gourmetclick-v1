@@ -1,12 +1,13 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useAuth } from '../features/auth/auth-context'
 import { getProductCount } from '../lib/product-service'
-import { getOrderStats, getOrders, getSalesAnalytics, updateOrderStatus, updateOrder, deleteOrder } from '../lib/order-service'
+import { getOrderStats, getOrders, getSalesAnalytics, updateOrderStatus, updateOrder, deleteOrder, ORDER_STATUSES } from '../lib/order-service'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card'
 import { OrderDetailModal } from '../features/orders/order-detail-modal'
 import { toast } from 'sonner'
 import { formatCurrency } from '../lib/utils'
+import { supabase } from '../lib/supabase'
 
 import {
     TrendingUp,
@@ -124,11 +125,40 @@ export function DashboardPage() {
                 startDate,
                 endDate
             })
-            return all.slice(0, 8)
+            return all.data ? all.data.slice(0, 8) : []
         },
         enabled: !!user?.id,
         refetchInterval: 60_000,
     })
+
+    // Realtime Subscription
+    useEffect(() => {
+        if (!user?.id) return
+
+        const channel = supabase
+            .channel('dashboard_updates')
+            .on(
+                'postgres_changes',
+                {
+                    event: '*',
+                    schema: 'public',
+                    table: 'orders',
+                    filter: `restaurant_id=eq.${user.id}` // Using user (tenant) ID
+                },
+                (payload) => {
+                    console.log('Realtime Order updated for Dashboard!', payload)
+                    // Invalidate all pertinent queries
+                    queryClient.invalidateQueries({ queryKey: ['order-stats-dashboard'] })
+                    queryClient.invalidateQueries({ queryKey: ['sales-analytics-dashboard'] })
+                    queryClient.invalidateQueries({ queryKey: ['recent-orders-dashboard'] })
+                }
+            )
+            .subscribe()
+
+        return () => {
+            supabase.removeChannel(channel)
+        }
+    }, [user?.id, queryClient])
 
     const formatCurrency = (val) => new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(val)
 
@@ -476,7 +506,7 @@ export function DashboardPage() {
                                                             order.status === 'cancelled' ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' :
                                                                 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'}
                                             `}>
-                                                {order.status === 'completed' ? 'Cerrado' : order.status}
+                                                {ORDER_STATUSES[order.status]?.label || order.status}
                                             </span>
                                         </div>
                                     </div>

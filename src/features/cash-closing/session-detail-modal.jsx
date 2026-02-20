@@ -84,6 +84,8 @@ export function SessionDetailModal({ session, onClose }) {
                                         {new Date(session.closed_at).toLocaleTimeString()}
                                     </p>
                                 </>
+                            ) : session.estado === 'cerrada' ? (
+                                <p className="text-sm font-bold text-red-500 italic">Corte Forzado (Sin Hora)</p>
                             ) : (
                                 <p className="text-sm font-bold text-blue-500 italic">En curso...</p>
                             )}

@@ -55,7 +55,8 @@ export async function createProduct(productData, userId) {
         .from('products')
         .insert([{
             ...productData,
-            restaurant_id: userId
+            restaurant_id: userId,
+            user_id: userId // Requerido por DB constraint
         }])
         .select()
         .single()
@@ -118,7 +119,8 @@ export async function deleteProduct(id, userId) {
 export async function bulkCreateProducts(productsArray, userId) {
     const productsWithUserId = productsArray.map(product => ({
         ...product,
-        restaurant_id: userId
+        restaurant_id: userId,
+        user_id: userId // Requerido por DB constraint
     }))
 
     const { data, error } = await supabase

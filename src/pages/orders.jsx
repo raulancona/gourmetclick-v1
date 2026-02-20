@@ -12,6 +12,7 @@ import { Textarea } from '../components/ui/textarea'
 import { Card, CardContent } from '../components/ui/card'
 import { useAuth } from '../features/auth/auth-context'
 import { useTerminal } from '../features/auth/terminal-context'
+import { supabase } from '../lib/supabase'
 import { getOrders, updateOrderStatus, updateOrder, deleteOrder, getOrderStats, ORDER_STATUSES, PAYMENT_METHODS, getNextStatuses } from '../lib/order-service'
 import { toast } from 'sonner'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select'
@@ -85,6 +86,33 @@ export function OrdersPage() {
         estimateSize: () => 100, // Estimate row height
         overscan: 5,
     })
+
+    // Realtime Subscription
+    useEffect(() => {
+        if (!tenant?.id) return
+
+        const channel = supabase
+            .channel('orders_updates')
+            .on(
+                'postgres_changes',
+                {
+                    event: '*',
+                    schema: 'public',
+                    table: 'orders',
+                    filter: `restaurant_id=eq.${tenant.id}`
+                },
+                (payload) => {
+                    console.log('Realtime Order updated!', payload)
+                    // Invalidate all queries related to 'orders' so it auto-refetches
+                    queryClient.invalidateQueries({ queryKey: ['orders'] })
+                }
+            )
+            .subscribe()
+
+        return () => {
+            supabase.removeChannel(channel)
+        }
+    }, [tenant?.id, queryClient])
 
     useEffect(() => {
         const [lastItem] = [...rowVirtualizer.getVirtualItems()].reverse()

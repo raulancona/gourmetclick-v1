@@ -17,11 +17,13 @@ export function CortesHistory() {
         enabled: !!tenant?.id
     })
 
+    const activeSession = history.find(s => s.estado === 'abierta')
+
     // Fetch active session current total to avoid "Calculando..."
     const { data: activeStats } = useQuery({
-        queryKey: ['active-session-stats', tenant?.id],
-        queryFn: () => getOrderStats(tenant.id, { filterByShift: true }), // Current open session stats
-        enabled: !!tenant?.id && history.some(s => s.estado === 'abierta'),
+        queryKey: ['active-session-stats', tenant?.id, activeSession?.id],
+        queryFn: () => getOrderStats(tenant.id, { sessionId: activeSession.id }),
+        enabled: !!tenant?.id && !!activeSession,
         refetchInterval: 30000 // Update every 30s
     })
 

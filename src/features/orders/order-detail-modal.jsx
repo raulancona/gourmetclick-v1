@@ -317,6 +317,8 @@ export function OrderDetailModal({ order, onClose, onUpdateStatus, onUpdateOrder
                                         <div className="grid grid-cols-2 gap-2">
                                             {Object.entries(ORDER_STATUSES).map(([key, info]) => {
                                                 if (key === order.status) return null
+                                                if (info.hidden && !isAdmin) return null // Hide restricted options like "completed" from cashiers
+
                                                 return (
                                                     <button
                                                         key={key}
@@ -336,11 +338,26 @@ export function OrderDetailModal({ order, onClose, onUpdateStatus, onUpdateOrder
                                 )}
                             {/* Closed badge for completed orders */}
                             {order.status === 'completed' && (
-                                <div className="bg-muted/50 border border-border rounded-xl p-4 text-center">
+                                <div className="bg-muted/50 border border-border rounded-xl p-4 text-center mt-4">
                                     <p className="text-sm font-bold text-muted-foreground">✅ Orden Cerrada</p>
-                                    <p className="text-xs text-muted-foreground mt-1">
-                                        {isAdmin ? 'Como admin puedes editar los datos.' : 'Esta orden fue liquidada en el cierre de turno.'}
+                                    <p className="text-xs text-muted-foreground mt-1 mb-3">
+                                        {isAdmin ? 'Como admin puedes editar los datos o reabrirla.' : 'Esta orden fue liquidada en el cierre de turno.'}
                                     </p>
+                                    {isAdmin && (
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={() => {
+                                                if (confirm('¿Estás seguro de reabrir esta orden? Se moverá a estado "Entregado" y volverá a contabilizarse en ventas activas.')) {
+                                                    onUpdateStatus('delivered')
+                                                }
+                                            }}
+                                            className="w-full border-amber-500/30 text-amber-600 hover:bg-amber-500/10"
+                                        >
+                                            <CheckCircle2 className="w-4 h-4 mr-2" />
+                                            Reabrir Orden (Deshacer Cierre)
+                                        </Button>
+                                    )}
                                 </div>
                             )}
                         </>
