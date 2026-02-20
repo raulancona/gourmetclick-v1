@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useAuth } from '../features/auth/auth-context'
+import { useTenant } from '../features/auth/tenant-context'
+import { useRealtimeSubscription } from '../features/realtime/realtime-context'
 import { getUnclosedOrders, createCashCut, updateOrderStatus, updateOrder, deleteOrder, getActiveSession } from '../lib/order-service'
 import { generateClosingSummary, sendWhatsAppOrder } from '../lib/whatsapp-service'
 import { OrderDetailModal } from '../features/orders/order-detail-modal'
@@ -24,6 +26,7 @@ import { supabase } from '../lib/supabase'
 
 export function CashClosingPage() {
     const { user } = useAuth()
+    const { tenant } = useTenant()
     const { activeEmployee } = useTerminal()
     const queryClient = useQueryClient()
     const [view, setView] = useState('closing') // 'closing', 'history', 'expenses'
@@ -33,53 +36,28 @@ export function CashClosingPage() {
     const isAdmin = !activeEmployee || activeEmployee.rol === 'admin'
 
     const { data: orders = [], isLoading: loadingOrders } = useQuery({
-        queryKey: ['unclosed-orders', user?.id],
-        queryFn: () => getUnclosedOrders(user.id),
-        enabled: !!user?.id,
+        queryKey: ['unclosed-orders', tenant?.id],
+        queryFn: () => getUnclosedOrders(tenant.id),
+        enabled: !!tenant?.id,
         refetchInterval: 30_000, // Polling fallback every 30s
     })
 
     const { data: activeSession, isLoading: loadingSession } = useQuery({
-        queryKey: ['active-session', user?.id],
-        queryFn: () => getActiveSession(user.id),
-        enabled: !!user?.id,
+        queryKey: ['active-session', tenant?.id],
+        queryFn: () => getActiveSession(tenant.id),
+        enabled: !!tenant?.id,
         refetchInterval: 30_000,
     })
 
     // Realtime: session changes + order status changes
-    useEffect(() => {
-        if (!user?.id) return
+    useRealtimeSubscription('sesiones_caja', () => {
+        queryClient.invalidateQueries(['active-session'])
+        queryClient.invalidateQueries(['sessions-history'])
+    })
 
-        const sessionChannel = supabase
-            .channel(`session-sync-${user.id}`)
-            .on(
-                'postgres_changes',
-                { event: '*', schema: 'public', table: 'sesiones_caja', filter: `restaurante_id=eq.${user.id}` },
-                () => {
-                    queryClient.invalidateQueries(['active-session'])
-                    queryClient.invalidateQueries(['sessions-history'])
-                }
-            )
-            .subscribe()
-
-        // Also listen to order changes so the panel auto-updates when waiter
-        // changes a status from the POS without needing manual refresh
-        const ordersChannel = supabase
-            .channel(`caja-orders-${user.id}`)
-            .on(
-                'postgres_changes',
-                { event: '*', schema: 'public', table: 'orders', filter: `user_id=eq.${user.id}` },
-                () => {
-                    queryClient.invalidateQueries(['unclosed-orders'])
-                }
-            )
-            .subscribe()
-
-        return () => {
-            supabase.removeChannel(sessionChannel)
-            supabase.removeChannel(ordersChannel)
-        }
-    }, [user?.id, queryClient])
+    useRealtimeSubscription('orders', () => {
+        queryClient.invalidateQueries(['unclosed-orders'])
+    })
 
     const onCutComplete = () => {
         queryClient.invalidateQueries(['unclosed-orders'])

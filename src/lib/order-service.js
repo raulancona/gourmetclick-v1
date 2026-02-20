@@ -34,7 +34,7 @@ function getNextStatuses(current) {
 
 export { ORDER_STATUSES, PAYMENT_METHODS, getNextStatuses }
 
-export async function getOrders(userId, { includeClosed = false, startDate = null, endDate = null } = {}) {
+export async function getOrders(restaurantId, { includeClosed = false, startDate = null, endDate = null, page = 1, pageSize = 50 } = {}) {
     // When hiding closed orders, we exclude by status AND by sesion_caja_id of closed sessions.
     // This prevents orphan orders from past shifts appearing in the active cashier view.
     let closedSessionIds = []
@@ -42,17 +42,21 @@ export async function getOrders(userId, { includeClosed = false, startDate = nul
         const { data: closedSessions } = await supabase
             .from('sesiones_caja')
             .select('id')
-            .eq('restaurante_id', userId)
+            .eq('restaurante_id', restaurantId)
             .eq('estado', 'cerrada')
 
         closedSessionIds = (closedSessions || []).map(s => s.id)
     }
 
+    const from = (page - 1) * pageSize
+    const to = from + pageSize - 1
+
     let query = supabase
         .from('orders')
-        .select('*')
-        .eq('user_id', userId)
+        .select('*', { count: 'exact' }) // Request count for pagination metadata
+        .eq('user_id', restaurantId)
         .order('created_at', { ascending: false })
+        .range(from, to)
 
     if (!includeClosed) {
         // Exclude completed and cancelled orders
@@ -73,9 +77,10 @@ export async function getOrders(userId, { includeClosed = false, startDate = nul
         query = query.lte('created_at', endDate)
     }
 
-    const { data, error } = await query
+    const { data, error, count } = await query
     if (error) throw error
-    return data || []
+
+    return { data: data || [], count }
 }
 
 export async function createOrder(orderData) {
@@ -141,7 +146,7 @@ export async function createOrder(orderData) {
     }
 }
 
-export async function updateOrderStatus(orderId, status, userId) {
+export async function updateOrderStatus(orderId, status, restaurantId) {
     const updates = {
         status,
         updated_at: new Date().toISOString()
@@ -156,7 +161,7 @@ export async function updateOrderStatus(orderId, status, userId) {
         .from('orders')
         .update(updates)
         .eq('id', orderId)
-        .eq('user_id', userId)
+        .eq('user_id', restaurantId)
         .select()
         .single()
 
@@ -164,7 +169,7 @@ export async function updateOrderStatus(orderId, status, userId) {
     return data
 }
 
-export async function updateOrder(orderId, updates, userId) {
+export async function updateOrder(orderId, updates, restaurantId) {
     const { data, error } = await supabase
         .from('orders')
         .update({ ...updates, updated_at: new Date().toISOString() })
@@ -177,7 +182,7 @@ export async function updateOrder(orderId, updates, userId) {
     return data
 }
 
-export async function deleteOrder(orderId, userId) {
+export async function deleteOrder(orderId, restaurantId) {
     const { error } = await supabase
         .from('orders')
         .delete()
@@ -187,11 +192,11 @@ export async function deleteOrder(orderId, userId) {
     if (error) throw error
 }
 
-export async function getOrderStats(userId, { cashCutId = null, filterByShift = true, startDate = null, endDate = null } = {}) {
+export async function getOrderStats(restaurantId, { cashCutId = null, filterByShift = true, startDate = null, endDate = null } = {}) {
     let query = supabase
         .from('orders')
         .select('status, total, order_type, payment_method, created_at')
-        .eq('user_id', userId)
+        .eq('user_id', restaurantId)
 
     if (cashCutId) {
         query = query.eq('cash_cut_id', cashCutId)
@@ -214,7 +219,8 @@ export async function getOrderStats(userId, { cashCutId = null, filterByShift = 
     const stats = {
         total: data.length,
         pending: data.filter(o => o.status === 'pending').length,
-        active: data.filter(o => ['confirmed', 'preparing', 'ready', 'on_the_way'].includes(o.status)).length,
+        // Active: Orders in progress (pending, confirmed, preparing, ready, on_the_way)
+        active: data.filter(o => ['pending', 'confirmed', 'preparing', 'ready', 'on_the_way'].includes(o.status)).length,
         // Count both delivered (active shift) and completed (closed shift)
         delivered: data.filter(o => o.status === 'delivered' || o.status === 'completed').length,
         cancelled: data.filter(o => o.status === 'cancelled').length,
@@ -250,11 +256,11 @@ export async function getOrderStats(userId, { cashCutId = null, filterByShift = 
     return stats
 }
 
-export async function getSalesAnalytics(userId, { cashCutId = null, filterByShift = true, startDate = null, endDate = null } = {}) {
+export async function getSalesAnalytics(restaurantId, { cashCutId = null, filterByShift = true, startDate = null, endDate = null } = {}) {
     let query = supabase
         .from('orders')
         .select('items, total, created_at, customer_phone, status')
-        .eq('user_id', userId)
+        .eq('user_id', restaurantId)
         .neq('status', 'cancelled')
 
     if (cashCutId) {
@@ -393,11 +399,11 @@ export async function getSalesAnalytics(userId, { cashCutId = null, filterByShif
  * FIXED: Previously filtered by `cash_cut_id` (legacy), but closeSession sets `status=completed`
  * Now correctly returns only 'delivered' orders, which are the ones awaiting close.
  */
-export async function getUnclosedOrders(userId) {
+export async function getUnclosedOrders(restaurantId) {
     const { data: activeSession } = await supabase
         .from('sesiones_caja')
         .select('id, opened_at')
-        .eq('restaurante_id', userId)
+        .eq('restaurante_id', restaurantId)
         .eq('estado', 'abierta')
         .maybeSingle()
 
@@ -407,7 +413,7 @@ export async function getUnclosedOrders(userId) {
     const { data, error } = await supabase
         .from('orders')
         .select('*')
-        .eq('user_id', userId)
+        .eq('user_id', restaurantId)
         .eq('sesion_caja_id', activeSession.id)
         .neq('status', 'completed')
         .neq('status', 'cancelled')
@@ -420,15 +426,15 @@ export async function getUnclosedOrders(userId) {
 /**
  * Create a new cash cut and link orders to it
  */
-export async function createCashCut(userId, summary, orderIds) {
+export async function createCashCut(restaurantId, summary, orderIds) {
     if (!orderIds || orderIds.length === 0) throw new Error('No hay órdenes para cerrar')
 
     // 1. Create the cash cut record
     const { data: cut, error: cutError } = await supabase
         .from('cash_cuts')
         .insert([{
-            restaurant_id: userId,
-            user_id: userId,
+            restaurant_id: restaurantId,
+            user_id: restaurantId, // Legacy user_id support
             total_cash: summary.byPayment.cash,
             total_card: summary.byPayment.card,
             total_transfer: summary.byPayment.transfer,
@@ -446,7 +452,7 @@ export async function createCashCut(userId, summary, orderIds) {
         .from('orders')
         .update({ cash_cut_id: cut.id })
         .in('id', orderIds)
-        .eq('user_id', userId)
+        .eq('user_id', restaurantId)
 
     if (updateError) throw updateError
 
@@ -456,11 +462,11 @@ export async function createCashCut(userId, summary, orderIds) {
 /**
  * Fetch all cash cuts for reports
  */
-export async function getCashCuts(userId) {
+export async function getCashCuts(restaurantId) {
     const { data, error } = await supabase
         .from('cash_cuts')
         .select('*')
-        .eq('user_id', userId)
+        .eq('user_id', restaurantId)
         .order('cut_date', { ascending: false })
 
     if (error) throw error
@@ -524,8 +530,8 @@ export async function getSessionFinancialSummary(sessionId) {
 /**
  * Perform Blind Cash Cut
  */
-export async function createBlindCashCut(userId, montoReal) {
-    const summary = await getDailyFinancialSummary(userId)
+export async function createBlindCashCut(restaurantId, montoReal) {
+    const summary = await getDailyFinancialSummary(restaurantId) // Assuming getDailyFinancialSummary also needs update or exists
     const montoEsperado = summary.expectedBalance
     const diferencia = parseFloat(montoReal) - montoEsperado
 
@@ -533,7 +539,7 @@ export async function createBlindCashCut(userId, montoReal) {
     const { data: cut, error: cutError } = await supabase
         .from('cortes_caja')
         .insert([{
-            usuario_id: userId,
+            usuario_id: restaurantId,
             monto_esperado: montoEsperado,
             monto_real: parseFloat(montoReal),
             diferencia: diferencia
@@ -549,7 +555,7 @@ export async function createBlindCashCut(userId, montoReal) {
             .from('orders')
             .update({ cash_cut_id: cut.id }) // Using the new cut ID
             .in('id', summary.orderIds)
-            .eq('user_id', userId)
+            .eq('user_id', restaurantId)
 
         if (updateError) throw updateError
     }
@@ -560,11 +566,11 @@ export async function createBlindCashCut(userId, montoReal) {
 /**
  * Session Management
  */
-export async function getActiveSession(userId) {
+export async function getActiveSession(restaurantId) {
     const { data, error } = await supabase
         .from('sesiones_caja')
         .select('*, empleado:empleado_id(nombre)')
-        .eq('restaurante_id', userId)
+        .eq('restaurante_id', restaurantId)
         .eq('estado', 'abierta')
         .maybeSingle()
 
@@ -572,11 +578,11 @@ export async function getActiveSession(userId) {
     return data
 }
 
-export async function openSession(userId, employeeId, initialAmount) {
+export async function openSession(restaurantId, employeeId, initialAmount) {
     const { data, error } = await supabase
         .from('sesiones_caja')
         .insert([{
-            restaurante_id: userId,
+            restaurante_id: restaurantId,
             empleado_id: employeeId,
             fondo_inicial: parseFloat(initialAmount),
             estado: 'abierta',
@@ -659,11 +665,11 @@ export async function closeSession(sessionId, montoReal, userId, closedByName) {
     return closedSession
 }
 
-export async function getSessionsHistory(userId) {
+export async function getSessionsHistory(restaurantId) {
     const { data, error } = await supabase
         .from('sesiones_caja')
         .select('*, empleado:empleado_id(nombre)')
-        .eq('restaurante_id', userId)
+        .eq('restaurante_id', restaurantId)
         .order('opened_at', { ascending: false })
 
     if (error) throw error

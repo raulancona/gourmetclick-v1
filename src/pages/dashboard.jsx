@@ -208,7 +208,15 @@ export function DashboardPage() {
                         <span className="text-[11px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest">Órdenes</span>
                     </div>
                     <div className="text-3xl font-black text-gray-900 dark:text-white tracking-tight">{stats?.total || 0}</div>
-                    <p className="text-xs text-gray-400 dark:text-gray-500">{stats?.delivered || 0} entregadas · {stats?.cancelled || 0} canceladas</p>
+                    <div className="flex items-center gap-3 text-xs mt-1">
+                        <span className="flex items-center gap-1 text-amber-600 dark:text-amber-400 font-bold bg-amber-50 dark:bg-amber-900/20 px-2 py-0.5 rounded-md">
+                            <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse"></span>
+                            {stats?.active || 0} Activas
+                        </span>
+                        <span className="text-muted-foreground">
+                            {stats?.delivered || 0} Finalizadas
+                        </span>
+                    </div>
                 </div>
 
                 {/* Products */}
@@ -384,26 +392,31 @@ export function DashboardPage() {
                         <CardDescription>Por tipo de servicio</CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-6">
-                        <div className="space-y-4">
+                        <div className="space-y-5">
                             {[
-                                { label: 'A domicilio (Delivery)', value: stats?.orderTypes?.delivery || 0, icon: Truck, color: '#3B82F6' },
-                                { label: 'Pasar a recoger (Pickup)', value: stats?.orderTypes?.pickup || 0, icon: Store, color: '#F59E0B' },
-                                { label: 'Comer aquí (Dine-in)', value: stats?.orderTypes?.dine_in || 0, icon: Armchair, color: '#10B981' },
+                                { label: 'Delivery', value: stats?.orderTypes?.delivery || 0, icon: Truck, color: 'bg-blue-500', text: 'text-blue-500', bg: 'bg-blue-50 dark:bg-blue-900/20' },
+                                { label: 'Pickup', value: stats?.orderTypes?.pickup || 0, icon: Store, color: 'bg-amber-500', text: 'text-amber-500', bg: 'bg-amber-50 dark:bg-amber-900/20' },
+                                { label: 'Dine-in', value: stats?.orderTypes?.dine_in || 0, icon: Armchair, color: 'bg-emerald-500', text: 'text-emerald-500', bg: 'bg-emerald-50 dark:bg-emerald-900/20' },
                             ].map((item, i) => {
                                 const percentage = stats?.total > 0 ? (item.value / stats.total) * 100 : 0
                                 return (
-                                    <div key={i} className="space-y-1.5">
-                                        <div className="flex items-center justify-between text-sm">
-                                            <div className="flex items-center gap-2">
-                                                <item.icon className="w-4 h-4" style={{ color: item.color }} />
-                                                <span className="font-medium text-foreground">{item.label}</span>
+                                    <div key={i} className="group">
+                                        <div className="flex items-center justify-between text-sm mb-2">
+                                            <div className="flex items-center gap-3">
+                                                <div className={`p-2 rounded-lg ${item.bg}`}>
+                                                    <item.icon className={`w-4 h-4 ${item.text}`} />
+                                                </div>
+                                                <span className="font-bold text-gray-700 dark:text-gray-300">{item.label}</span>
                                             </div>
-                                            <span className="font-black text-foreground">{item.value}</span>
+                                            <div className="flex items-baseline gap-1">
+                                                <span className="font-black text-lg text-foreground">{item.value}</span>
+                                                <span className="text-[10px] text-muted-foreground">({Math.round(percentage)}%)</span>
+                                            </div>
                                         </div>
-                                        <div className="h-2 w-full bg-muted rounded-full overflow-hidden">
+                                        <div className="h-2 w-full bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden">
                                             <div
-                                                className="h-full transition-all duration-1000"
-                                                style={{ width: `${percentage}%`, backgroundColor: item.color }}
+                                                className={`h-full transition-all duration-1000 ${item.color}`}
+                                                style={{ width: `${percentage}%` }}
                                             />
                                         </div>
                                     </div>
@@ -423,35 +436,48 @@ export function DashboardPage() {
                         {recentOrders.length === 0 ? (
                             <div className="py-8 text-center text-muted-foreground italic">No hay actividad reciente</div>
                         ) : (
-                            <div className="divide-y divide-border">
+                            <div className="space-y-3">
                                 {recentOrders.map(order => (
                                     <div
                                         key={order.id}
-                                        className="py-3 flex items-center justify-between cursor-pointer hover:bg-muted/50 transition-colors px-2 -mx-2 rounded-xl"
+                                        className="group relative flex items-center justify-between p-3 rounded-xl hover:bg-muted/50 transition-all border border-transparent hover:border-border cursor-pointer"
                                         onClick={() => setSelectedOrder(order)}
                                     >
-                                        <div className="flex items-center gap-3">
-                                            <div className="w-10 h-10 rounded-xl bg-muted flex items-center justify-center">
-                                                <Clock className="w-5 h-5 text-muted-foreground" />
+                                        <div className="flex items-center gap-4">
+                                            <div className={`
+                                                w-10 h-10 rounded-full flex items-center justify-center shrink-0
+                                                ${order.status === 'delivered' || order.status === 'completed' ? 'bg-green-100 text-green-600 dark:bg-green-900/30' :
+                                                    order.status === 'cancelled' ? 'bg-red-100 text-red-600 dark:bg-red-900/30' :
+                                                        'bg-blue-100 text-blue-600 dark:bg-blue-900/30'}
+                                            `}>
+                                                {order.order_type === 'delivery' ? <Truck className="w-5 h-5" /> :
+                                                    order.order_type === 'dine_in' ? <Armchair className="w-5 h-5" /> :
+                                                        <Store className="w-5 h-5" />}
                                             </div>
                                             <div>
-                                                <p className="text-sm font-bold text-foreground">{order.customer_name}</p>
-                                                <p className="text-xs text-muted-foreground">
-                                                    {order.order_type === 'delivery' ? '🛵 Envío' : order.order_type === 'dine_in' ? '🪑 Mesa' : '🏪 Recoger'}
+                                                <p className="font-bold text-sm text-foreground group-hover:text-primary transition-colors">
+                                                    {order.customer_name || 'Cliente General'}
                                                 </p>
+                                                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                                    <span>{new Date(order.created_at).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })}</span>
+                                                    <span>•</span>
+                                                    <span>{order.quantity || (order.items?.length || 0)} ítems</span>
+                                                </div>
                                             </div>
                                         </div>
+
                                         <div className="text-right">
-                                            <p className="text-sm font-black text-foreground">{formatCurrency(order.total)}</p>
-                                            <div className="mt-1">
-                                                <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase transition-colors ${order.status === 'delivered' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' :
+                                            <p className="font-black text-sm">{formatCurrency(order.total)}</p>
+                                            <span className={`
+                                                inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold uppercase mt-1
+                                                ${order.status === 'delivered' || order.status === 'completed' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' :
                                                     order.status === 'pending' ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400' :
-                                                        order.status === 'cancelled' ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' :
-                                                            'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
-                                                    }`}>
-                                                    {order.status}
-                                                </span>
-                                            </div>
+                                                        order.status === 'getting_ready' || order.status === 'preparing' ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400' :
+                                                            order.status === 'cancelled' ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' :
+                                                                'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'}
+                                            `}>
+                                                {order.status === 'completed' ? 'Cerrado' : order.status}
+                                            </span>
                                         </div>
                                     </div>
                                 ))}

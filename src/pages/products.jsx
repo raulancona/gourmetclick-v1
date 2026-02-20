@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Plus, Upload, Search, Trash2, Images } from 'lucide-react'
-import { useAuth } from '../features/auth/auth-context'
+import { useTenant } from '../features/auth/tenant-context'
 import { getProducts, createProduct, updateProduct, deleteProduct } from '../lib/product-service'
 import { deleteProductImage } from '../lib/image-service'
 import { ProductCard } from '../features/products/product-card'
@@ -15,7 +15,7 @@ import { toast } from 'sonner'
 
 
 export function ProductsPage() {
-    const { user } = useAuth()
+    const { tenant } = useTenant()
     const queryClient = useQueryClient()
 
     // State
@@ -30,14 +30,14 @@ export function ProductsPage() {
 
     // Fetch products
     const { data: products = [], isLoading } = useQuery({
-        queryKey: ['products', user?.id],
-        queryFn: () => getProducts(user.id),
-        enabled: !!user?.id
+        queryKey: ['products', tenant?.id],
+        queryFn: () => getProducts(tenant.id),
+        enabled: !!tenant?.id
     })
 
     // Create mutation
     const createMutation = useMutation({
-        mutationFn: (productData) => createProduct(productData, user.id),
+        mutationFn: (productData) => createProduct(productData, tenant.id),
         onSuccess: (data) => {
             queryClient.invalidateQueries(['products'])
             setIsCreateModalOpen(false)
@@ -51,7 +51,7 @@ export function ProductsPage() {
 
     // Update mutation
     const updateMutation = useMutation({
-        mutationFn: ({ id, data }) => updateProduct(id, data, user.id),
+        mutationFn: ({ id, data }) => updateProduct(id, data, tenant.id),
         onSuccess: () => {
             queryClient.invalidateQueries(['products'])
             setIsEditModalOpen(false)
@@ -70,7 +70,7 @@ export function ProductsPage() {
             if (product.image_url) {
                 await deleteProductImage(product.image_url)
             }
-            await deleteProduct(product.id, user.id)
+            await deleteProduct(product.id, tenant.id)
         },
         onSuccess: () => {
             queryClient.invalidateQueries(['products'])

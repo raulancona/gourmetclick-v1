@@ -1,13 +1,13 @@
 import { useQuery } from '@tanstack/react-query'
 import { getActiveSession } from '../lib/order-service'
-import { useAuth } from '../features/auth/auth-context'
+import { useTenant } from '../features/auth/tenant-context'
 
 /**
  * Hook to track the currently active cash session
  * Useful for blocking UI elements or forcing a shift start
  */
 export function useActiveSession() {
-    const { user } = useAuth()
+    const { tenant } = useTenant()
 
     const {
         data: session,
@@ -16,9 +16,9 @@ export function useActiveSession() {
         isError,
         error
     } = useQuery({
-        queryKey: ['active-session', user?.id],
-        queryFn: () => getActiveSession(user.id),
-        enabled: !!user?.id,
+        queryKey: ['active-session', tenant?.id],
+        queryFn: () => getActiveSession(tenant.id),
+        enabled: !!tenant?.id,
         staleTime: 1000 * 60 * 5, // 5 minutes
         retry: 1
     })

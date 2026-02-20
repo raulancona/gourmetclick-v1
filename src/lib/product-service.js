@@ -10,16 +10,20 @@ import { supabase } from './supabase'
  * @param {string} userId - The authenticated user's ID
  * @returns {Promise<Array>} Array of products
  */
-export async function getProducts(userId) {
-    const { data, error } = await supabase
+export async function getProducts(userId, { page = 1, pageSize = 50 } = {}) {
+    const from = (page - 1) * pageSize
+    const to = from + pageSize - 1
+
+    const { data, error, count } = await supabase
         .from('products')
-        .select('*')
+        .select('*', { count: 'exact' })
         .eq('user_id', userId)
         .eq('is_active', true) // Only fetch active products
         .order('created_at', { ascending: false })
+        .range(from, to)
 
     if (error) throw error
-    return data || []
+    return { data: data || [], count }
 }
 
 /**

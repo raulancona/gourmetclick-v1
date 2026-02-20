@@ -1,8 +1,25 @@
-import { Navigate } from 'react-router-dom'
+import { Navigate, useLocation } from 'react-router-dom'
 import { useAuth } from './auth-context'
+import { useTerminal } from './terminal-context'
+import { toast } from 'sonner'
+import { useEffect } from 'react'
 
 export function ProtectedRoute({ children }) {
     const { user, loading } = useAuth()
+    const { activeEmployee } = useTerminal()
+    const location = useLocation()
+
+    // Rutas restringidas para empleados no-admin
+    const restrictedRoutes = ['/dashboard', '/settings', '/inventory', '/products', '/staff']
+
+    useEffect(() => {
+        if (activeEmployee && activeEmployee.rol !== 'admin') {
+            const isRestricted = restrictedRoutes.some(route => location.pathname.startsWith(route))
+            if (isRestricted) {
+                toast.error('Acceso denegado: Se requieren permisos de administrador')
+            }
+        }
+    }, [activeEmployee, location.pathname])
 
     if (loading) {
         return (
@@ -14,6 +31,14 @@ export function ProtectedRoute({ children }) {
 
     if (!user) {
         return <Navigate to="/login" replace />
+    }
+
+    // Si hay un empleado logueado Y NO es admin, verificar ruta
+    if (activeEmployee && activeEmployee.rol !== 'admin') {
+        const isRestricted = restrictedRoutes.some(route => location.pathname.startsWith(route))
+        if (isRestricted) {
+            return <Navigate to="/pos" replace />
+        }
     }
 
     return children

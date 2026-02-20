@@ -4,7 +4,7 @@ import { Plus, GripVertical, Edit2, Trash2 } from 'lucide-react'
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core'
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy, useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { useAuth } from '../features/auth/auth-context'
+import { useTenant } from '../features/auth/tenant-context'
 import { getCategories, createCategory, updateCategory, deleteCategory, reorderCategories } from '../lib/category-service'
 import { Button } from '../components/ui/button'
 import { Input } from '../components/ui/input'
@@ -65,7 +65,7 @@ function SortableCategoryItem({ category, onEdit, onDelete }) {
 }
 
 export function CategoriesPage() {
-    const { user } = useAuth()
+    const { tenant } = useTenant()
     const queryClient = useQueryClient()
 
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
@@ -75,9 +75,9 @@ export function CategoriesPage() {
 
     // Fetch categories
     const { data: categories = [], isLoading } = useQuery({
-        queryKey: ['categories', user?.id],
-        queryFn: () => getCategories(user.id),
-        enabled: !!user?.id
+        queryKey: ['categories', tenant?.id],
+        queryFn: () => getCategories(tenant.id),
+        enabled: !!tenant?.id
     })
 
     const sensors = useSensors(
@@ -89,7 +89,7 @@ export function CategoriesPage() {
 
     // Reorder mutation
     const reorderMutation = useMutation({
-        mutationFn: (newCategories) => reorderCategories(newCategories, user.id),
+        mutationFn: (newCategories) => reorderCategories(newCategories, tenant.id),
         onSuccess: () => {
             // Invalidate but don't force refetch immediately to prevent jumpiness if we are optimistic
             // actually, better to just let the query update naturally or optimistically update
@@ -101,7 +101,7 @@ export function CategoriesPage() {
 
     // Create mutation
     const createMutation = useMutation({
-        mutationFn: (name) => createCategory({ name, sort_order: categories.length }, user.id),
+        mutationFn: (name) => createCategory({ name, sort_order: categories.length }, tenant.id),
         onSuccess: () => {
             queryClient.invalidateQueries(['categories'])
             setIsCreateModalOpen(false)
@@ -113,7 +113,7 @@ export function CategoriesPage() {
 
     // Update mutation
     const updateMutation = useMutation({
-        mutationFn: ({ id, name }) => updateCategory(id, { name }, user.id),
+        mutationFn: ({ id, name }) => updateCategory(id, { name }, tenant.id),
         onSuccess: () => {
             queryClient.invalidateQueries(['categories'])
             setIsEditModalOpen(false)
@@ -126,7 +126,7 @@ export function CategoriesPage() {
 
     // Delete mutation
     const deleteMutation = useMutation({
-        mutationFn: (id) => deleteCategory(id, user.id),
+        mutationFn: (id) => deleteCategory(id, tenant.id),
         onSuccess: () => {
             queryClient.invalidateQueries(['categories'])
             toast.success('Categoría eliminada exitosamente')
@@ -145,7 +145,7 @@ export function CategoriesPage() {
 
             // Optimistic update via queryClient would be better, but for now we rely on mutation
             // We should update the cache immediately to prevent flicker
-            queryClient.setQueryData(['categories', user?.id], newCategories)
+            queryClient.setQueryData(['categories', tenant?.id], newCategories)
 
             reorderMutation.mutate(newCategories)
         }
