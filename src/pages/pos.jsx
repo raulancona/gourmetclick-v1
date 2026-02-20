@@ -50,6 +50,7 @@ export default function POSPage() {
     const [availableModifiers, setAvailableModifiers] = useState([])
     const [selectedModifiers, setSelectedModifiers] = useState([])
     const [fetchingModifiers, setFetchingModifiers] = useState(false)
+    const [modalQuantity, setModalQuantity] = useState(1)
 
     // Realtime subscription
     useCategorySubscription(user?.id)
@@ -116,8 +117,10 @@ export default function POSPage() {
     useEffect(() => {
         if (!user?.id) return
 
+        // Unique channel name per user prevents collisions when
+        // cashier & waiter both have the POS open simultaneously.
         const channel = supabase
-            .channel('products-realtime')
+            .channel(`products-realtime-${user.id}`)
             .on(
                 'postgres_changes',
                 {
@@ -148,6 +151,7 @@ export default function POSPage() {
             setSelectedProduct(product)
             setCustomizations('')
             setSelectedModifiers([])
+            setModalQuantity(1) // Reset quantity on each modal open
             setIsOptionsModalOpen(true)
 
             try {
@@ -213,19 +217,22 @@ export default function POSPage() {
             ...(customizations.trim() ? [{ name: 'Nota', value: customizations }] : [])
         ]
 
-        // Calculate extra price total
         const extraTotal = selectedModifiers.reduce((acc, m) => acc + parseFloat(m.extra_price), 0)
 
-        addToCart({
-            ...selectedProduct,
-            price: parseFloat(selectedProduct.price) + extraTotal
-        }, itemModifiers)
+        // Add items according to quantity chosen in modal
+        for (let i = 0; i < modalQuantity; i++) {
+            addToCart({
+                ...selectedProduct,
+                price: parseFloat(selectedProduct.price) + extraTotal
+            }, itemModifiers)
+        }
 
         setIsOptionsModalOpen(false)
         setSelectedProduct(null)
         setCustomizations('')
         setSelectedModifiers([])
         setAvailableModifiers([])
+        setModalQuantity(1)
     }
 
     const toggleModifier = (modifier) => {
@@ -656,9 +663,9 @@ export default function POSPage() {
                         </div>
                     </div>
 
-                    {/* Pay Button */}
+                    {/* Pay Button — prominent on both mobile and desktop */}
                     <Button
-                        className="w-full h-12 rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 transition-all shadow-lg shadow-primary/20"
+                        className="w-full h-14 rounded-xl font-black text-base tracking-wide shadow-xl shadow-primary/30 bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 text-primary-foreground transition-all"
                         onClick={handleCreateOrder}
                         disabled={
                             cart.length === 0 ||
@@ -666,10 +673,10 @@ export default function POSPage() {
                             (paymentMethod === 'cash' && (!montoRecibido || parseFloat(montoRecibido) < cartTotal))
                         }
                     >
-                        {isSubmitting ? (<Loader2 className="w-5 h-5 animate-spin" />) : (
+                        {isSubmitting ? <Loader2 className="w-5 h-5 animate-spin" /> : (
                             <div className="flex items-center justify-between w-full px-2">
-                                <span>{editingOrder ? 'Actualizar Orden' : 'Procesar Venta'}</span>
-                                <ArrowLeft className="w-5 h-5 rotate-180" />
+                                <span>{editingOrder ? '✏️ Actualizar Orden' : '✅ Procesar Venta'}</span>
+                                <span className="font-black">{formatCurrency(cartTotal)}</span>
                             </div>
                         )}
                     </Button>
@@ -770,6 +777,25 @@ export default function POSPage() {
                     )}
                 </div>
                 <ModalFooter className="mt-6">
+                    {/* Quantity selector in modal */}
+                    <div className="flex items-center gap-3 mr-auto">
+                        <span className="text-xs font-bold text-muted-foreground uppercase">Cant.</span>
+                        <div className="flex items-center gap-2 bg-muted rounded-xl p-1">
+                            <button
+                                onClick={() => setModalQuantity(q => Math.max(1, q - 1))}
+                                className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-card transition-colors text-foreground"
+                            >
+                                <Minus className="w-4 h-4" />
+                            </button>
+                            <span className="w-8 text-center font-black text-foreground">{modalQuantity}</span>
+                            <button
+                                onClick={() => setModalQuantity(q => q + 1)}
+                                className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-card transition-colors text-foreground"
+                            >
+                                <Plus className="w-4 h-4" />
+                            </button>
+                        </div>
+                    </div>
                     <Button variant="ghost" onClick={() => setIsOptionsModalOpen(false)} className="rounded-xl">
                         Cancelar
                     </Button>
@@ -778,9 +804,9 @@ export default function POSPage() {
                         className="rounded-xl px-8"
                         disabled={fetchingModifiers}
                     >
-                        Agregar por {formatCurrency(
-                            parseFloat(selectedProduct?.price || 0) +
-                            selectedModifiers.reduce((acc, m) => acc + parseFloat(m.extra_price), 0)
+                        Agregar {modalQuantity > 1 ? `${modalQuantity}x ` : ''}por {formatCurrency(
+                            (parseFloat(selectedProduct?.price || 0) +
+                                selectedModifiers.reduce((acc, m) => acc + parseFloat(m.extra_price), 0)) * modalQuantity
                         )}
                     </Button>
                 </ModalFooter>

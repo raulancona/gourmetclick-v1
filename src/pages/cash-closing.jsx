@@ -35,29 +35,26 @@ export function CashClosingPage() {
     const { data: orders = [], isLoading: loadingOrders } = useQuery({
         queryKey: ['unclosed-orders', user?.id],
         queryFn: () => getUnclosedOrders(user.id),
-        enabled: !!user?.id
+        enabled: !!user?.id,
+        refetchInterval: 30_000, // Polling fallback every 30s
     })
 
     const { data: activeSession, isLoading: loadingSession } = useQuery({
         queryKey: ['active-session', user?.id],
         queryFn: () => getActiveSession(user.id),
-        enabled: !!user?.id
+        enabled: !!user?.id,
+        refetchInterval: 30_000,
     })
 
-    // Realtime Session Sync
+    // Realtime: session changes + order status changes
     useEffect(() => {
         if (!user?.id) return
 
-        const channel = supabase
+        const sessionChannel = supabase
             .channel(`session-sync-${user.id}`)
             .on(
                 'postgres_changes',
-                {
-                    event: '*',
-                    schema: 'public',
-                    table: 'sesiones_caja',
-                    filter: `restaurante_id=eq.${user.id}`
-                },
+                { event: '*', schema: 'public', table: 'sesiones_caja', filter: `restaurante_id=eq.${user.id}` },
                 () => {
                     queryClient.invalidateQueries(['active-session'])
                     queryClient.invalidateQueries(['sessions-history'])
@@ -65,8 +62,22 @@ export function CashClosingPage() {
             )
             .subscribe()
 
+        // Also listen to order changes so the panel auto-updates when waiter
+        // changes a status from the POS without needing manual refresh
+        const ordersChannel = supabase
+            .channel(`caja-orders-${user.id}`)
+            .on(
+                'postgres_changes',
+                { event: '*', schema: 'public', table: 'orders', filter: `user_id=eq.${user.id}` },
+                () => {
+                    queryClient.invalidateQueries(['unclosed-orders'])
+                }
+            )
+            .subscribe()
+
         return () => {
-            supabase.removeChannel(channel)
+            supabase.removeChannel(sessionChannel)
+            supabase.removeChannel(ordersChannel)
         }
     }, [user?.id, queryClient])
 
@@ -75,7 +86,7 @@ export function CashClosingPage() {
         queryClient.invalidateQueries(['active-session'])
         queryClient.invalidateQueries(['cortes-history'])
         queryClient.invalidateQueries(['sessions-history'])
-        if (isAdmin) setView('history')
+        // Stay on closing view (history is now in Reports page)
     }
 
     if (loadingOrders || loadingSession) {
@@ -105,13 +116,6 @@ export function CashClosingPage() {
                             className="rounded-xl font-bold h-10 px-4"
                         >
                             <Banknote className="w-4 h-4 mr-2" /> Gastos
-                        </Button>
-                        <Button
-                            variant={view === 'history' ? 'default' : 'ghost'}
-                            onClick={() => setView('history')}
-                            className="rounded-xl font-bold h-10 px-4"
-                        >
-                            <History className="w-4 h-4 mr-2" /> Historial
                         </Button>
                     </div>
                 )}

@@ -35,6 +35,19 @@ function getNextStatuses(current) {
 export { ORDER_STATUSES, PAYMENT_METHODS, getNextStatuses }
 
 export async function getOrders(userId, { includeClosed = false, startDate = null, endDate = null } = {}) {
+    // When hiding closed orders, we exclude by status AND by sesion_caja_id of closed sessions.
+    // This prevents orphan orders from past shifts appearing in the active cashier view.
+    let closedSessionIds = []
+    if (!includeClosed) {
+        const { data: closedSessions } = await supabase
+            .from('sesiones_caja')
+            .select('id')
+            .eq('restaurante_id', userId)
+            .eq('estado', 'cerrada')
+
+        closedSessionIds = (closedSessions || []).map(s => s.id)
+    }
+
     let query = supabase
         .from('orders')
         .select('*')
@@ -42,8 +55,15 @@ export async function getOrders(userId, { includeClosed = false, startDate = nul
         .order('created_at', { ascending: false })
 
     if (!includeClosed) {
-        // Exclude both legacy closed (cash_cut_id) and new closed (completed)
-        query = query.is('cash_cut_id', null).neq('status', 'completed')
+        // Exclude completed and cancelled orders
+        query = query
+            .neq('status', 'completed')
+            .neq('status', 'cancelled')
+
+        // Exclude orders belonging to any closed session
+        if (closedSessionIds.length > 0) {
+            query = query.not('sesion_caja_id', 'in', `(${closedSessionIds.join(',')})`)
+        }
     }
 
     if (startDate) {
@@ -195,31 +215,37 @@ export async function getOrderStats(userId, { cashCutId = null, filterByShift = 
         total: data.length,
         pending: data.filter(o => o.status === 'pending').length,
         active: data.filter(o => ['confirmed', 'preparing', 'ready', 'on_the_way'].includes(o.status)).length,
-        delivered: data.filter(o => o.status === 'delivered').length,
+        // Count both delivered (active shift) and completed (closed shift)
+        delivered: data.filter(o => o.status === 'delivered' || o.status === 'completed').length,
         cancelled: data.filter(o => o.status === 'cancelled').length,
-        revenue: data.filter(o => o.status === 'delivered').reduce((s, o) => s + parseFloat(o.total || 0), 0),
+        // Revenue includes BOTH delivered (open) and completed (closed) orders
+        revenue: data
+            .filter(o => o.status === 'delivered' || o.status === 'completed')
+            .reduce((s, o) => s + parseFloat(o.total || 0), 0),
 
-        // Distribution of order types
+        // Distribution of order types (all non-cancelled)
         orderTypes: {
             delivery: data.filter(o => o.order_type === 'delivery').length,
             pickup: data.filter(o => o.order_type === 'pickup').length,
             dine_in: data.filter(o => o.order_type === 'dine_in').length,
         },
 
-        // Most used payment method
-        paymentMethods: data.reduce((acc, o) => {
-            acc[o.payment_method] = (acc[o.payment_method] || 0) + 1;
-            return acc;
-        }, {}),
+        // Most used payment method (from completed sales)
+        paymentMethods: data
+            .filter(o => o.status === 'delivered' || o.status === 'completed')
+            .reduce((acc, o) => {
+                if (o.payment_method) {
+                    acc[o.payment_method] = (acc[o.payment_method] || 0) + 1
+                }
+                return acc
+            }, {}),
     }
 
     // Identify most used payment
-    const payments = Object.entries(stats.paymentMethods);
-    if (payments.length > 0) {
-        stats.topPayment = payments.sort((a, b) => b[1] - a[1])[0][0];
-    } else {
-        stats.topPayment = null;
-    }
+    const payments = Object.entries(stats.paymentMethods)
+    stats.topPayment = payments.length > 0
+        ? payments.sort((a, b) => b[1] - a[1])[0][0]
+        : null
 
     return stats
 }
@@ -363,25 +389,32 @@ export async function getSalesAnalytics(userId, { cashCutId = null, filterByShif
 }
 
 /**
- * Fetch orders pending closing (Delivered status, but no cash cut)
+ * Fetch orders pending closing (Delivered status, linked to the active session)
+ * FIXED: Previously filtered by `cash_cut_id` (legacy), but closeSession sets `status=completed`
+ * Now correctly returns only 'delivered' orders, which are the ones awaiting close.
  */
 export async function getUnclosedOrders(userId) {
-    // Determine the start of the current day (or further back if needed)
-    // To be safe and catch orphans, we'll look at the last 1000 delivered orders
-    // and filter in JS. This aligns logic exactly with the UI badges.
+    const { data: activeSession } = await supabase
+        .from('sesiones_caja')
+        .select('id, opened_at')
+        .eq('restaurante_id', userId)
+        .eq('estado', 'abierta')
+        .maybeSingle()
+
+    // If no active session, no orders to show
+    if (!activeSession) return []
+
     const { data, error } = await supabase
         .from('orders')
         .select('*')
         .eq('user_id', userId)
-        .eq('status', 'delivered')
+        .eq('sesion_caja_id', activeSession.id)
+        .neq('status', 'completed')
+        .neq('status', 'cancelled')
         .order('created_at', { ascending: false })
-        .limit(1000)
 
     if (error) throw error
-
-    // Filter client-side to match the UI's "falsy" check
-    // This catches null, undefined, and empty strings
-    return (data || []).filter(o => !o.cash_cut_id)
+    return data || []
 }
 
 /**
@@ -450,15 +483,15 @@ export async function getSessionFinancialSummary(sessionId) {
     const startTime = session.opened_at
     const endTime = session.closed_at || new Date().toISOString()
 
-    // 2. Get ALL delivered orders for this restaurant in the session's time range
-    //    (covers both linked orders via sesion_caja_id AND legacy orders without it)
+    // 2. Get ALL completed/delivered orders for this restaurant in the session's time range
     const { data: orders, error: ordersError } = await supabase
         .from('orders')
-        .select('total, payment_method, id')
+        .select('id, folio, total, payment_method, status, customer_name, order_type, table_number, items, created_at')
         .eq('user_id', session.restaurante_id)
         .in('status', ['delivered', 'completed'])
         .gte('created_at', startTime)
         .lte('created_at', endTime)
+        .order('created_at', { ascending: false })
 
     if (ordersError) throw ordersError
 
@@ -483,7 +516,8 @@ export async function getSessionFinancialSummary(sessionId) {
         totalSales,
         totalExpenses,
         byPayment,
-        orderIds: (orders || []).map(o => o.id)
+        orderIds: (orders || []).map(o => o.id),
+        orders: orders || [],  // Full order list for detail view
     }
 }
 
@@ -555,7 +589,7 @@ export async function openSession(userId, employeeId, initialAmount) {
     return data
 }
 
-export async function closeSession(sessionId, montoReal, userId) {
+export async function closeSession(sessionId, montoReal, userId, closedByName) {
     // 1. Get session details and financial summary
     const { data: session, error: sessionError } = await supabase
         .from('sesiones_caja')
@@ -594,7 +628,9 @@ export async function closeSession(sessionId, montoReal, userId) {
             monto_esperado: currentInventory,
             monto_real: parseFloat(montoReal),
             diferencia: diferencia,
-            closed_at: new Date().toISOString()
+            closed_at: new Date().toISOString(),
+            cerrado_por: userId,
+            nombre_cajero: closedByName
         })
         .eq('id', sessionId)
         .select()
@@ -602,7 +638,8 @@ export async function closeSession(sessionId, montoReal, userId) {
 
     if (updateError) throw updateError
 
-    // 4. Close orders (Mark as completed)
+    // 4. Close ALL active orders in this session (pending, preparing, ready, delivered)
+    //    Excludes only cancelled orders, which are revenue-negative anyway.
     const { error: closeOrdersError } = await supabase
         .from('orders')
         .update({
@@ -610,7 +647,7 @@ export async function closeSession(sessionId, montoReal, userId) {
             fecha_cierre: new Date().toISOString()
         })
         .eq('sesion_caja_id', sessionId)
-        .eq('status', 'delivered')
+        .not('status', 'in', '("completed","cancelled")')
 
     if (closeOrdersError) {
         console.error('Error closing orders:', closeOrdersError)

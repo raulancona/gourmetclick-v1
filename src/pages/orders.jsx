@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Search, Filter, Package, Clock, ChefHat, Truck, CheckCircle2, XCircle, Eye, ChevronDown, MapPin, Phone, User, CreditCard, Banknote, Building2, ExternalLink, Trash2, RefreshCw, Armchair, Store, Edit2, Save, X } from 'lucide-react'
+import { Search, Filter, Package, Clock, ChefHat, Truck, CheckCircle2, XCircle, Eye, ChevronDown, MapPin, Phone, User, CreditCard, Banknote, Building2, ExternalLink, Trash2, RefreshCw, Armchair, Store, Edit2, Save, X, Shield } from 'lucide-react'
 import { Button } from '../components/ui/button'
 import { Input } from '../components/ui/input'
 import { Label } from '../components/ui/label'
@@ -19,6 +19,7 @@ const STATUS_FILTERS = [
     { value: 'all', label: 'Todos', icon: Package },
     { value: 'active', label: 'Activos', icon: Clock },
     { value: 'delivered', label: 'Entregados', icon: CheckCircle2 },
+    { value: 'completed', label: 'Cerradas', icon: Shield }, // New tab for historical/closed orders
     { value: 'cancelled', label: 'Cancelados', icon: XCircle },
 ]
 
@@ -32,8 +33,8 @@ export function OrdersPage() {
     const [searchTerm, setSearchTerm] = useState('')
     const [selectedOrder, setSelectedOrder] = useState(null)
     const { data: orders = [], isLoading } = useQuery({
-        queryKey: ['orders'],
-        queryFn: () => getOrders(user.id, { includeClosed: true }),
+        queryKey: ['orders', statusFilter === 'completed'], // Re-fetch when switching to/from 'completed'
+        queryFn: () => getOrders(user.id, { includeClosed: statusFilter === 'completed' }),
         enabled: !!user,
     })
 
@@ -131,6 +132,7 @@ export function OrdersPage() {
         let matchesFilter = true
         if (statusFilter === 'active') matchesFilter = ['pending', 'confirmed', 'preparing', 'ready', 'on_the_way'].includes(order.status)
         else if (statusFilter === 'delivered') matchesFilter = order.status === 'delivered'
+        else if (statusFilter === 'completed') matchesFilter = order.status === 'completed'
         else if (statusFilter === 'cancelled') matchesFilter = order.status === 'cancelled'
 
         return matchesSearch && matchesFilter
@@ -281,6 +283,17 @@ export function OrdersPage() {
                                     </div>
 
                                     <div className="text-right shrink-0">
+                                        <p className="font-bold text-foreground text-sm truncate">{order.customer_name || 'Cliente General'}</p>
+                                        <div className="flex items-center gap-2">
+                                            <p className="text-xs text-muted-foreground font-mono">#{order.folio || order.id.slice(0, 6)}</p>
+                                            {order.status === 'completed' && (
+                                                <span className="text-[9px] bg-stone-100 text-stone-600 px-1.5 py-0.5 rounded-full font-bold border border-stone-200 flex items-center gap-0.5">
+                                                    <Shield className="w-2.5 h-2.5" /> Cerrada
+                                                </span>
+                                            )}
+                                        </div>
+                                    </div>
+                                    <div className="text-right">
                                         <p className="font-bold text-foreground">${parseFloat(order.total).toFixed(2)}</p>
                                         <p className="text-xs text-muted-foreground">{getTimeAgo(order.created_at)}</p>
                                     </div>
@@ -324,6 +337,7 @@ export function OrdersPage() {
             {selectedOrder && (
                 <OrderDetailModal
                     order={selectedOrder}
+                    isAdmin={true}
                     onClose={() => setSelectedOrder(null)}
                     onUpdateStatus={(status) => {
                         updateStatusMutation.mutate({ orderId: selectedOrder.id, status })

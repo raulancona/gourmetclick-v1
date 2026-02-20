@@ -9,7 +9,7 @@ export function useCategorySubscription(userId) {
         if (!userId) return
 
         const channel = supabase
-            .channel('category-changes')
+            .channel(`category-changes-${userId}`)
             .on(
                 'postgres_changes',
                 {

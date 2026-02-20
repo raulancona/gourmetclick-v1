@@ -35,7 +35,16 @@ export function DashboardPage() {
     const [selectedOrder, setSelectedOrder] = useState(null)
 
     // Date Filtering Logic
-    const [timeRange, setTimeRange] = useState('7d')
+    const [timeRange, setTimeRange] = useState('today')
+
+    const TIME_LABELS = {
+        today: 'Hoy',
+        yesterday: 'Ayer',
+        '7d': 'Últimos 7 días',
+        '30d': 'Últimos 30 días',
+        month: 'Este mes',
+        '3m': 'Últimos 3 meses',
+    }
 
     const getDateRange = (range) => {
         const now = new Date()
@@ -46,18 +55,26 @@ export function DashboardPage() {
             case 'today':
                 start.setHours(0, 0, 0, 0)
                 break
-            case 'yesterday':
+            case 'yesterday': {
                 start.setDate(now.getDate() - 1)
                 start.setHours(0, 0, 0, 0)
                 const endYesterday = new Date()
                 endYesterday.setDate(now.getDate() - 1)
                 endYesterday.setHours(23, 59, 59, 999)
                 return { start: start.toISOString(), end: endYesterday.toISOString() }
+            }
             case '7d':
                 start.setDate(now.getDate() - 7)
                 break
+            case '30d':
+                start.setDate(now.getDate() - 30)
+                break
             case 'month':
-                start.setMonth(now.getMonth() - 1)
+                start.setDate(1)
+                start.setHours(0, 0, 0, 0)
+                break
+            case '3m':
+                start.setMonth(now.getMonth() - 3)
                 break
             default:
                 start.setDate(now.getDate() - 7)
@@ -82,7 +99,8 @@ export function DashboardPage() {
             startDate,
             endDate
         }),
-        enabled: !!user?.id
+        enabled: !!user?.id,
+        refetchInterval: 60_000, // Auto-refresh every 60s
     })
 
     // Fetch sales analytics (Analytics Mode - Date Based)
@@ -93,21 +111,23 @@ export function DashboardPage() {
             startDate,
             endDate
         }),
-        enabled: !!user?.id
+        enabled: !!user?.id,
+        refetchInterval: 60_000,
     })
 
-    // Fetch recent orders for the dashboard view (Date Based)
+    // Fetch recent orders for the dashboard view (Date Based) - always includes closed
     const { data: recentOrders = [] } = useQuery({
         queryKey: ['recent-orders-dashboard', user?.id, timeRange],
         queryFn: async () => {
             const all = await getOrders(user.id, {
-                includeClosed: true, // Dashboard shows everything in the range
+                includeClosed: true,
                 startDate,
                 endDate
             })
-            return all.slice(0, 5)
+            return all.slice(0, 8)
         },
-        enabled: !!user?.id
+        enabled: !!user?.id,
+        refetchInterval: 60_000,
     })
 
     const formatCurrency = (val) => new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(val)
@@ -141,18 +161,20 @@ export function DashboardPage() {
                     <p className="text-muted-foreground">Analítica detallada y estado histórico de tu restaurante</p>
                 </div>
 
-                {/* Date Filter Selector */}
-                <div className="flex items-center gap-2 bg-white dark:bg-gray-800 p-1 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-sm">
+                {/* Date Filter Selector — improved with 6 ranges */}
+                <div className="flex flex-wrap items-center gap-1 bg-white dark:bg-gray-800 p-1 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-sm">
                     {[
                         { id: 'today', label: 'Hoy' },
                         { id: 'yesterday', label: 'Ayer' },
-                        { id: '7d', label: '7 días' },
-                        { id: 'month', label: 'Mes' }
+                        { id: '7d', label: '7 Días' },
+                        { id: '30d', label: '30 Días' },
+                        { id: 'month', label: 'Este Mes' },
+                        { id: '3m', label: '3 Meses' },
                     ].map(range => (
                         <button
                             key={range.id}
                             onClick={() => setTimeRange(range.id)}
-                            className={`px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-all ${timeRange === range.id
+                            className={`px-3 py-1.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-all ${timeRange === range.id
                                 ? 'bg-primary text-white shadow-md'
                                 : 'text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700'
                                 }`}
@@ -232,7 +254,7 @@ export function DashboardPage() {
                             <LineChartIcon className="w-5 h-5 text-muted-foreground" />
                             Tendencia de Ventas
                         </CardTitle>
-                        <CardDescription>Ingresos de los últimos 7 días</CardDescription>
+                        <CardDescription>Ingresos · {TIME_LABELS[timeRange]}</CardDescription>
                     </CardHeader>
                     <CardContent className="h-[300px]">
                         <ResponsiveContainer width="100%" height="100%">

@@ -45,7 +45,7 @@ export function BlindCashCut({ onComplete, session, isAdmin, orders = [] }) {
             setIsLoading(true)
             if (!session?.id) throw new Error('No hay una sesión activa para cerrar')
 
-            await closeSession(session.id, montoReal, user.id)
+            await closeSession(session.id, montoReal, user.id, user.user_metadata?.nombre || user.email || 'Admin')
             toast.success('Sesión de caja cerrada con éxito')
             setMontoReal('')
             setShowConfirm(false)

@@ -18,7 +18,7 @@ import {
 import { ORDER_STATUSES, PAYMENT_METHODS, getNextStatuses } from '../../lib/order-service'
 import { toast } from 'sonner'
 
-export function OrderDetailModal({ order, onClose, onUpdateStatus, onUpdateOrder, onDelete }) {
+export function OrderDetailModal({ order, onClose, onUpdateStatus, onUpdateOrder, onDelete, isAdmin = false }) {
     const navigate = useNavigate()
     const [isEditing, setIsEditing] = useState(false)
     const [formData, setFormData] = useState({
@@ -65,7 +65,9 @@ export function OrderDetailModal({ order, onClose, onUpdateStatus, onUpdateOrder
                                     Cerrada: {new Date(order.fecha_cierre).toLocaleString('es-MX', { dateStyle: 'medium', timeStyle: 'short' })}
                                 </span>
                             )}
-                            {!['delivered', 'cancelled'].includes(order.status) && (
+                            {/* Only allow POS-edit for active (not completed/cancelled/delivered) orders.
+                                Completed = closed by cashier. Admins can always edit. */}
+                            {!['delivered', 'cancelled', 'completed'].includes(order.status) && (
                                 <button
                                     onClick={handleEditInPOS}
                                     className="text-primary hover:underline flex items-center gap-1 mt-1 font-medium"
@@ -74,11 +76,29 @@ export function OrderDetailModal({ order, onClose, onUpdateStatus, onUpdateOrder
                                     Editar productos
                                 </button>
                             )}
+                            {order.status === 'completed' && isAdmin && (
+                                <button
+                                    onClick={handleEditInPOS}
+                                    className="text-amber-500 hover:underline flex items-center gap-1 mt-1 font-medium text-[11px]"
+                                >
+                                    <Edit2 className="w-3 h-3" />
+                                    Editar (Admin)
+                                </button>
+                            )}
                         </div>
                     </div>
                     <div className="flex gap-2 text-foreground">
-                        {!isEditing && order.status !== 'cancelled' && order.status !== 'delivered' && (
-                            <Button variant="ghost" size="icon" onClick={() => setIsEditing(true)} title="Editar detalles">
+                        {/* Edit button: hide for completed (closed) orders for non-admins */}
+                        {!isEditing &&
+                            order.status !== 'cancelled' &&
+                            order.status !== 'delivered' &&
+                            order.status !== 'completed' && (
+                                <Button variant="ghost" size="icon" onClick={() => setIsEditing(true)} title="Editar detalles">
+                                    <Edit2 className="w-4 h-4" />
+                                </Button>
+                            )}
+                        {!isEditing && order.status === 'completed' && isAdmin && (
+                            <Button variant="ghost" size="icon" onClick={() => setIsEditing(true)} title="Editar (Admin)" className="text-amber-500">
                                 <Edit2 className="w-4 h-4" />
                             </Button>
                         )}
@@ -245,20 +265,30 @@ export function OrderDetailModal({ order, onClose, onUpdateStatus, onUpdateOrder
                                                     </span>
                                                 </div>
 
-                                                {/* Extras Hierarchical Rendering */}
+                                                {/* Extras and special instructions */}
                                                 {extras.length > 0 && (
                                                     <div className="px-3 pb-3 ml-4 space-y-1 border-l-2 border-primary/10">
-                                                        {extras.map((ext, j) => (
-                                                            <div key={j} className="flex justify-between items-center text-[11px] text-muted-foreground font-medium">
-                                                                <div className="flex items-center gap-1.5">
-                                                                    <span className="w-1.5 h-1.5 rounded-full bg-primary/20" />
-                                                                    <span>{ext.name || ext.nombre}</span>
+                                                        {extras.map((ext, j) => {
+                                                            // Items saved as {name:'Nota', value:'...'} are special instructions
+                                                            const isNote = !ext.price && !ext.extra_price && ext.value
+                                                            return (
+                                                                <div key={j} className={`flex justify-between items-start text-[11px] font-medium ${isNote ? 'text-amber-600 dark:text-amber-400 bg-amber-500/10 rounded-lg px-2 py-1' : 'text-muted-foreground'}`}>
+                                                                    <div className="flex items-center gap-1.5">
+                                                                        {isNote ? (
+                                                                            <span>📝 <strong>Instrucciones:</strong> {ext.value || ext.name}</span>
+                                                                        ) : (
+                                                                            <>
+                                                                                <span className="w-1.5 h-1.5 rounded-full bg-primary/20 shrink-0" />
+                                                                                <span>{ext.name || ext.nombre}</span>
+                                                                            </>
+                                                                        )}
+                                                                    </div>
+                                                                    {!isNote && (ext.price > 0 || ext.extra_price > 0) && (
+                                                                        <span>+${parseFloat((ext.price || ext.extra_price || 0) * item.quantity).toFixed(2)}</span>
+                                                                    )}
                                                                 </div>
-                                                                {ext.price > 0 && (
-                                                                    <span>+${parseFloat(ext.price * item.quantity).toFixed(2)}</span>
-                                                                )}
-                                                            </div>
-                                                        ))}
+                                                            )
+                                                        })}
                                                     </div>
                                                 )}
                                             </div>
@@ -278,37 +308,46 @@ export function OrderDetailModal({ order, onClose, onUpdateStatus, onUpdateOrder
                                 </div>
                             )}
 
-                            {/* Status Actions */}
-                            {order.status !== 'delivered' && order.status !== 'cancelled' && (
-                                <div>
-                                    <h3 className="text-sm font-bold text-foreground mb-3">Cambiar estado</h3>
-                                    <div className="grid grid-cols-2 gap-2">
-                                        {Object.entries(ORDER_STATUSES).map(([key, info]) => {
-                                            if (key === order.status) return null
-                                            return (
-                                                <button
-                                                    key={key}
-                                                    onClick={() => onUpdateStatus(key)}
-                                                    className={`p-3 rounded-xl border border-border text-left transition-all hover:border-primary/50 hover:bg-primary/5 group ${key === 'cancelled'
-                                                        ? 'hover:border-red-500/50 hover:bg-red-500/5'
-                                                        : ''
-                                                        }`}
-                                                >
-                                                    <div className="text-lg mb-1">{info.emoji}</div>
-                                                    <div className={`text-xs font-bold leading-tight ${key === 'cancelled' ? 'group-hover:text-red-500' : 'group-hover:text-primary'} text-foreground`}>
-                                                        {info.label}
-                                                    </div>
-                                                </button>
-                                            )
-                                        })}
+                            {/* Status Actions: hide for completed/cancelled/delivered (closed orders) unless admin */}
+                            {order.status !== 'delivered' &&
+                                order.status !== 'cancelled' &&
+                                order.status !== 'completed' && (
+                                    <div>
+                                        <h3 className="text-sm font-bold text-foreground mb-3">Cambiar estado</h3>
+                                        <div className="grid grid-cols-2 gap-2">
+                                            {Object.entries(ORDER_STATUSES).map(([key, info]) => {
+                                                if (key === order.status) return null
+                                                return (
+                                                    <button
+                                                        key={key}
+                                                        onClick={() => onUpdateStatus(key)}
+                                                        className={`p-3 rounded-xl border border-border text-left transition-all hover:border-primary/50 hover:bg-primary/5 group ${key === 'cancelled' ? 'hover:border-red-500/50 hover:bg-red-500/5' : ''
+                                                            }`}
+                                                    >
+                                                        <div className="text-lg mb-1">{info.emoji}</div>
+                                                        <div className={`text-xs font-bold leading-tight ${key === 'cancelled' ? 'group-hover:text-red-500' : 'group-hover:text-primary'} text-foreground`}>
+                                                            {info.label}
+                                                        </div>
+                                                    </button>
+                                                )
+                                            })}
+                                        </div>
                                     </div>
+                                )}
+                            {/* Closed badge for completed orders */}
+                            {order.status === 'completed' && (
+                                <div className="bg-muted/50 border border-border rounded-xl p-4 text-center">
+                                    <p className="text-sm font-bold text-muted-foreground">✅ Orden Cerrada</p>
+                                    <p className="text-xs text-muted-foreground mt-1">
+                                        {isAdmin ? 'Como admin puedes editar los datos.' : 'Esta orden fue liquidada en el cierre de turno.'}
+                                    </p>
                                 </div>
                             )}
                         </>
                     )}
 
-                    {/* Delete */}
-                    {!isEditing && (
+                    {/* Delete: only for non-closed orders, or admin for any */}
+                    {!isEditing && (order.status !== 'completed' || isAdmin) && (
                         <div className="pt-4 border-t border-border">
                             <button
                                 onClick={() => {
@@ -319,7 +358,7 @@ export function OrderDetailModal({ order, onClose, onUpdateStatus, onUpdateOrder
                                 className="w-full py-3 rounded-xl text-sm font-bold text-red-500 bg-red-500/10 hover:bg-red-500/20 transition-colors flex items-center justify-center gap-2"
                             >
                                 <Trash2 className="w-4 h-4" />
-                                Eliminar orden
+                                {order.status === 'completed' && isAdmin ? 'Eliminar (Admin)' : 'Eliminar orden'}
                             </button>
                         </div>
                     )}

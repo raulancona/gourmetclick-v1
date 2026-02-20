@@ -1,15 +1,26 @@
+import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { getSessionsHistory } from '../../lib/order-service'
+import { getSessionsHistory, getOrderStats } from '../../lib/order-service'
 import { useAuth } from '../auth/auth-context'
 import { formatCurrency } from '../../lib/utils'
 import { TrendingUp, TrendingDown, CheckCircle2, Calendar, User, Clock, Shield } from 'lucide-react'
+import { SessionDetailModal } from './session-detail-modal'
 
 export function CortesHistory() {
     const { user } = useAuth()
+    const [selectedSession, setSelectedSession] = useState(null)
     const { data: history = [], isLoading } = useQuery({
         queryKey: ['sessions-history', user?.id],
         queryFn: () => getSessionsHistory(user.id),
         enabled: !!user?.id
+    })
+
+    // Fetch active session current total to avoid "Calculando..."
+    const { data: activeStats } = useQuery({
+        queryKey: ['active-session-stats', user?.id],
+        queryFn: () => getOrderStats(user.id, { filterByShift: true }), // Current open session stats
+        enabled: !!user?.id && history.some(s => s.estado === 'abierta'),
+        refetchInterval: 30000 // Update every 30s
     })
 
     if (isLoading) return <div className="text-center py-12 text-muted-foreground animate-pulse font-medium">Cargando historial de cortes...</div>
@@ -38,7 +49,11 @@ export function CortesHistory() {
                         const isOpen = session.estado === 'abierta'
 
                         return (
-                            <div key={session.id} className={`bg-card border rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-shadow ${isOpen ? 'border-primary ring-1 ring-primary/20' : 'border-border'}`}>
+                            <div
+                                key={session.id}
+                                onClick={() => setSelectedSession(session)}
+                                className={`bg-card border rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-all cursor-pointer hover:scale-[1.01] ${isOpen ? 'border-primary ring-1 ring-primary/20' : 'border-border'}`}
+                            >
                                 <div className="p-5 flex flex-col md:flex-row md:items-center justify-between gap-6">
                                     {/* Date and Info */}
                                     <div className="flex items-start gap-4">
@@ -70,7 +85,10 @@ export function CortesHistory() {
                                                     {new Date(session.opened_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                                     {session.closed_at && ` - ${new Date(session.closed_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`}
                                                 </span>
-                                                <span className="flex items-center gap-1"><User className="w-3 h-3" /> {session.empleado?.nombre || 'Admin'}</span>
+                                                <span className="flex items-center gap-1">
+                                                    <User className="w-3 h-3" />
+                                                    {isClosed ? (session.nombre_cajero || 'Admin') : (session.empleado?.nombre || 'Admin')}
+                                                </span>
                                             </div>
                                         </div>
                                     </div>
@@ -84,7 +102,7 @@ export function CortesHistory() {
                                         <div>
                                             <p className="text-[9px] font-black text-muted-foreground uppercase mb-1">{isOpen ? 'Monto Actual' : 'Esperado'}</p>
                                             <p className="text-sm font-bold text-foreground">
-                                                {isOpen ? 'Calculando...' : formatCurrency(session.monto_esperado)}
+                                                {isOpen ? formatCurrency(parseFloat(session.fondo_inicial) + (activeStats?.revenue || 0)) : formatCurrency(session.monto_esperado)}
                                             </p>
                                         </div>
                                         <div className="text-right">
@@ -110,6 +128,13 @@ export function CortesHistory() {
                     })
                 )}
             </div>
+
+            {selectedSession && (
+                <SessionDetailModal
+                    session={selectedSession}
+                    onClose={() => setSelectedSession(null)}
+                />
+            )}
         </div>
     )
 }
