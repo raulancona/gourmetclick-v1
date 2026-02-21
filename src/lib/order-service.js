@@ -113,18 +113,23 @@ export async function createOrder(orderData) {
         console.error("Error fetching session for order:", e);
     }
 
-    if (!activeSession) {
+    // Determine if it is a public order (customer-originated)
+    const isPublicOrder = ['pickup', 'delivery'].includes(orderData.order_type) || !orderData.user_id;
+
+    if (!activeSession && !isPublicOrder) {
         throw new Error(`No es posible crear la orden: No hay una sesión de caja abierta para el tenant ${searchTenantId}.`)
     }
 
     const finalPayload = {
         ...payload,
-        sesion_caja_id: activeSession.id,
+        sesion_caja_id: activeSession?.id || null,
         restaurant_id: searchTenantId,
-        user_id: payload.user_id || activeSession.empleado_id || searchTenantId // Fallback robusto que respete FK (ideal payload.user_id proveído por POS)
+        user_id: payload.user_id || activeSession?.empleado_id || searchTenantId, // Fallback robusto que respete FK
+        // Force pending status if it's a public order without a session
+        status: (!activeSession && isPublicOrder) ? 'pending' : (payload.status || 'pending')
     }
 
-    console.log('📦 Processed Payload with Session:', finalPayload)
+    console.log('📦 Processed Payload:', finalPayload)
 
     try {
         const { data, error } = await supabase
@@ -536,7 +541,7 @@ export async function getDailyFinancialSummary(restaurantId) {
 
     return {
         ...summary,
-        expectedBalance: parseFloat(activeSession.fondo_inicial || 0) + summary.totalSales - summary.totalExpenses
+        expectedBalance: parseFloat(activeSession.fondo_inicial || 0) + summary.byPayment.cash - summary.totalExpenses
     }
 }
 
@@ -645,9 +650,9 @@ export async function closeSession(sessionId, montoReal, userId, closedByName, e
     // 2. Calculate totals for THIS session
     const { data: orders, error: ordersError } = await supabase
         .from('orders')
-        .select('total')
+        .select('total, payment_method')
         .eq('sesion_caja_id', sessionId)
-        .eq('status', 'delivered')
+        .in('status', ['delivered', 'completed']) // We use both in case some are already marked completed
 
     if (ordersError) throw ordersError
 
@@ -658,9 +663,14 @@ export async function closeSession(sessionId, montoReal, userId, closedByName, e
 
     if (gastosError) throw gastosError
 
-    // Use the expectedBalance passed from the UI (which includes all payment methods correctly calculated)
-    // Fallback to the old calculation just in case (though it only counted 'delivered' orders)
-    const finalExpectedBalance = expectedBalance !== undefined ? expectedBalance : (parseFloat(session.fondo_inicial) + ((orders || []).reduce((sum, o) => sum + (parseFloat(o.total) || 0), 0)) - ((gastos || []).reduce((sum, g) => sum + (parseFloat(g.monto) || 0), 0)))
+    // Security: Recalculate everything server-side using ONLY cash payments for physical balance
+    const cashSales = (orders || [])
+        .filter(o => (o.payment_method || 'cash') === 'cash')
+        .reduce((sum, o) => sum + (parseFloat(o.total) || 0), 0)
+
+    const totalExpenses = (gastos || []).reduce((sum, g) => sum + (parseFloat(g.monto) || 0), 0)
+
+    const finalExpectedBalance = parseFloat(session.fondo_inicial || 0) + cashSales - totalExpenses
     const diferencia = parseFloat(montoReal) - finalExpectedBalance
 
     // 3. Update session

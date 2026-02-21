@@ -1,14 +1,16 @@
 import { useState, useEffect } from 'react'
-import { Plus, Trash2, Receipt, ArrowDownCircle, Search, Calendar, Tag, FileText, Loader2, Camera, ExternalLink } from 'lucide-react'
+import { Plus, Trash2, Receipt, ArrowDownCircle, Search, Calendar, Tag, FileText, Loader2, AlertCircle } from 'lucide-react'
 import { Button } from '../../components/ui/button'
 import { Input } from '../../components/ui/input'
 import { Label } from '../../components/ui/label'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../auth/auth-context'
+import { useTenant } from '../auth/tenant-context'
 import { toast } from 'sonner'
 
 export function ExpenseManager() {
     const { user } = useAuth()
+    const { tenant } = useTenant()
     const [loading, setLoading] = useState(false)
     const [expenses, setExpenses] = useState([])
     const [formData, setFormData] = useState({
@@ -20,8 +22,8 @@ export function ExpenseManager() {
     const categories = ['Operación', 'Insumos', 'Nómina', 'Mantenimiento', 'Marketing', 'Otros']
 
     useEffect(() => {
-        if (user) loadTodayExpenses()
-    }, [user])
+        if (tenant?.id) loadTodayExpenses()
+    }, [tenant?.id])
 
     const loadTodayExpenses = async () => {
         try {
@@ -32,7 +34,7 @@ export function ExpenseManager() {
             const { data, error } = await supabase
                 .from('gastos')
                 .select('*')
-                .eq('restaurant_id', user.id)
+                .eq('restaurant_id', tenant.id)
                 .gte('created_at', today.toISOString())
                 .order('created_at', { ascending: false })
 
@@ -53,37 +55,24 @@ export function ExpenseManager() {
             return
         }
 
+        if (!tenant?.id) {
+            toast.error('Error de sesión: No se identificó el restaurante')
+            return
+        }
+
         try {
             setLoading(true)
 
-            // Check for an active session to link this expense
+            // Check for an active session to link this expense (restaurante_id in sessions table)
             const { data: activeSession } = await supabase
                 .from('sesiones_caja')
                 .select('id')
-                .eq('restaurante_id', user.id)
+                .eq('restaurante_id', tenant.id)
                 .eq('estado', 'abierta')
                 .maybeSingle()
 
             if (!activeSession) {
-                throw new Error('No es posible registrar el gasto: No hay una sesión de caja abierta.')
-            }
-
-            let comprobanteUrl = null
-
-            if (formData.file) {
-                const fileExt = formData.file.name.split('.').pop()
-                const fileName = `${user.id}/${Date.now()}.${fileExt}`
-                const { error: uploadError } = await supabase.storage
-                    .from('expense-receipts')
-                    .upload(fileName, formData.file)
-
-                if (uploadError) throw uploadError
-
-                const { data: { publicUrl } } = supabase.storage
-                    .from('expense-receipts')
-                    .getPublicUrl(fileName)
-
-                comprobanteUrl = publicUrl
+                toast.warning('Aviso: Registrando gasto sin una sesión de caja activa.')
             }
 
             const { data, error } = await supabase
@@ -92,22 +81,21 @@ export function ExpenseManager() {
                     monto: parseFloat(formData.monto),
                     descripcion: formData.descripcion || null,
                     categoria: formData.categoria,
-                    restaurant_id: user.id, // Corregido el mapeo al esquema de bd
-                    sesion_caja_id: activeSession.id,
-                    comprobante_url: comprobanteUrl
+                    restaurant_id: tenant.id, // restaurant_id in gastos table
+                    sesion_caja_id: activeSession?.id || null, // Allow null as requested
+                    empleado_id: user?.id,
+                    fecha: new Date().toISOString() // Explicitly send fecha as requested
                 }])
                 .select()
                 .single()
 
             if (error) throw error
 
-            setExpenses([data, ...expenses])
-            setFormData({ monto: '', descripcion: '', categoria: 'Operación', file: null })
-            // Reset file input manually if needed, or rely on key reset (simple reset here)
-            document.getElementById('comprobante').value = ''
+            setExpenses(prev => [data, ...prev])
+            setFormData({ monto: '', descripcion: '', categoria: 'Operación' })
             toast.success('Gasto registrado correctamente')
         } catch (error) {
-            console.error('Error saving expense:', error)
+            console.error('Error saving expense:', error.message)
             toast.error('Error al guardar el gasto')
         } finally {
             setLoading(false)
@@ -138,7 +126,7 @@ export function ExpenseManager() {
                         </div>
                         <div>
                             <h2 className="text-lg font-bold">Registrar Gasto</h2>
-                            <p className="text-xs text-muted-foreground uppercase font-semibold">Salida de efectivo del turno</p>
+                            <p className="text-xs text-muted-foreground uppercase font-semibold">Salida de efectivo</p>
                         </div>
                     </div>
 
@@ -181,18 +169,7 @@ export function ExpenseManager() {
                                 id="descripcion"
                                 value={formData.descripcion}
                                 onChange={e => setFormData({ ...formData, descripcion: e.target.value })}
-                                placeholder="Ej: Compra de hielos, refrescos..."
-                            />
-                        </div>
-
-                        <div className="space-y-2">
-                            <Label htmlFor="comprobante">Comprobante (Opcional)</Label>
-                            <Input
-                                id="comprobante"
-                                type="file"
-                                accept="image/*"
-                                onChange={e => setFormData({ ...formData, file: e.target.files[0] })}
-                                className="cursor-pointer"
+                                placeholder="Ej: Compra de hielos, suministros..."
                             />
                         </div>
 
@@ -255,14 +232,16 @@ export function ExpenseManager() {
                                             </td>
                                             <td className="px-6 py-4">
                                                 <p className="text-sm font-bold text-foreground">{expense.descripcion || 'Sin descripción'}</p>
-                                                <p className="text-[10px] text-muted-foreground font-medium uppercase">
-                                                    {new Date(expense.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                                                </p>
-                                                {expense.comprobante_url && (
-                                                    <a href={expense.comprobante_url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-[10px] text-blue-600 hover:underline mt-1">
-                                                        <ExternalLink className="w-3 h-3" /> Ver Comprobante
-                                                    </a>
-                                                )}
+                                                <div className="flex items-center gap-2 mt-0.5">
+                                                    <p className="text-[10px] text-muted-foreground font-medium uppercase">
+                                                        {new Date(expense.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                                    </p>
+                                                    {!expense.sesion_caja_id && (
+                                                        <span className="inline-flex items-center gap-1 text-[9px] text-amber-600 font-bold uppercase tracking-wider">
+                                                            <AlertCircle className="w-2.5 h-2.5" /> Sin Turno
+                                                        </span>
+                                                    )}
+                                                </div>
                                             </td>
                                             <td className="px-6 py-4 text-right">
                                                 <span className="text-base font-black text-red-600">-${parseFloat(expense.monto).toFixed(2)}</span>
