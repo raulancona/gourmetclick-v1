@@ -1,12 +1,12 @@
 import { useState } from 'react'
-import { Outlet, useLocation } from 'react-router-dom'
+import { Outlet } from 'react-router-dom'
 import { Menu } from 'lucide-react'
 import { Button } from '../../components/ui/button'
 import { Sidebar } from './sidebar'
 
 export function DashboardLayout() {
-    const location = useLocation()
     const [isSidebarOpen, setIsSidebarOpen] = useState(false)
+    const [isCollapsed, setIsCollapsed] = useState(false)
 
     return (
         <div className="flex h-screen overflow-hidden relative">
@@ -15,16 +15,21 @@ export function DashboardLayout() {
                 <Button
                     variant="ghost"
                     size="icon"
-                    className="bg-white shadow-md rounded-full"
+                    className="bg-card shadow-md rounded-full border border-border"
                     onClick={() => setIsSidebarOpen(true)}
                 >
                     <Menu className="w-5 h-5" />
                 </Button>
             </div>
 
-            <Sidebar isOpen={isSidebarOpen} onClose={() => setIsSidebarOpen(false)} />
+            <Sidebar
+                isOpen={isSidebarOpen}
+                onClose={() => setIsSidebarOpen(false)}
+                isCollapsed={isCollapsed}
+                onToggleCollapse={() => setIsCollapsed(c => !c)}
+            />
 
-            <main className="flex-1 overflow-y-auto scrollbar-hide bg-background p-0 w-full">
+            <main className="flex-1 overflow-y-auto scrollbar-hide bg-background p-0 w-full min-w-0">
                 <Outlet />
             </main>
         </div>
