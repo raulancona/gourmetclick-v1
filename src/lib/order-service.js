@@ -11,7 +11,7 @@ const ORDER_STATUSES = {
     ready: { label: 'Listo', emoji: '📦', color: '#10B981' },
     on_the_way: { label: 'En camino', emoji: '🛵', color: '#6366F1' },
     delivered: { label: 'Entregado', emoji: '🎉', color: '#22C55E' },
-    completed: { label: 'Liquidada', emoji: '🏁', color: '#111827', hidden: true },
+    // 'completed' is set automatically by closeSession, never shown as a user option
     cancelled: { label: 'Cancelado', emoji: '❌', color: '#EF4444' },
 }
 

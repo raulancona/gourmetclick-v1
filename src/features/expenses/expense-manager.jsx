@@ -16,7 +16,8 @@ export function ExpenseManager() {
     const [formData, setFormData] = useState({
         monto: '',
         descripcion: '',
-        categoria: 'Operación'
+        categoria: 'Operación',
+        medio_pago: 'cash'   // default: cash
     })
 
     const categories = ['Operación', 'Insumos', 'Nómina', 'Mantenimiento', 'Marketing', 'Otros']
@@ -81,10 +82,11 @@ export function ExpenseManager() {
                     monto: parseFloat(formData.monto),
                     descripcion: formData.descripcion || null,
                     categoria: formData.categoria,
-                    restaurant_id: tenant.id, // restaurant_id in gastos table
-                    sesion_caja_id: activeSession?.id || null, // Allow null as requested
+                    medio_pago: formData.medio_pago || 'cash',
+                    restaurant_id: tenant.id,
+                    sesion_caja_id: activeSession?.id || null,
                     empleado_id: user?.id,
-                    fecha: new Date().toISOString() // Explicitly send fecha as requested
+                    fecha: new Date().toISOString()
                 }])
                 .select()
                 .single()
@@ -92,7 +94,7 @@ export function ExpenseManager() {
             if (error) throw error
 
             setExpenses(prev => [data, ...prev])
-            setFormData({ monto: '', descripcion: '', categoria: 'Operación' })
+            setFormData({ monto: '', descripcion: '', categoria: 'Operación', medio_pago: 'cash' })
             toast.success('Gasto registrado correctamente')
         } catch (error) {
             console.error('Error saving expense:', error.message)
@@ -171,6 +173,30 @@ export function ExpenseManager() {
                                 onChange={e => setFormData({ ...formData, descripcion: e.target.value })}
                                 placeholder="Ej: Compra de hielos, suministros..."
                             />
+                        </div>
+
+                        {/* Medio de Pago — critical for cash reconciliation */}
+                        <div className="space-y-2">
+                            <Label className="text-xs font-black uppercase tracking-widest text-muted-foreground">Medio de Pago</Label>
+                            <div className="grid grid-cols-3 gap-2">
+                                {[
+                                    { value: 'cash', label: '💵 Efectivo' },
+                                    { value: 'card', label: '💳 Tarjeta' },
+                                    { value: 'transfer', label: '🏦 Transferencia' }
+                                ].map(opt => (
+                                    <button
+                                        key={opt.value}
+                                        type="button"
+                                        onClick={() => setFormData({ ...formData, medio_pago: opt.value })}
+                                        className={`py-2 px-2 rounded-xl text-xs font-bold border transition-all text-center ${formData.medio_pago === opt.value
+                                            ? 'bg-primary text-primary-foreground border-primary shadow-md'
+                                            : 'bg-background border-border text-muted-foreground hover:border-primary/50'
+                                            }`}
+                                    >
+                                        {opt.label}
+                                    </button>
+                                ))}
+                            </div>
                         </div>
 
                         <Button type="submit" className="w-full h-12 rounded-xl text-base font-bold" disabled={loading}>

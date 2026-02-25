@@ -34,17 +34,30 @@ export function DashboardPage() {
 
     // Date Filtering Logic
     const [timeRange, setTimeRange] = useState('today')
+    const [customStart, setCustomStart] = useState(() => {
+        const d = new Date()
+        d.setHours(0, 0, 0, 0)
+        return d.toISOString().split('T')[0]
+    })
+    const [customEnd, setCustomEnd] = useState(() => new Date().toISOString().split('T')[0])
 
     const TIME_LABELS = {
         today: 'Hoy',
         yesterday: 'Ayer',
-        '7d': 'Últimos 7 días',
-        '30d': 'Últimos 30 días',
-        month: 'Este mes',
-        '3m': 'Últimos 3 meses',
+        '7d': '7 Días',
+        '30d': '30 Días',
+        month: 'Este Mes',
+        '3m': '3 Meses',
+        custom: 'Personalizado',
     }
 
     const getDateRange = (range) => {
+        if (range === 'custom') {
+            return {
+                start: new Date(customStart + 'T00:00:00').toISOString(),
+                end: new Date(customEnd + 'T23:59:59').toISOString()
+            }
+        }
         const now = new Date()
         const end = now.toISOString()
         let start = new Date()
@@ -213,27 +226,57 @@ export function DashboardPage() {
                     <p className="text-muted-foreground">Analítica detallada y estado histórico de tu restaurante</p>
                 </div>
 
-                {/* Date Filter Selector — improved with 6 ranges */}
-                <div className="flex flex-wrap items-center gap-1 bg-white dark:bg-gray-800 p-1 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-sm">
-                    {[
-                        { id: 'today', label: 'Hoy' },
-                        { id: 'yesterday', label: 'Ayer' },
-                        { id: '7d', label: '7 Días' },
-                        { id: '30d', label: '30 Días' },
-                        { id: 'month', label: 'Este Mes' },
-                        { id: '3m', label: '3 Meses' },
-                    ].map(range => (
-                        <button
-                            key={range.id}
-                            onClick={() => setTimeRange(range.id)}
-                            className={`px-3 py-1.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-all ${timeRange === range.id
-                                ? 'bg-primary text-white shadow-md'
-                                : 'text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700'
-                                }`}
-                        >
-                            {range.label}
-                        </button>
-                    ))}
+                {/* Date Filter Selector — presets + custom range */}
+                <div className="flex flex-col gap-2 items-end">
+                    <div className="flex flex-wrap items-center gap-1 bg-white dark:bg-gray-800 p-1 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-sm">
+                        {[
+                            { id: 'today', label: 'Hoy' },
+                            { id: 'yesterday', label: 'Ayer' },
+                            { id: '7d', label: '7 Días' },
+                            { id: '30d', label: '30 Días' },
+                            { id: 'month', label: 'Este Mes' },
+                            { id: '3m', label: '3 Meses' },
+                            { id: 'custom', label: '📅 Personalizado' },
+                        ].map(range => (
+                            <button
+                                key={range.id}
+                                onClick={() => setTimeRange(range.id)}
+                                className={`px-3 py-1.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-all ${timeRange === range.id
+                                    ? 'bg-primary text-white shadow-md'
+                                    : 'text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700'
+                                    }`}
+                            >
+                                {range.label}
+                            </button>
+                        ))}
+                    </div>
+                    {/* Custom date range inputs */}
+                    {timeRange === 'custom' && (
+                        <div className="flex items-center gap-2 bg-white dark:bg-gray-800 p-2 rounded-2xl border border-primary/30 shadow-sm">
+                            <div className="flex items-center gap-1">
+                                <span className="text-[10px] font-black text-muted-foreground uppercase">Desde</span>
+                                <input
+                                    type="date"
+                                    value={customStart}
+                                    max={customEnd}
+                                    onChange={e => setCustomStart(e.target.value)}
+                                    className="text-xs font-bold border border-border rounded-lg px-2 py-1 bg-background text-foreground focus:ring-1 focus:ring-primary outline-none"
+                                />
+                            </div>
+                            <span className="text-muted-foreground font-bold">→</span>
+                            <div className="flex items-center gap-1">
+                                <span className="text-[10px] font-black text-muted-foreground uppercase">Hasta</span>
+                                <input
+                                    type="date"
+                                    value={customEnd}
+                                    min={customStart}
+                                    max={new Date().toISOString().split('T')[0]}
+                                    onChange={e => setCustomEnd(e.target.value)}
+                                    className="text-xs font-bold border border-border rounded-lg px-2 py-1 bg-background text-foreground focus:ring-1 focus:ring-primary outline-none"
+                                />
+                            </div>
+                        </div>
+                    )}
                 </div>
             </div>
 
