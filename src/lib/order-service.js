@@ -59,9 +59,10 @@ export async function getOrders(restaurantId, { includeClosed = false, startDate
         .range(from, to)
 
     if (!includeClosed) {
-        // Exclude orders belonging to any closed session (historic shifts)
+        // Exclude orders belonging to closed sessions, EXCEPT if they are still active.
+        // This ensures "ghost orders" are always visible to the staff so they can be managed.
         if (closedSessionIds.length > 0) {
-            query = query.not('sesion_caja_id', 'in', `(${closedSessionIds.join(',')})`)
+            query = query.or(`sesion_caja_id.not.in.(${closedSessionIds.join(',')}),sesion_caja_id.is.null,status.in.(pending,confirmed,preparing,ready,on_the_way)`)
         }
     }
 
@@ -124,13 +125,20 @@ export async function createOrder(orderData) {
         }
     }
 
+    const finalStatus = (!activeSession && isPublicOrder) ? 'pending' : (payload.status || 'pending')
+
     const finalPayload = {
         ...payload,
         sesion_caja_id: activeSession?.id || null,
         restaurant_id: searchTenantId,
         user_id: payload.user_id || activeSession?.empleado_id || searchTenantId, // Fallback robusto que respete FK
-        // Force pending status if it's a public order without a session
-        status: (!activeSession && isPublicOrder) ? 'pending' : (payload.status || 'pending')
+        status: finalStatus,
+        audit_log: [{
+            action: 'CREATED',
+            timestamp: new Date().toISOString(),
+            user: isPublicOrder ? (payload.customer_name || 'Cliente') : 'Sistema/Staff',
+            details: 'Orden creada'
+        }]
     }
 
     console.log('📦 Processed Payload:', finalPayload)
@@ -155,14 +163,30 @@ export async function createOrder(orderData) {
     }
 }
 
-export async function updateOrderStatus(orderId, status, restaurantId) {
+export async function updateOrderStatus(orderId, status, restaurantId, userName = 'Sistema') {
+    // Get current order to append audit log
+    const { data: currentOrder } = await supabase
+        .from('orders')
+        .select('status, audit_log')
+        .eq('id', orderId)
+        .single();
+
+    const currentAuditLog = currentOrder?.audit_log || [];
+    const prevStatus = currentOrder?.status || 'desconocido';
+
     const updates = {
         status,
-        updated_at: new Date().toISOString()
+        updated_at: new Date().toISOString(),
+        audit_log: [...currentAuditLog, {
+            action: 'STATUS_CHANGE',
+            timestamp: new Date().toISOString(),
+            user: userName,
+            details: `Estado cambiado de ${ORDER_STATUSES[prevStatus]?.label || prevStatus} a ${ORDER_STATUSES[status]?.label || status}`
+        }]
     }
 
     // Set closing date if order is completed
-    if (status === 'delivered' || status === 'completed') {
+    if (status === 'delivered' || status === 'completed' || status === 'cancelled') {
         updates.fecha_cierre = new Date().toISOString()
     }
 
@@ -178,10 +202,30 @@ export async function updateOrderStatus(orderId, status, restaurantId) {
     return data
 }
 
-export async function updateOrder(orderId, updates, restaurantId) {
+export async function updateOrder(orderId, updates, restaurantId, userName = 'Sistema') {
+    // Get current order to append audit log
+    const { data: currentOrder } = await supabase
+        .from('orders')
+        .select('audit_log')
+        .eq('id', orderId)
+        .single();
+
+    const currentAuditLog = currentOrder?.audit_log || [];
+
+    const finalUpdates = {
+        ...updates,
+        updated_at: new Date().toISOString(),
+        audit_log: [...currentAuditLog, {
+            action: 'UPDATED',
+            timestamp: new Date().toISOString(),
+            user: userName,
+            details: 'Orden editada (productos/notas/tipo)'
+        }]
+    }
+
     const { data, error } = await supabase
         .from('orders')
-        .update({ ...updates, updated_at: new Date().toISOString() })
+        .update(finalUpdates)
         .eq('id', orderId)
         .or(`restaurant_id.eq.${restaurantId},user_id.eq.${restaurantId}`)
         .select()
