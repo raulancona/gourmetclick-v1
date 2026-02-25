@@ -204,43 +204,45 @@ export function PublicMenuPage() {
     const groupedProducts = getGroupedProducts()
 
     return (
-        <CartProvider>
-            <MenuContent
-                restaurant={restaurant}
-                categories={categories}
-                products={products}
-                filteredProducts={filteredProducts}
-                groupedProducts={groupedProducts}
-                searchTerm={searchTerm}
-                setSearchTerm={setSearchTerm}
-                selectedCategory={selectedCategory}
-                setSelectedCategory={setSelectedCategory}
-                selectedProduct={selectedProduct}
-                setSelectedProduct={setSelectedProduct}
-                showCart={showCart}
-                setShowCart={setShowCart}
-                showCheckout={showCheckout}
-                setShowCheckout={setShowCheckout}
-                primaryColor={primaryColor}
-                secondaryColor={secondaryColor}
-            />
-
-            {/* Promo Popup */}
-            {showPopup && (
-                <PromoPopup
+        <div className="public-menu-root">
+            <CartProvider>
+                <MenuContent
                     restaurant={restaurant}
+                    categories={categories}
+                    products={products}
+                    filteredProducts={filteredProducts}
+                    groupedProducts={groupedProducts}
+                    searchTerm={searchTerm}
+                    setSearchTerm={setSearchTerm}
+                    selectedCategory={selectedCategory}
+                    setSelectedCategory={setSelectedCategory}
+                    selectedProduct={selectedProduct}
+                    setSelectedProduct={setSelectedProduct}
+                    showCart={showCart}
+                    setShowCart={setShowCart}
+                    showCheckout={showCheckout}
+                    setShowCheckout={setShowCheckout}
                     primaryColor={primaryColor}
-                    onClose={() => {
-                        setShowPopup(false)
-                        sessionStorage.setItem(`popup_dismissed_${restaurant.id} `, '1')
-                    }}
+                    secondaryColor={secondaryColor}
                 />
-            )}
-        </CartProvider>
+
+                {/* Promo Popup */}
+                {showPopup && (
+                    <PromoPopup
+                        restaurant={restaurant}
+                        primaryColor={primaryColor}
+                        onClose={() => {
+                            setShowPopup(false)
+                            sessionStorage.setItem(`popup_dismissed_${restaurant.id} `, '1')
+                        }}
+                    />
+                )}
+            </CartProvider>
+        </div>
     )
 }
 
-// ─── Promo Popup ──────────────────────────────────────────────────────────────
+
 function PromoPopup({ restaurant, primaryColor, onClose }) {
     return (
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-6" onClick={onClose}>
@@ -782,8 +784,6 @@ function ProductModal({ product, primaryColor, secondaryColor, onClose }) {
 }
 
 
-// ─── Cart Panel ───────────────────────────────────────────────────────────────
-// ─── Cart Panel (Modern Refined) ───────────────────────────────────────────────
 function CartPanel({ restaurant, primaryColor, onClose, onCheckout }) {
     const { items, getTotal, getItemCount, updateQuantity, removeItem, clearCart } = useCart()
 
@@ -794,78 +794,90 @@ function CartPanel({ restaurant, primaryColor, onClose, onCheckout }) {
                 className="relative bg-white w-full sm:max-w-md sm:rounded-[2.5rem] rounded-t-[2.5rem] max-h-[90vh] flex flex-col shadow-2xl animate-in slide-in-from-bottom duration-500"
                 onClick={e => e.stopPropagation()}
             >
-                <div className="flex items-center justify-between px-6 py-5 border-b border-gray-100/50">
+                {/* Header */}
+                <div className="flex items-center justify-between px-6 py-5 border-b-2 border-gray-100">
                     <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-2xl bg-gray-50 flex items-center justify-center">
-                            <ShoppingBag className="w-5 h-5 text-gray-400" />
+                        <div className="w-10 h-10 rounded-2xl bg-gray-100 flex items-center justify-center">
+                            <ShoppingBag className="w-5 h-5 text-gray-600" />
                         </div>
                         <div>
                             <h2 className="text-xl font-black text-gray-900">Tu Pedido</h2>
-                            <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">{getItemCount()} artículos</p>
+                            <p className="text-[11px] text-gray-500 font-bold uppercase tracking-wider">{getItemCount()} artículos</p>
                         </div>
                     </div>
                     <div className="flex items-center gap-2">
                         {items.length > 0 && (
-                            <button onClick={clearCart} className="text-[11px] text-red-500 font-black uppercase px-4 py-2 rounded-xl hover:bg-red-50 transition-colors">Vaciar</button>
+                            <button onClick={clearCart} className="text-[11px] text-red-600 font-black uppercase px-4 py-2 rounded-xl border border-red-100 bg-red-50 hover:bg-red-100 transition-colors">Vaciar</button>
                         )}
-                        <button onClick={onClose} className="w-10 h-10 rounded-2xl bg-gray-50 flex items-center justify-center hover:bg-gray-100 transition-colors">
-                            <X className="w-5 h-5 text-gray-600" />
+                        <button onClick={onClose} className="w-10 h-10 rounded-2xl bg-gray-100 flex items-center justify-center hover:bg-gray-200 transition-colors">
+                            <X className="w-5 h-5 text-gray-700" />
                         </button>
                     </div>
                 </div>
 
-                <div className="flex-1 overflow-y-auto p-6 space-y-4 no-scrollbar">
+                {/* Items */}
+                <div className="flex-1 overflow-y-auto p-5 space-y-3 no-scrollbar">
                     {items.length === 0 ? (
                         <div className="text-center py-20">
-                            <div className="w-24 h-24 mx-auto mb-6 bg-gray-50 rounded-[2rem] flex items-center justify-center">
-                                <ShoppingBag className="w-10 h-10 text-gray-200" />
+                            <div className="w-24 h-24 mx-auto mb-6 bg-gray-100 rounded-[2rem] flex items-center justify-center">
+                                <ShoppingBag className="w-10 h-10 text-gray-300" />
                             </div>
                             <p className="text-xl font-black text-gray-900 mb-2">Tu canasta está vacía</p>
-                            <p className="text-sm text-gray-400 font-medium px-10">Agrega platillos deliciosos para comenzar tu pedido</p>
+                            <p className="text-sm text-gray-500 font-medium px-10">Agrega platillos para comenzar tu pedido</p>
                         </div>
                     ) : (
                         items.map(item => (
-                            <div key={item.id} className="bg-white rounded-3xl p-4 border border-gray-100 shadow-sm hover:shadow-md transition-shadow group">
-                                <div className="flex gap-4 mb-3">
-                                    {/* Item Image */}
-                                    <div className="w-16 h-16 rounded-2xl bg-gray-100 shrink-0 overflow-hidden">
+                            <div key={item.id} className="bg-gray-50 rounded-2xl p-4 border-2 border-gray-200 hover:border-gray-300 transition-colors group">
+                                <div className="flex gap-3 mb-3">
+                                    {/* Thumbnail */}
+                                    <div className="w-14 h-14 rounded-xl bg-gray-200 shrink-0 overflow-hidden">
                                         {item.product.image_url ? (
                                             <img src={item.product.image_url} alt={item.product.name} className="w-full h-full object-cover" />
                                         ) : (
-                                            <div className="w-full h-full flex items-center justify-center text-gray-300">
-                                                <UtensilsCrossed className="w-6 h-6" />
+                                            <div className="w-full h-full flex items-center justify-center text-gray-400">
+                                                <UtensilsCrossed className="w-5 h-5" />
                                             </div>
                                         )}
                                     </div>
 
                                     <div className="flex-1 min-w-0">
-                                        <h3 className="font-black text-gray-900 text-[15px] group-hover:text-primary transition-colors leading-tight mb-1">{item.product.name}</h3>
+                                        <h3 className="font-black text-gray-900 text-[15px] leading-tight mb-1">{item.product.name}</h3>
                                         {item.modifiers.length > 0 && (
-                                            <div className="flex flex-wrap gap-1.5">
+                                            <div className="flex flex-wrap gap-1">
                                                 {item.modifiers.map((mod, i) => (
-                                                    <span key={i} className="text-[9px] font-black uppercase px-2 py-1 bg-gray-50 rounded-lg text-gray-500 border border-gray-100">
+                                                    <span key={i} className="text-[9px] font-black uppercase px-2 py-0.5 bg-white rounded-lg text-gray-600 border border-gray-200">
                                                         {mod.name}
                                                     </span>
                                                 ))}
                                             </div>
                                         )}
                                     </div>
-                                    <button onClick={() => removeItem(item.id)} className="w-8 h-8 flex items-center justify-center text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all shrink-0">
+                                    <button onClick={() => removeItem(item.id)} className="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all shrink-0 border border-transparent hover:border-red-100">
                                         <Trash2 className="w-4 h-4" />
                                     </button>
                                 </div>
-                                <div className="flex items-center justify-between mt-2 pt-2 border-t border-gray-50">
-                                    <div className="flex items-center gap-3 bg-gray-50 p-1.5 rounded-2xl border border-gray-200/50">
-                                        <button onClick={() => updateQuantity(item.id, item.quantity - 1)} className="w-8 h-8 flex items-center justify-center bg-white rounded-xl shadow-sm hover:text-red-500 transition-colors">
+
+                                {/* Quantity + Price row */}
+                                <div className="flex items-center justify-between pt-2 border-t border-gray-200">
+                                    {/* Quantity buttons — high contrast */}
+                                    <div className="flex items-center gap-1 bg-white rounded-xl border-2 border-gray-200 p-0.5">
+                                        <button
+                                            onClick={() => updateQuantity(item.id, item.quantity - 1)}
+                                            className="w-8 h-8 flex items-center justify-center bg-gray-200 hover:bg-red-100 hover:text-red-600 text-gray-800 rounded-lg transition-colors font-black"
+                                        >
                                             <Minus className="w-4 h-4" />
                                         </button>
-                                        <span className="w-6 text-center font-black text-sm">{item.quantity}</span>
-                                        <button onClick={() => updateQuantity(item.id, item.quantity + 1)} className="w-8 h-8 flex items-center justify-center bg-white rounded-xl shadow-sm hover:text-green-500 transition-colors">
+                                        <span className="w-8 text-center font-black text-gray-900 text-[15px]">{item.quantity}</span>
+                                        <button
+                                            onClick={() => updateQuantity(item.id, item.quantity + 1)}
+                                            className="w-8 h-8 flex items-center justify-center bg-gray-200 hover:bg-green-100 hover:text-green-700 text-gray-800 rounded-lg transition-colors font-black"
+                                        >
                                             <Plus className="w-4 h-4" />
                                         </button>
                                     </div>
+                                    {/* Subtotal */}
                                     <div className="text-right">
-                                        <p className="text-[10px] text-gray-400 font-bold uppercase leading-none mb-1">Subtotal</p>
+                                        <p className="text-[10px] text-gray-500 font-bold uppercase mb-0.5">Subtotal</p>
                                         <span className="font-black text-gray-900 text-lg">${item.subtotal.toFixed(0)}</span>
                                     </div>
                                 </div>
@@ -874,15 +886,16 @@ function CartPanel({ restaurant, primaryColor, onClose, onCheckout }) {
                     )}
                 </div>
 
+                {/* Footer */}
                 {items.length > 0 && (
-                    <div className="border-t border-gray-100 p-6 space-y-4 bg-white shadow-[0_-8px_40px_rgba(0,0,0,0.04)]">
-                        <div className="flex items-center justify-between px-2">
+                    <div className="border-t-2 border-gray-100 p-6 space-y-4 bg-white">
+                        <div className="flex items-center justify-between px-1">
                             <div>
-                                <p className="text-sm font-black text-gray-400 uppercase tracking-widest">Total a pagar</p>
-                                <p className="text-3xl font-black text-gray-900">${getTotal().toFixed(0)}</p>
+                                <p className="text-[11px] font-black text-gray-500 uppercase tracking-widest">Total a pagar</p>
+                                <p className="text-4xl font-black text-gray-900 leading-none">${getTotal().toFixed(0)}</p>
                             </div>
-                            <div className="w-14 h-14 rounded-2xl bg-green-50 flex items-center justify-center">
-                                <MessageCircle className="w-7 h-7 text-green-500" />
+                            <div className="w-14 h-14 rounded-2xl bg-green-100 border-2 border-green-200 flex items-center justify-center">
+                                <MessageCircle className="w-7 h-7 text-green-600" />
                             </div>
                         </div>
                         <button
@@ -901,6 +914,7 @@ function CartPanel({ restaurant, primaryColor, onClose, onCheckout }) {
         </div>
     )
 }
+
 
 
 // ─── Checkout Flow (Multi-Step: Info → Payment → Review) ──────────────────────
@@ -942,7 +956,8 @@ function CheckoutFlow({ restaurant, primaryColor, secondaryColor, onClose, onBac
         if (!formData.name.trim()) return
 
         const orderData = {
-            user_id: restaurant.id,
+            restaurant_id: restaurant.restaurant_table_id, // FK to restaurants.id (not profiles.id)
+            user_id: restaurant.id,                        // profiles/auth ID for RLS
             guest_id: localStorage.getItem('gc_guest_id'),
             customer_name: formData.name,
             customer_phone: formData.phone,
@@ -998,220 +1013,314 @@ function CheckoutFlow({ restaurant, primaryColor, secondaryColor, onClose, onBac
 
     return (
         <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center p-0 sm:p-4" onClick={onClose}>
-            <div className="absolute inset-0 bg-black/80 backdrop-blur-xl"></div>
+            <div className="absolute inset-0 bg-black/75 backdrop-blur-sm"></div>
             <div
-                className="relative bg-white w-full sm:max-w-md sm:rounded-[2.5rem] rounded-t-[2.5rem] max-h-[92vh] flex flex-col shadow-2xl animate-in slide-in-from-bottom duration-500 overflow-hidden"
+                className="relative w-full sm:max-w-md sm:rounded-[2rem] rounded-t-[2rem] max-h-[92vh] flex flex-col shadow-2xl animate-in slide-in-from-bottom duration-400 overflow-hidden"
+                style={{ background: '#ffffff', colorScheme: 'light' }}
                 onClick={e => e.stopPropagation()}
             >
-                {/* Header Progress */}
-                <div className="px-8 pt-8 pb-4">
-                    <div className="flex items-center gap-4 mb-6">
-                        <button onClick={step === 1 ? onBack : () => setStep(step - 1)} className="w-10 h-10 rounded-2xl bg-gray-50 flex items-center justify-center hover:bg-gray-100 transition-colors">
-                            <ChevronDown className="w-5 h-5 text-gray-600 rotate-90" />
+                {/* ── Header ── */}
+                <div style={{ padding: '24px 24px 16px', borderBottom: '2px solid #f3f4f6' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px' }}>
+                        <button
+                            onClick={step === 1 ? onBack : () => setStep(step - 1)}
+                            style={{ width: 40, height: 40, borderRadius: 14, background: '#f3f4f6', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', transition: 'background 0.2s' }}
+                            onMouseEnter={e => e.currentTarget.style.background = '#e5e7eb'}
+                            onMouseLeave={e => e.currentTarget.style.background = '#f3f4f6'}
+                        >
+                            <ChevronDown style={{ width: 20, height: 20, color: '#374151', transform: 'rotate(90deg)' }} />
                         </button>
-                        <div className="flex-1">
-                            <h2 className="text-xl font-black text-gray-900 tracking-tight">Finalizar Pedido</h2>
-                            <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">Paso {step} de {totalSteps}</p>
+                        <div>
+                            <h2 style={{ fontSize: 20, fontWeight: 900, color: '#111827', margin: 0, lineHeight: 1.2 }}>Finalizar Pedido</h2>
+                            <p style={{ fontSize: 11, color: '#6b7280', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', margin: 0 }}>PASO {step} DE {totalSteps}</p>
                         </div>
                     </div>
-                    <div className="flex gap-2.5">
+                    {/* Progress bar */}
+                    <div style={{ display: 'flex', gap: 8 }}>
                         {[1, 2, 3].map(s => (
-                            <div key={s} className="h-1.5 flex-1 rounded-full overflow-hidden bg-gray-100">
-                                <div
-                                    className="h-full transition-all duration-500"
-                                    style={{
-                                        width: step >= s ? '100%' : '0%',
-                                        background: primaryColor
-                                    }}
-                                ></div>
+                            <div key={s} style={{ height: 6, flex: 1, borderRadius: 99, background: '#f3f4f6', overflow: 'hidden' }}>
+                                <div style={{ height: '100%', transition: 'width 0.5s ease', width: step >= s ? '100%' : '0%', background: primaryColor, borderRadius: 99 }} />
                             </div>
                         ))}
                     </div>
                 </div>
 
-                <div className="flex-1 overflow-y-auto px-8 pb-8 no-scrollbar">
-                    {/* Step 1: User Info + Order Type */}
+                {/* ── Scrollable Content ── */}
+                <div className="flex-1 overflow-y-auto no-scrollbar" style={{ padding: '24px' }}>
+
+                    {/* ── STEP 1 ── */}
                     {step === 1 && (
-                        <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-300">
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }} className="animate-in fade-in duration-300">
+
+                            {/* Name field */}
                             <div>
-                                <label className="text-[11px] font-black text-gray-400 uppercase tracking-widest block mb-2 px-1">Tu nombre *</label>
-                                <div className="relative group">
-                                    <User className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-300 group-focus-within:text-primary transition-colors" />
+                                <label style={{ fontSize: 11, fontWeight: 800, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.1em', display: 'block', marginBottom: 8 }}>Tu nombre *</label>
+                                <div style={{ position: 'relative' }}>
+                                    <User style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', width: 18, height: 18, color: '#9ca3af' }} />
                                     <input
                                         type="text"
                                         value={formData.name}
                                         onChange={e => setFormData({ ...formData, name: e.target.value })}
                                         placeholder="¿A nombre de quién?"
-                                        className="w-full pl-12 pr-4 py-4 rounded-[1.5rem] border-2 border-gray-100 focus:border-primary focus:outline-none text-[15px] transition-all bg-gray-50/50 focus:bg-white"
                                         autoFocus
+                                        style={{
+                                            width: '100%', boxSizing: 'border-box',
+                                            paddingLeft: 44, paddingRight: 16, paddingTop: 16, paddingBottom: 16,
+                                            borderRadius: 16, border: '2px solid #e5e7eb',
+                                            fontSize: 16, color: '#111827', background: '#f9fafb',
+                                            outline: 'none', fontFamily: 'inherit'
+                                        }}
+                                        onFocus={e => { e.target.style.borderColor = primaryColor; e.target.style.background = '#fff' }}
+                                        onBlur={e => { e.target.style.borderColor = '#e5e7eb'; e.target.style.background = '#f9fafb' }}
                                     />
                                 </div>
                             </div>
 
+                            {/* Order type */}
                             <div>
-                                <label className="text-[11px] font-black text-gray-400 uppercase tracking-widest block mb-2 px-1">¿Dónde recibes?</label>
-                                <div className="grid grid-cols-3 gap-2.5">
+                                <label style={{ fontSize: 11, fontWeight: 800, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.1em', display: 'block', marginBottom: 10 }}>¿Dónde recibes tu pedido?</label>
+                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>
                                     {[
-                                        { value: 'dine_in', label: 'Aquí', icon: '🪑' },
-                                        { value: 'pickup', label: 'Local', icon: '🏪' },
-                                        { value: 'delivery', label: 'Envío', icon: '🛵' }
-                                    ].map(opt => (
-                                        <button
-                                            key={opt.value}
-                                            onClick={() => setFormData({ ...formData, orderType: opt.value })}
-                                            className={`p-4 rounded-3xl border-2 flex flex-col items-center gap-2 transition-all duration-300 ${formData.orderType === opt.value
-                                                ? 'shadow-lg scale-105'
-                                                : 'border-transparent bg-gray-50 opacity-60'
-                                                }`}
-                                            style={formData.orderType === opt.value ? { borderColor: primaryColor, background: '#fff' } : {}}
-                                        >
-                                            <span className="text-2xl">{opt.icon}</span>
-                                            <span className="text-[11px] font-black uppercase tracking-tight">{opt.label}</span>
-                                        </button>
-                                    ))}
-                                </div>
-                            </div>
-
-                            {formData.orderType === 'dine_in' && (
-                                <div className="animate-in slide-in-from-top-4 duration-300">
-                                    <label className="text-[11px] font-black text-gray-400 uppercase tracking-widest block mb-2 px-1">Número de mesa *</label>
-                                    <input
-                                        type="text"
-                                        value={tableNumber}
-                                        onChange={e => setTableNumber(e.target.value)}
-                                        placeholder="Ej. 5, 12, VIP..."
-                                        className="w-full px-5 py-4 rounded-[1.5rem] border-2 border-gray-100 focus:border-primary focus:outline-none text-[15px] transition-all bg-gray-50/50 focus:bg-white"
-                                    />
-                                </div>
-                            )}
-
-                            {formData.orderType === 'delivery' && (
-                                <div className="space-y-4 animate-in slide-in-from-top-4 duration-300">
-                                    <div>
-                                        <label className="text-[11px] font-black text-gray-400 uppercase tracking-widest block mb-2 px-1">Dirección exacta</label>
-                                        <div className="relative group">
-                                            <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-300 transition-colors group-focus-within:text-primary" />
-                                            <input
-                                                type="text"
-                                                value={address}
-                                                onChange={e => setAddress(e.target.value)}
-                                                placeholder="Calle, número, colonia..."
-                                                className="w-full pl-12 pr-4 py-4 rounded-[1.5rem] border-2 border-gray-100 focus:border-primary focus:outline-none text-[15px] transition-all bg-gray-50/50 focus:bg-white"
-                                            />
-                                        </div>
-                                    </div>
-                                    <button
-                                        type="button"
-                                        onClick={handleGetLocation}
-                                        disabled={gettingLocation}
-                                        className="w-full flex items-center justify-center gap-3 py-4 rounded-2xl border-2 border-dashed border-gray-200 text-gray-400 hover:text-primary hover:border-primary transition-all group/loc"
-                                    >
-                                        {gettingLocation ? (
-                                            <><Loader2 className="w-5 h-5 animate-spin" /> Localizando...</>
-                                        ) : locationUrl ? (
-                                            <><CheckCircle2 className="w-5 h-5 text-green-500" /> <span className="text-green-500 font-bold">Ubicación guardada</span></>
-                                        ) : (
-                                            <><MapPinned className="w-5 h-5 group-hover/loc:scale-110 transition-transform" /> <span className="font-bold">Compartir ubicación GPS</span></>
-                                        )}
-                                    </button>
-                                </div>
-                            )}
-
-                            <button
-                                onClick={() => formData.name.trim() && (formData.orderType !== 'dine_in' || tableNumber.trim()) && setStep(2)}
-                                disabled={!formData.name.trim() || (formData.orderType === 'dine_in' && !tableNumber.trim())}
-                                className="w-full py-5 rounded-[2rem] text-white font-black text-lg active:scale-[0.98] transition-all shadow-xl disabled:opacity-40"
-                                style={{ background: primaryColor }}
-                            >
-                                Continuar →
-                            </button>
-                        </div>
-                    )}
-
-                    {/* Step 2: Payment Method */}
-                    {step === 2 && (
-                        <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-300">
-                            <div>
-                                <label className="text-[11px] font-black text-gray-400 uppercase tracking-widest block mb-4 px-1">¿Cómo deseas pagar?</label>
-                                <div className="space-y-3">
-                                    {[
-                                        { value: 'cash', label: 'Efectivo', emoji: '💵', desc: 'Pago al recibir' },
-                                        { value: 'transfer', label: 'Transferencia', emoji: '🏦', desc: 'Coordinar por WhatsApp' },
-                                        { value: 'card', label: 'Tarjeta', emoji: '💳', desc: 'Terminal bancaria' },
+                                        { value: 'dine_in', label: 'Aquí', sublabel: 'Mesa', icon: '🪑' },
+                                        { value: 'pickup', label: 'Recoger', sublabel: 'En local', icon: '🏪' },
+                                        { value: 'delivery', label: 'Domicilio', sublabel: 'A casa', icon: '🛵' }
                                     ].map(opt => {
-                                        const isSelected = formData.paymentMethod === opt.value
+                                        const isSelected = formData.orderType === opt.value
                                         return (
                                             <button
                                                 key={opt.value}
-                                                onClick={() => setFormData({ ...formData, paymentMethod: opt.value })}
-                                                className={`w-full flex items-center gap-5 p-5 rounded-[1.75rem] border-2 transition-all duration-300 ${isSelected ? 'shadow-xl scale-[1.02]' : 'border-transparent bg-gray-50/50'}`}
-                                                style={isSelected ? { borderColor: primaryColor, background: '#fff' } : {}}
+                                                onClick={() => setFormData({ ...formData, orderType: opt.value })}
+                                                style={{
+                                                    padding: '14px 8px',
+                                                    borderRadius: 16,
+                                                    border: isSelected ? `2.5px solid ${primaryColor}` : '2px solid #e5e7eb',
+                                                    background: isSelected ? '#fff' : '#f9fafb',
+                                                    display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
+                                                    cursor: 'pointer',
+                                                    transform: isSelected ? 'scale(1.04)' : 'scale(1)',
+                                                    boxShadow: isSelected ? '0 4px 12px rgba(0,0,0,0.1)' : 'none',
+                                                    transition: 'all 0.2s ease'
+                                                }}
                                             >
-                                                <span className="text-3xl">{opt.emoji}</span>
-                                                <div className="flex-1 text-left">
-                                                    <p className="font-black text-gray-900 leading-tight">{opt.label}</p>
-                                                    <p className="text-[11px] text-gray-400 font-bold uppercase tracking-tight">{opt.desc}</p>
-                                                </div>
-                                                <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all ${isSelected ? '' : 'border-gray-200'}`} style={isSelected ? { borderColor: primaryColor } : {}}>
-                                                    {isSelected && <div className="w-3 h-3 rounded-full" style={{ background: primaryColor }}></div>}
-                                                </div>
+                                                <span style={{ fontSize: 28, lineHeight: 1 }}>{opt.icon}</span>
+                                                <span style={{ fontSize: 12, fontWeight: 800, color: isSelected ? '#111827' : '#6b7280', lineHeight: 1.2 }}>{opt.label}</span>
+                                                <span style={{ fontSize: 10, color: isSelected ? '#6b7280' : '#9ca3af', lineHeight: 1 }}>{opt.sublabel}</span>
                                             </button>
                                         )
                                     })}
                                 </div>
                             </div>
 
+                            {/* Dine-in: Table */}
+                            {formData.orderType === 'dine_in' && (
+                                <div className="animate-in slide-in-from-top-2 duration-300">
+                                    <label style={{ fontSize: 11, fontWeight: 800, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.1em', display: 'block', marginBottom: 8 }}>Número de mesa *</label>
+                                    <input
+                                        type="text"
+                                        value={tableNumber}
+                                        onChange={e => setTableNumber(e.target.value)}
+                                        placeholder="Ej. 5, 12, Terraza..."
+                                        style={{
+                                            width: '100%', boxSizing: 'border-box',
+                                            padding: '16px 18px', borderRadius: 16,
+                                            border: '2px solid #e5e7eb', fontSize: 16,
+                                            color: '#111827', background: '#f9fafb', outline: 'none', fontFamily: 'inherit'
+                                        }}
+                                        onFocus={e => { e.target.style.borderColor = primaryColor; e.target.style.background = '#fff' }}
+                                        onBlur={e => { e.target.style.borderColor = '#e5e7eb'; e.target.style.background = '#f9fafb' }}
+                                    />
+                                </div>
+                            )}
+
+                            {/* Delivery: Address + GPS */}
+                            {formData.orderType === 'delivery' && (
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }} className="animate-in slide-in-from-top-2 duration-300">
+                                    <div>
+                                        <label style={{ fontSize: 11, fontWeight: 800, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.1em', display: 'block', marginBottom: 8 }}>Dirección exacta</label>
+                                        <div style={{ position: 'relative' }}>
+                                            <MapPin style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', width: 18, height: 18, color: '#9ca3af' }} />
+                                            <input
+                                                type="text"
+                                                value={address}
+                                                onChange={e => setAddress(e.target.value)}
+                                                placeholder="Calle, número, colonia..."
+                                                style={{
+                                                    width: '100%', boxSizing: 'border-box',
+                                                    paddingLeft: 44, paddingRight: 16, paddingTop: 16, paddingBottom: 16,
+                                                    borderRadius: 16, border: '2px solid #e5e7eb',
+                                                    fontSize: 16, color: '#111827', background: '#f9fafb',
+                                                    outline: 'none', fontFamily: 'inherit'
+                                                }}
+                                                onFocus={e => { e.target.style.borderColor = primaryColor; e.target.style.background = '#fff' }}
+                                                onBlur={e => { e.target.style.borderColor = '#e5e7eb'; e.target.style.background = '#f9fafb' }}
+                                            />
+                                        </div>
+                                    </div>
+
+                                    {/* GPS Button — redesigned */}
+                                    <button
+                                        type="button"
+                                        onClick={handleGetLocation}
+                                        disabled={gettingLocation}
+                                        style={{
+                                            width: '100%', padding: '14px 20px',
+                                            borderRadius: 16, border: 'none', cursor: 'pointer',
+                                            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
+                                            background: locationUrl
+                                                ? 'linear-gradient(135deg, #059669, #10b981)'
+                                                : 'linear-gradient(135deg, #1d4ed8, #3b82f6)',
+                                            color: '#fff', fontWeight: 800, fontSize: 14,
+                                            boxShadow: locationUrl
+                                                ? '0 4px 14px rgba(5,150,105,0.35)'
+                                                : '0 4px 14px rgba(59,130,246,0.35)',
+                                            transition: 'all 0.2s', opacity: gettingLocation ? 0.7 : 1
+                                        }}
+                                    >
+                                        {gettingLocation ? (
+                                            <><Loader2 style={{ width: 18, height: 18, animation: 'spin 1s linear infinite' }} /> Localizando...</>
+                                        ) : locationUrl ? (
+                                            <><CheckCircle2 style={{ width: 18, height: 18 }} /> ✓ Ubicación GPS guardada</>
+                                        ) : (
+                                            <><MapPinned style={{ width: 18, height: 18 }} /> Compartir ubicación GPS</>
+                                        )}
+                                    </button>
+                                </div>
+                            )}
+
+                            {/* Continue button */}
                             <button
-                                onClick={() => setStep(3)}
-                                className="w-full py-5 rounded-[2rem] text-white font-black text-lg active:scale-[0.98] transition-all shadow-xl"
-                                style={{ background: primaryColor }}
+                                onClick={() => formData.name.trim() && (formData.orderType !== 'dine_in' || tableNumber.trim()) && setStep(2)}
+                                disabled={!formData.name.trim() || (formData.orderType === 'dine_in' && !tableNumber.trim())}
+                                style={{
+                                    width: '100%', padding: '18px', borderRadius: 18, border: 'none',
+                                    background: primaryColor, color: '#fff',
+                                    fontSize: 17, fontWeight: 900, cursor: 'pointer',
+                                    opacity: (!formData.name.trim() || (formData.orderType === 'dine_in' && !tableNumber.trim())) ? 0.4 : 1,
+                                    boxShadow: `0 8px 20px rgba(0,0,0,0.15)`, transition: 'all 0.2s'
+                                }}
                             >
                                 Continuar →
                             </button>
                         </div>
                     )}
 
-                    {/* Step 3: Review & Send */}
+                    {/* ── STEP 2: Payment ── */}
+                    {step === 2 && (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }} className="animate-in fade-in duration-300">
+                            <div>
+                                <label style={{ fontSize: 11, fontWeight: 800, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.1em', display: 'block', marginBottom: 14 }}>¿Cómo deseas pagar?</label>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                                    {[
+                                        { value: 'cash', label: 'Efectivo', emoji: '💵', desc: 'Pago al momento de recibir' },
+                                        { value: 'transfer', label: 'Transferencia', emoji: '🏦', desc: 'Te compartimos los datos por WhatsApp' },
+                                        { value: 'card', label: 'Tarjeta', emoji: '💳', desc: 'Terminal bancaria en local' },
+                                    ].map(opt => {
+                                        const isSelected = formData.paymentMethod === opt.value
+                                        return (
+                                            <button
+                                                key={opt.value}
+                                                onClick={() => setFormData({ ...formData, paymentMethod: opt.value })}
+                                                style={{
+                                                    display: 'flex', alignItems: 'center', gap: 16,
+                                                    padding: '18px 20px', borderRadius: 18,
+                                                    border: isSelected ? `2.5px solid ${primaryColor}` : '2px solid #e5e7eb',
+                                                    background: isSelected ? '#fff' : '#f9fafb',
+                                                    cursor: 'pointer', textAlign: 'left',
+                                                    boxShadow: isSelected ? '0 4px 16px rgba(0,0,0,0.1)' : 'none',
+                                                    transform: isSelected ? 'scale(1.02)' : 'scale(1)',
+                                                    transition: 'all 0.2s'
+                                                }}
+                                            >
+                                                <span style={{ fontSize: 32 }}>{opt.emoji}</span>
+                                                <div style={{ flex: 1 }}>
+                                                    <p style={{ margin: 0, fontWeight: 900, color: '#111827', fontSize: 15 }}>{opt.label}</p>
+                                                    <p style={{ margin: 0, fontSize: 11, color: '#9ca3af', fontWeight: 600, marginTop: 2 }}>{opt.desc}</p>
+                                                </div>
+                                                <div style={{
+                                                    width: 22, height: 22, borderRadius: '50%',
+                                                    border: `2.5px solid ${isSelected ? primaryColor : '#d1d5db'}`,
+                                                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                                    background: '#fff', flexShrink: 0
+                                                }}>
+                                                    {isSelected && <div style={{ width: 10, height: 10, borderRadius: '50%', background: primaryColor }} />}
+                                                </div>
+                                            </button>
+                                        )
+                                    })}
+                                </div>
+                            </div>
+                            <button
+                                onClick={() => setStep(3)}
+                                style={{
+                                    width: '100%', padding: '18px', borderRadius: 18, border: 'none',
+                                    background: primaryColor, color: '#fff',
+                                    fontSize: 17, fontWeight: 900, cursor: 'pointer',
+                                    boxShadow: `0 8px 20px rgba(0,0,0,0.15)`, transition: 'all 0.2s'
+                                }}
+                            >
+                                Continuar →
+                            </button>
+                        </div>
+                    )}
+
+                    {/* ── STEP 3: Review & Send ── */}
                     {step === 3 && (
-                        <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-300">
-                            <div className="bg-gray-50 rounded-[2.5rem] p-8 space-y-4">
-                                <div className="space-y-3">
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }} className="animate-in fade-in duration-300">
+                            {/* Order summary card */}
+                            <div style={{ background: '#f9fafb', borderRadius: 20, padding: '20px', border: '2px solid #e5e7eb' }}>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                                     {items.map(item => (
-                                        <div key={item.id} className="flex justify-between text-sm items-center">
-                                            <div className="flex items-center gap-2">
-                                                <span className="w-6 h-6 rounded-lg bg-white flex items-center justify-center font-black text-[11px] shadow-sm">{item.quantity}</span>
-                                                <span className="text-gray-600 font-bold">{item.product.name}</span>
+                                        <div key={item.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                                                <span style={{
+                                                    width: 26, height: 26, borderRadius: 8, background: '#fff',
+                                                    border: '2px solid #e5e7eb', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                                    fontWeight: 900, fontSize: 13, color: '#111827', flexShrink: 0
+                                                }}>{item.quantity}</span>
+                                                <span style={{ fontWeight: 700, color: '#374151', fontSize: 14 }}>{item.product.name}</span>
                                             </div>
-                                            <span className="font-black text-gray-900">${item.subtotal.toFixed(0)}</span>
+                                            <span style={{ fontWeight: 900, color: '#111827', fontSize: 15 }}>${item.subtotal.toFixed(0)}</span>
                                         </div>
                                     ))}
                                 </div>
-                                <div className="pt-4 border-t border-gray-200/50 flex justify-between items-end">
-                                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Total Final</p>
-                                    <p className="text-4xl font-black text-gray-900 leading-none">${getTotal().toFixed(0)}</p>
+                                <div style={{ marginTop: 16, paddingTop: 16, borderTop: '2px solid #e5e7eb', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                    <span style={{ fontSize: 12, fontWeight: 800, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Total Final</span>
+                                    <span style={{ fontSize: 36, fontWeight: 900, color: '#111827', lineHeight: 1 }}>${getTotal().toFixed(0)}</span>
                                 </div>
                             </div>
 
-                            <div className="px-1">
-                                <label className="text-[11px] font-black text-gray-400 uppercase tracking-widest block mb-2 px-1">¿Alguna nota extra?</label>
+                            {/* Notes */}
+                            <div>
+                                <label style={{ fontSize: 11, fontWeight: 800, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.1em', display: 'block', marginBottom: 8 }}>¿Alguna nota extra?</label>
                                 <textarea
                                     value={formData.notes}
                                     onChange={e => setFormData({ ...formData, notes: e.target.value })}
-                                    placeholder="Sin cebolla, extra salsa, timbre malogrado..."
+                                    placeholder="Sin cebolla, extra salsa, instrucciones especiales..."
                                     rows={3}
-                                    className="w-full px-6 py-4 rounded-[1.5rem] border-2 border-gray-100 focus:border-primary focus:outline-none text-[15px] resize-none transition-all bg-gray-50/50 focus:bg-white"
+                                    style={{
+                                        width: '100%', boxSizing: 'border-box',
+                                        padding: '14px 18px', borderRadius: 16,
+                                        border: '2px solid #e5e7eb', fontSize: 15,
+                                        color: '#111827', background: '#f9fafb',
+                                        outline: 'none', resize: 'none', fontFamily: 'inherit'
+                                    }}
+                                    onFocus={e => { e.target.style.borderColor = primaryColor; e.target.style.background = '#fff' }}
+                                    onBlur={e => { e.target.style.borderColor = '#e5e7eb'; e.target.style.background = '#f9fafb' }}
                                 />
                             </div>
 
+                            {/* Send via WhatsApp */}
                             <button
                                 onClick={handleSubmit}
-                                className="w-full py-6 rounded-[2.5rem] text-white font-black text-xl flex items-center justify-center gap-4 active:scale-[0.98] transition-all shadow-2xl hover:opacity-95"
                                 style={{
-                                    background: '#25D366',
-                                    boxShadow: '0 20px 40px rgba(37, 211, 102, 0.4)'
+                                    width: '100%', padding: '20px', borderRadius: 20, border: 'none', cursor: 'pointer',
+                                    background: 'linear-gradient(135deg, #128C7E, #25D366)',
+                                    color: '#fff', fontSize: 18, fontWeight: 900,
+                                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12,
+                                    boxShadow: '0 8px 24px rgba(37, 211, 102, 0.4)', transition: 'all 0.2s'
                                 }}
                             >
-                                <MessageCircle className="w-7 h-7" />
+                                <MessageCircle style={{ width: 24, height: 24 }} />
                                 Enviar por WhatsApp
                             </button>
                         </div>
@@ -1221,4 +1330,3 @@ function CheckoutFlow({ restaurant, primaryColor, secondaryColor, onClose, onBac
         </div>
     )
 }
-

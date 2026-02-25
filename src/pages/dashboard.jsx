@@ -295,8 +295,8 @@ export function DashboardPage() {
                         </CardTitle>
                         <CardDescription>Ingresos · {TIME_LABELS[timeRange]}</CardDescription>
                     </CardHeader>
-                    <CardContent className="h-[300px]">
-                        <ResponsiveContainer width="100%" height="100%">
+                    <CardContent className="h-[300px] flex items-center">
+                        <ResponsiveContainer width="100%" height={280}>
                             <LineChart data={analytics?.salesTrend || []}>
                                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
                                 <XAxis
@@ -341,8 +341,8 @@ export function DashboardPage() {
                         </CardTitle>
                         <CardDescription>Productos con mayores ingresos</CardDescription>
                     </CardHeader>
-                    <CardContent className="h-[300px]">
-                        <ResponsiveContainer width="100%" height="100%">
+                    <CardContent className="h-[300px] flex items-center">
+                        <ResponsiveContainer width="100%" height={280}>
                             <BarChart data={analytics?.topProducts || []} layout="vertical" margin={{ left: 0 }}>
                                 <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} stroke="hsl(var(--border))" />
                                 <XAxis type="number" hide />

@@ -46,16 +46,22 @@ export function RealtimeProvider({ children }) {
         const channel = supabase.channel(`global-tenant-${tenant.id}`)
 
         // 3. Bind Listeners for Key Tables
-        const tables = ['products', 'categories', 'orders', 'order_items', 'sesiones_caja']
+        // Each table uses a different column name for tenant ID — must match the actual schema
+        const tableConfigs = [
+            { table: 'products', filter: `user_id=eq.${tenant.id}` },
+            { table: 'categories', filter: `user_id=eq.${tenant.id}` },
+            { table: 'orders', filter: `restaurant_id=eq.${tenant.id}` },
+            { table: 'sesiones_caja', filter: `restaurante_id=eq.${tenant.id}` },
+        ]
 
-        tables.forEach(table => {
+        tableConfigs.forEach(({ table, filter }) => {
             channel.on(
                 'postgres_changes',
                 {
                     event: '*',
                     schema: 'public',
                     table: table,
-                    filter: `user_id=eq.${tenant.id}`
+                    filter
                 },
                 (payload) => {
                     console.log(`⚡ Realtime Event [${table}]:`, payload.eventType)

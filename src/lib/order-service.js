@@ -102,22 +102,26 @@ export async function createOrder(orderData) {
         items: snapshotItems
     }
 
-    // Check for an active session to link this order
-    // FIXED: Use getActiveSession to benefit from auto-correction and correct restaurant_id lookup
+    // tenant ID used for session lookup and payload
     const searchTenantId = orderData.restaurant_id || orderData.user_id;
+
+    // Determine FIRST if it is a public order (customer-originated)
+    // pickup & delivery never require a cash session — customers don't open a register
+    const isPublicOrder = ['pickup', 'delivery'].includes(orderData.order_type);
+
     let activeSession = null;
 
-    try {
-        activeSession = await getActiveSession(searchTenantId);
-    } catch (e) {
-        console.error("Error fetching session for order:", e);
-    }
+    if (!isPublicOrder) {
+        // Only look up session for internal orders (dine_in from POS/dashboard)
+        try {
+            activeSession = await getActiveSession(searchTenantId);
+        } catch (e) {
+            console.error('Error fetching session for order:', e);
+        }
 
-    // Determine if it is a public order (customer-originated)
-    const isPublicOrder = ['pickup', 'delivery'].includes(orderData.order_type) || !orderData.user_id;
-
-    if (!activeSession && !isPublicOrder) {
-        throw new Error(`No es posible crear la orden: No hay una sesión de caja abierta para el tenant ${searchTenantId}.`)
+        if (!activeSession) {
+            throw new Error(`No es posible crear la orden: No hay una sesión de caja abierta para el tenant ${searchTenantId}. (order_type: ${orderData.order_type})`);
+        }
     }
 
     const finalPayload = {

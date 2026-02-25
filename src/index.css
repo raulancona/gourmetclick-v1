@@ -68,10 +68,12 @@
 
 /* ── Native App Scrollbar Utilities ───────────────────────────────────────── */
 @layer utilities {
+
   /* Hide scrollbar visually but keep scroll functionality */
   .scrollbar-hide::-webkit-scrollbar {
     display: none;
   }
+
   .scrollbar-hide {
     -ms-overflow-style: none;
     scrollbar-width: none;
@@ -82,4 +84,82 @@
     min-height: 44px;
     min-width: 44px;
   }
+}
+
+/* ── Global Dark Mode Form Fix ─────────────────────────────────────────────── */
+/* Ensures ALL inputs/textareas/selects are readable in dark mode
+   regardless of whether individual components use dark: variants or not */
+@layer base {
+
+  .dark input,
+  .dark textarea,
+  .dark select {
+    color-scheme: dark;
+    color: hsl(var(--foreground));
+    background-color: hsl(var(--secondary));
+    border-color: hsl(var(--border));
+  }
+
+  .dark input::placeholder,
+  .dark textarea::placeholder {
+    color: hsl(var(--muted-foreground));
+    opacity: 1;
+  }
+
+  /* Fix hardcoded bg-white/bg-gray-* inputs that don't have dark: variants */
+  .dark input[class*="bg-white"],
+  .dark input[class*="bg-gray"],
+  .dark textarea[class*="bg-white"],
+  .dark textarea[class*="bg-gray"] {
+    background-color: hsl(240 3.7% 15.9%) !important;
+    color: hsl(0 0% 98%) !important;
+  }
+
+  .dark input[class*="border-gray"],
+  .dark textarea[class*="border-gray"],
+  .dark select[class*="border-gray"] {
+    border-color: hsl(240 3.7% 25%) !important;
+  }
+
+  /* Fix placeholder in hardcoded gray inputs in dark mode */
+  .dark input[class*="bg-gray"]::placeholder,
+  .dark input[class*="bg-white"]::placeholder,
+  .dark textarea[class*="bg-gray"]::placeholder,
+  .dark textarea[class*="bg-white"]::placeholder {
+    color: hsl(240 5% 64.9%) !important;
+  }
+
+  /* Scrollbar in dark mode */
+  .dark ::-webkit-scrollbar-track {
+    background: hsl(240 10% 6%);
+  }
+
+  .dark ::-webkit-scrollbar-thumb {
+    background: hsl(240 3.7% 25%);
+    border-radius: 4px;
+  }
+
+  .dark ::-webkit-scrollbar-thumb:hover {
+    background: hsl(240 3.7% 35%);
+  }
+}
+
+/* ── Public Menu: Always Light Mode ────────────────────────────────────────── */
+/* The public customer menu should ALWAYS appear in light mode for clarity.
+   Override any dark: classes that may have leaked into the public menu. */
+.public-menu-root {
+  color-scheme: light;
+}
+
+.public-menu-root input,
+.public-menu-root textarea,
+.public-menu-root select {
+  color-scheme: light;
+  color: #111827 !important;
+  background-color: #f9fafb !important;
+}
+
+.public-menu-root input::placeholder,
+.public-menu-root textarea::placeholder {
+  color: #9ca3af !important;
 }

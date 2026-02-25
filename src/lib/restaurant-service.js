@@ -69,6 +69,13 @@ export async function getMenuBySlug(slug) {
 
     if (profileError) throw profileError
 
+    // Get the actual restaurants.id (required for FK on orders.restaurant_id)
+    const { data: restaurantRecord } = await supabase
+        .from('restaurants')
+        .select('id')
+        .eq('owner_id', profile.id)
+        .maybeSingle()
+
     // Get categories
     const { data: categories, error: categoriesError } = await supabase
         .from('categories')
@@ -95,8 +102,10 @@ export async function getMenuBySlug(slug) {
     if (productsError) throw productsError
 
     return {
-        restaurant: profile,
+        // Merge restaurants.id into the profile so public-menu can use it for orders
+        restaurant: { ...profile, restaurant_table_id: restaurantRecord?.id || null },
         categories: categories || [],
         products: products || []
     }
 }
+
