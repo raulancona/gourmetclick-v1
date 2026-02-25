@@ -37,44 +37,51 @@ export function TrackingPage() {
 
         fetchOrder()
 
-        // Realtime Subscription
-        const statusChangeSound = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3')
+        // Polling every 5s as reliability fallback for anon users
+        const pollInterval = setInterval(async () => {
+            try {
+                const { data } = await supabase
+                    .from('orders')
+                    .select('*')
+                    .eq('tracking_id', tracking_id)
+                    .single()
+                if (data) setOrder(data)
+            } catch { }
+        }, 5_000)
 
+        // Realtime — no filter (filters cause CHANNEL_ERROR with RLS for anon users)
+        // Filter client-side using tracking_id
         const channel = supabase
-            .channel(`order-${tracking_id}`)
+            .channel(`tracking-${tracking_id}`)
             .on(
                 'postgres_changes',
-                {
-                    event: 'UPDATE',
-                    schema: 'public',
-                    table: 'orders',
-                    filter: `tracking_id=eq.${tracking_id}`
-                },
+                { event: 'UPDATE', schema: 'public', table: 'orders' },
                 (payload) => {
-                    console.log('Realtime update for tracking:', payload)
-                    if (payload.new) {
-                        const oldStatus = order?.status
-                        const newStatus = payload.new.status
+                    // Only react to this specific order
+                    if (payload.new?.tracking_id !== tracking_id) return
 
-                        setOrder(payload.new)
+                    const newData = payload.new
+                    const oldStatus = order?.status
 
-                        // Play sound if status changed
-                        if (oldStatus && oldStatus !== newStatus) {
-                            statusChangeSound.play().catch(e => {
-                                console.warn('Audio play blocked by browser. User interaction required:', e)
-                            })
-                        }
+                    setOrder(newData)
+
+                    if (oldStatus && oldStatus !== newData.status) {
+                        try {
+                            new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3')
+                                .play().catch(() => { })
+                        } catch { }
                     }
                 }
             )
             .subscribe((status) => {
-                console.log('Tracking subscription status:', status)
+                console.log('📞 Tracking realtime status:', status)
             })
 
         return () => {
+            clearInterval(pollInterval)
             supabase.removeChannel(channel)
         }
-    }, [tracking_id, order?.status])
+    }, [tracking_id])
 
     const handlePrint = () => {
         window.print()

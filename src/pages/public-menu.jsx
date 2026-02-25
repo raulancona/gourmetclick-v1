@@ -988,7 +988,11 @@ function CheckoutFlow({ restaurant, primaryColor, secondaryColor, onClose, onBac
         }
 
         try {
-            await createOrder(orderData)
+            const createdOrder = await createOrder(orderData)
+            const trackingUrl = createdOrder?.tracking_id
+                ? `${window.location.origin}/rastreo/${createdOrder.tracking_id}`
+                : ''
+
             const message = generateWhatsAppMessage(
                 items,
                 restaurant.company_name || 'Restaurante',
@@ -997,10 +1001,23 @@ function CheckoutFlow({ restaurant, primaryColor, secondaryColor, onClose, onBac
                 formData.orderType === 'delivery' ? address : (formData.orderType === 'dine_in' ? `Mesa: ${tableNumber}` : null),
                 formData.notes,
                 formData.paymentMethod,
-                formData.orderType === 'delivery' ? locationUrl : ''
+                formData.orderType === 'delivery' ? locationUrl : '',
+                trackingUrl  // ← NEW: tracking URL included in WhatsApp message
             )
             sendWhatsAppOrder(restaurant.phone, message)
-            toast.success('¡Pedido enviado con éxito!', { icon: '🚀' })
+
+            if (trackingUrl) {
+                toast.success('¡Pedido enviado! Sigue tu pedido en tiempo real 👉', {
+                    description: trackingUrl,
+                    duration: 10000,
+                    action: {
+                        label: '📡 Ver',
+                        onClick: () => window.open(trackingUrl, '_blank')
+                    }
+                })
+            } else {
+                toast.success('¡Pedido enviado con éxito!', { icon: '🚀' })
+            }
             clearCart()
             onClose()
         } catch (error) {

@@ -40,20 +40,18 @@ export function OrdersPage() {
     const restaurantId = tenant?.id || user?.id
 
     // ─── Orders Query — simple useQuery, no pagination ────────────────────────
-    // Fetches ALL active orders (excludes completed/cancelled unless explicitly needed).
-    // refetchInterval = 8s as fallback if websocket drops.
-    const { data: ordersData, isLoading, refetch } = useQuery({
+    // Returns raw {data: [], count} — NO select transform to avoid optimistic update crash
+    const { data: ordersRaw, isLoading, refetch } = useQuery({
         queryKey: ['orders-live', restaurantId],
         queryFn: () => getOrders(restaurantId, {
-            includeClosed: false,  // Never include completed orders in main view
-            pageSize: 500          // Large enough to get all orders in a session
+            includeClosed: false,
+            pageSize: 500
         }),
         enabled: !!restaurantId,
-        refetchInterval: 8_000,  // Polling every 8s as reliability fallback
-        select: (data) => data?.data || [],
+        refetchInterval: 8_000,
     })
 
-    const allOrders = ordersData || []
+    const allOrders = ordersRaw?.data || []
 
     // ─── Stats Query ──────────────────────────────────────────────────────────
     const { data: stats } = useQuery({
@@ -68,42 +66,40 @@ export function OrdersPage() {
         if (!restaurantId) return
 
         const channel = supabase
-            .channel(`orders-page-${restaurantId}`)
+            .channel(`orders-live-${restaurantId}`)
             .on(
                 'postgres_changes',
                 {
                     event: '*',
                     schema: 'public',
                     table: 'orders',
-                    filter: `restaurant_id=eq.${restaurantId}`
+                    // NOTE: No filter here — row-level filters fail silently with RLS.
+                    // We filter client-side using restaurantId after receiving the event.
                 },
                 (payload) => {
-                    console.log('⚡ Order update:', payload.eventType, payload.new?.id)
+                    // Only react to events for THIS restaurant
+                    const orderId = payload.new?.restaurant_id || payload.old?.restaurant_id
+                    if (orderId && orderId !== restaurantId) return
+
+                    console.log('⚡ Order update:', payload.eventType)
                     setLastUpdate(Date.now())
 
-                    // Immediate invalidation — triggers instant re-fetch
                     queryClient.invalidateQueries({ queryKey: ['orders-live', restaurantId] })
                     queryClient.invalidateQueries({ queryKey: ['order-stats-live', restaurantId] })
 
                     if (payload.eventType === 'INSERT') {
-                        // Play notification sound for new orders
                         try {
                             const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3')
-                            audio.play().catch(() => { }) // Silently ignore if blocked
+                            audio.play().catch(() => { })
                         } catch { }
-                        toast.success(`🔔 ¡Nueva orden! ${payload.new?.customer_name || 'Cliente General'}`, {
-                            duration: 6000,
-                        })
+                        toast.success(`🔔 ¡Nueva orden! ${payload.new?.customer_name || 'Cliente General'}`, { duration: 6000 })
                     }
                 }
             )
             .subscribe((status) => {
-                setIsConnected(status === 'SUBSCRIBED')
-                if (status === 'SUBSCRIBED') {
-                    console.log('✅ Orders realtime connected')
-                } else {
-                    console.warn('⚠️ Orders realtime status:', status)
-                }
+                const connected = status === 'SUBSCRIBED'
+                setIsConnected(connected)
+                console.log('🔌 Realtime status:', status)
             })
 
         return () => {
@@ -135,12 +131,16 @@ export function OrdersPage() {
     const updateStatusMutation = useMutation({
         mutationFn: ({ orderId, status }) => updateOrderStatus(orderId, status, restaurantId),
         onMutate: async ({ orderId, status }) => {
-            // Optimistic update — instantly reflect change in UI
+            // Optimistic update — instantly reflect change in UI  
+            // NOTE: queryData has shape {data: [], count: N} because we don't use select transform
             await queryClient.cancelQueries({ queryKey: ['orders-live', restaurantId] })
             const prev = queryClient.getQueryData(['orders-live', restaurantId])
             queryClient.setQueryData(['orders-live', restaurantId], (old) => {
-                if (!old) return old
-                return old.map(o => o.id === orderId ? { ...o, status } : o)
+                if (!old?.data) return old
+                return {
+                    ...old,
+                    data: old.data.map(o => o.id === orderId ? { ...o, status } : o)
+                }
             })
             return { prev }
         },

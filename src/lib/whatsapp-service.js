@@ -2,7 +2,7 @@
  * Generate WhatsApp order message from cart items
  * Enhanced with customer data, order type, delivery address, location, payment method, and notes
  */
-export function generateWhatsAppMessage(items, restaurantName, customerName = '', customerPhone = '', deliveryAddress = null, notes = '', paymentMethod = '', locationUrl = '') {
+export function generateWhatsAppMessage(items, restaurantName, customerName = '', customerPhone = '', deliveryAddress = null, notes = '', paymentMethod = '', locationUrl = '', trackingUrl = '') {
     let message = `*🍽️ Nuevo Pedido - ${restaurantName}*\n`
     message += '━━━━━━━━━━━━━━━━━━━━━━━━\n\n'
 
@@ -20,7 +20,7 @@ export function generateWhatsAppMessage(items, restaurantName, customerName = ''
             message += `🪑 *Tipo:* Comer en el lugar\n`
             message += `🔢 *${deliveryAddress}*\n`
         } else {
-            message += `🛵 *Tipo:* Envío a domicilio\n`
+            message += `🛥️ *Tipo:* Envío a domicilio\n`
             message += `📍 *Dirección:* ${deliveryAddress}\n`
         }
     } else {
@@ -65,6 +65,11 @@ export function generateWhatsAppMessage(items, restaurantName, customerName = ''
 
     if (notes) {
         message += `\n📝 *Notas:* ${notes}\n`
+    }
+
+    // Tracking link — customer can follow their order live
+    if (trackingUrl) {
+        message += `\n📡 *Sigue tu pedido en tiempo real:*\n${trackingUrl}\n`
     }
 
     message += '\n_Pedido realizado desde el menú digital_ ✨'
