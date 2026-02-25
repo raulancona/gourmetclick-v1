@@ -11,7 +11,7 @@ const ORDER_STATUSES = {
     ready: { label: 'Listo', emoji: '📦', color: '#10B981' },
     on_the_way: { label: 'En camino', emoji: '🛵', color: '#6366F1' },
     delivered: { label: 'Entregado', emoji: '🎉', color: '#22C55E' },
-    // 'completed' is set automatically by closeSession, never shown as a user option
+    completed: { label: 'Cerrado', emoji: '🔒', color: '#64748B', hidden: true }, // 'completed' is set automatically by closeSession, hidden from cashier options
     cancelled: { label: 'Cancelado', emoji: '❌', color: '#EF4444' },
 }
 
@@ -34,7 +34,7 @@ function getNextStatuses(current) {
 
 export { ORDER_STATUSES, PAYMENT_METHODS, getNextStatuses }
 
-export async function getOrders(restaurantId, { includeClosed = false, startDate = null, endDate = null, page = 1, pageSize = 50 } = {}) {
+export async function getOrders(restaurantId, { includeClosed = false, startDate = null, endDate = null, page = 1, pageSize = 50, statuses = null } = {}) {
     // When hiding closed orders, we exclude by status AND by sesion_caja_id of closed sessions.
     // This prevents orphan orders from past shifts appearing in the active cashier view.
     let closedSessionIds = []
@@ -71,6 +71,9 @@ export async function getOrders(restaurantId, { includeClosed = false, startDate
     }
     if (endDate) {
         query = query.lte('created_at', endDate)
+    }
+    if (statuses && statuses.length > 0) {
+        query = query.in('status', statuses)
     }
 
     const { data, error, count } = await query
