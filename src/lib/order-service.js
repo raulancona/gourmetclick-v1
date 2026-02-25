@@ -11,7 +11,6 @@ const ORDER_STATUSES = {
     ready: { label: 'Listo', emoji: '📦', color: '#10B981' },
     on_the_way: { label: 'En camino', emoji: '🛵', color: '#6366F1' },
     delivered: { label: 'Entregado', emoji: '🎉', color: '#22C55E' },
-    completed: { label: 'Cerrado', emoji: '🔒', color: '#64748B', hidden: true }, // 'completed' is set automatically by closeSession, hidden from cashier options
     cancelled: { label: 'Cancelado', emoji: '❌', color: '#EF4444' },
 }
 
@@ -191,8 +190,8 @@ export async function updateOrderStatus(orderId, status, restaurantId, userName 
         }]
     }
 
-    // Set closing date if order is completed
-    if (status === 'delivered' || status === 'completed' || status === 'cancelled') {
+    // Set closing date if order is delivered or cancelled
+    if (status === 'delivered' || status === 'cancelled') {
         updates.fecha_cierre = new Date().toISOString()
     }
 
@@ -282,12 +281,12 @@ export async function getOrderStats(restaurantId, { cashCutId = null, filterBySh
         pending: data.filter(o => o.status === 'pending').length,
         // Active: Orders in progress (pending, confirmed, preparing, ready, on_the_way)
         active: data.filter(o => ['pending', 'confirmed', 'preparing', 'ready', 'on_the_way'].includes(o.status)).length,
-        // Count both delivered (active shift) and completed (closed shift)
-        delivered: data.filter(o => o.status === 'delivered' || o.status === 'completed').length,
+        // Count delivered
+        delivered: data.filter(o => o.status === 'delivered').length,
         cancelled: data.filter(o => o.status === 'cancelled').length,
-        // Revenue includes BOTH delivered (open) and completed (closed) orders
+        // Revenue includes delivered orders
         revenue: data
-            .filter(o => o.status === 'delivered' || o.status === 'completed')
+            .filter(o => o.status === 'delivered')
             .reduce((s, o) => s + parseFloat(o.total || 0), 0),
 
         // Distribution of order types (all non-cancelled)
@@ -297,9 +296,9 @@ export async function getOrderStats(restaurantId, { cashCutId = null, filterBySh
             dine_in: data.filter(o => o.order_type === 'dine_in').length,
         },
 
-        // Most used payment method (from completed sales)
+        // Most used payment method (from delivered sales)
         paymentMethods: data
-            .filter(o => o.status === 'delivered' || o.status === 'completed')
+            .filter(o => o.status === 'delivered')
             .reduce((acc, o) => {
                 if (o.payment_method) {
                     acc[o.payment_method] = (acc[o.payment_method] || 0) + 1
@@ -460,8 +459,6 @@ export async function getSalesAnalytics(restaurantId, { cashCutId = null, filter
 
 /**
  * Fetch orders pending closing (Delivered status, linked to the active session)
- * FIXED: Previously filtered by `cash_cut_id` (legacy), but closeSession sets `status=completed`
- * Now correctly returns only 'delivered' orders, which are the ones awaiting close.
  */
 export async function getUnclosedOrders(restaurantId) {
     const { data: activeSession } = await supabase
@@ -480,7 +477,6 @@ export async function getUnclosedOrders(restaurantId) {
         .or(`restaurant_id.eq.${restaurantId},user_id.eq.${restaurantId}`)
         .eq('sesion_caja_id', activeSession.id)
         .is('cash_cut_id', null)          // ← Exclude orders already in a cut
-        .neq('status', 'completed')
         .neq('status', 'cancelled')
         .order('created_at', { ascending: false })
 
@@ -550,12 +546,12 @@ export async function getSessionFinancialSummary(sessionId) {
 
     if (sessionError) throw sessionError
 
-    // 2. Get ALL completed/delivered orders for this session specifically
+    // 2. Get ALL delivered orders for this session specifically
     const { data: orders, error: ordersError } = await supabase
         .from('orders')
         .select('id, folio, total, payment_method, status, customer_name, order_type, table_number, items, created_at')
         .eq('sesion_caja_id', sessionId)
-        .in('status', ['delivered', 'completed'])
+        .eq('status', 'delivered')
         .order('created_at', { ascending: false })
 
     if (ordersError) throw ordersError
@@ -708,7 +704,7 @@ export async function closeSession(sessionId, montoReal, userId, closedByName, e
         .from('orders')
         .select('total, payment_method')
         .eq('sesion_caja_id', sessionId)
-        .in('status', ['delivered', 'completed']) // We use both in case some are already marked completed
+        .eq('status', 'delivered')
 
     if (ordersError) throw ordersError
 
@@ -746,24 +742,6 @@ export async function closeSession(sessionId, montoReal, userId, closedByName, e
         .single()
 
     if (updateError) throw updateError
-
-    // 4. Close ALL active orders in this session (pending, preparing, ready, delivered)
-    //    Excludes only cancelled orders, which are revenue-negative anyway.
-    const { error: closeOrdersError } = await supabase
-        .from('orders')
-        .update({
-            status: 'completed',
-            fecha_cierre: new Date().toISOString()
-        })
-        .eq('sesion_caja_id', sessionId)
-        .not('status', 'in', '("completed","cancelled")')
-
-    if (closeOrdersError) {
-        console.error('Error closing orders:', closeOrdersError)
-        // We don't throw here to avoid failing the session close if just status update fails, 
-        // but it's important. ideally we should transaction.
-        // For now logging is safer than rolling back session close manually.
-    }
 
     return closedSession
 }

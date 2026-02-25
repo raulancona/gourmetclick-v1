@@ -55,7 +55,7 @@ export function OrdersPage() {
             includeClosed: true,
             page: historyPage,
             pageSize: 50,
-            statuses: ['delivered', 'cancelled', 'completed']
+            statuses: ['delivered', 'cancelled']
         }),
         enabled: !!restaurantId && activeTab === 'historial',
         refetchInterval: 15_000,
@@ -130,7 +130,7 @@ export function OrdersPage() {
                 String(order.folio || '').includes(searchTerm)
 
             const isActiveStatus = ['pending', 'confirmed', 'preparing', 'ready', 'on_the_way'].includes(order.status)
-            const isHistoryStatus = ['delivered', 'cancelled', 'completed'].includes(order.status)
+            const isHistoryStatus = ['delivered', 'cancelled'].includes(order.status)
 
             const matchesTab = activeTab === 'activas' ? isActiveStatus : isHistoryStatus
 
@@ -525,9 +525,9 @@ export function OrdersPage() {
                     if (selectedKpi.label === 'Pendientes') statuses = ['pending']
                     else if (selectedKpi.label === 'Activos') statuses = ['preparing', 'ready', 'on_the_way']
                     else if (selectedKpi.label === 'En Cola') statuses = ['pending', 'confirmed', 'preparing', 'ready', 'on_the_way']
-                    else if (selectedKpi.label === 'Completadas') statuses = ['delivered', 'completed']
+                    else if (selectedKpi.label === 'Completadas') statuses = ['delivered']
                     else if (selectedKpi.label === 'Desperdicio/Cancel.') statuses = ['cancelled']
-                    else if (selectedKpi.label === 'Ingresos (Histórico)') statuses = ['delivered', 'completed']
+                    else if (selectedKpi.label === 'Ingresos (Histórico)') statuses = ['delivered']
 
                     return await getOrders(restaurantId, {
                         includeClosed: selectedKpi.label === 'Ingresos (Histórico)' || selectedKpi.label === 'Completadas' || selectedKpi.label === 'Desperdicio/Cancel.',

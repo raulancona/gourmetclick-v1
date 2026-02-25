@@ -601,7 +601,7 @@ export function DashboardPage() {
                                         <div className="flex items-center gap-4">
                                             <div className={`
                                                 w-10 h-10 rounded-full flex items-center justify-center shrink-0
-                                                ${order.status === 'delivered' || order.status === 'completed' ? 'bg-green-100 text-green-600 dark:bg-green-900/30' :
+                                                ${order.status === 'delivered' ? 'bg-green-100 text-green-600 dark:bg-green-900/30' :
                                                     order.status === 'cancelled' ? 'bg-red-100 text-red-600 dark:bg-red-900/30' :
                                                         'bg-blue-100 text-blue-600 dark:bg-blue-900/30'}
                                             `}>
@@ -625,7 +625,7 @@ export function DashboardPage() {
                                             <p className="font-black text-sm">{formatCurrency(order.total)}</p>
                                             <span className={`
                                                 inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold uppercase mt-1
-                                                ${order.status === 'delivered' || order.status === 'completed' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' :
+                                                ${order.status === 'delivered' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' :
                                                     order.status === 'pending' ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400' :
                                                         order.status === 'getting_ready' || order.status === 'preparing' ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400' :
                                                             order.status === 'cancelled' ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' :
@@ -722,7 +722,7 @@ export function DashboardPage() {
                         endDate,
                         page,
                         pageSize,
-                        statuses: ['delivered', 'completed'],
+                        statuses: ['delivered'],
                         paymentMethod
                     })
                 }}

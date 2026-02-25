@@ -235,7 +235,7 @@ export function TrackingPage() {
                     </div>
 
                     {/* Download/Print Note Button - Conditional */}
-                    {(order.status === 'delivered' || order.status === 'completed') && (
+                    {order.status === 'delivered' && (
                         <div className="mt-8 pt-6 border-t border-border no-print">
                             <Button
                                 onClick={handlePrint}

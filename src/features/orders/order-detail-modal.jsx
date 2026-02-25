@@ -67,7 +67,7 @@ export function OrderDetailModal({ order, onClose, onUpdateStatus, onUpdateOrder
                                     <Lock className="w-3 h-3" />
                                     Incluida en Corte <span className="font-mono">#{order.cash_cut_id.slice(0, 8)}</span>
                                 </span>
-                            ) : order.status === 'completed' ? (
+                            ) : order.fecha_cierre ? (
                                 <span className="flex items-center gap-1.5 text-stone-600 dark:text-stone-400 font-bold bg-stone-50 dark:bg-stone-900/30 px-2 py-1 rounded-lg border border-stone-200 dark:border-stone-700 w-fit mt-1 text-xs">
                                     <Lock className="w-3 h-3" />
                                     Cerrada en Turno <span className="font-mono text-[10px] ml-1 opacity-70">#{order.sesion_caja_id?.slice(0, 8) || 'N/A'}</span>
@@ -85,9 +85,9 @@ export function OrderDetailModal({ order, onClose, onUpdateStatus, onUpdateOrder
                                     Cerrada: {new Date(order.fecha_cierre).toLocaleString('es-MX', { dateStyle: 'medium', timeStyle: 'short' })}
                                 </span>
                             )}
-                            {/* Only allow POS-edit for active (not completed/cancelled/delivered) orders.
-                                Completed = closed by cashier. Admins can always edit. */}
-                            {!['delivered', 'cancelled', 'completed'].includes(order.status) && (
+                            {/* Only allow POS-edit for active (not closed by cashier/cancelled/delivered) orders.
+                                Closed = closed by cashier (has fecha_cierre) or cancelled/delivered. Admins can always edit. */}
+                            {!['delivered', 'cancelled'].includes(order.status) && !order.fecha_cierre && (
                                 <button
                                     onClick={handleEditInPOS}
                                     className="text-primary hover:underline flex items-center gap-1 mt-1 font-medium"
@@ -96,7 +96,7 @@ export function OrderDetailModal({ order, onClose, onUpdateStatus, onUpdateOrder
                                     Editar productos
                                 </button>
                             )}
-                            {order.status === 'completed' && isAdmin && (
+                            {order.fecha_cierre && isAdmin && (
                                 <button
                                     onClick={handleEditInPOS}
                                     className="text-amber-500 hover:underline flex items-center gap-1 mt-1 font-medium text-[11px]"
@@ -108,16 +108,16 @@ export function OrderDetailModal({ order, onClose, onUpdateStatus, onUpdateOrder
                         </div>
                     </div>
                     <div className="flex gap-2 text-foreground">
-                        {/* Edit button: hide for completed (closed) orders for non-admins */}
+                        {/* Edit button: hide for closed orders for non-admins */}
                         {!isEditing &&
                             order.status !== 'cancelled' &&
                             order.status !== 'delivered' &&
-                            order.status !== 'completed' && (
+                            !order.fecha_cierre && (
                                 <Button variant="ghost" size="icon" onClick={() => setIsEditing(true)} title="Editar detalles">
                                     <Edit2 className="w-4 h-4" />
                                 </Button>
                             )}
-                        {!isEditing && order.status === 'completed' && isAdmin && (
+                        {!isEditing && order.fecha_cierre && isAdmin && (
                             <Button variant="ghost" size="icon" onClick={() => setIsEditing(true)} title="Editar (Admin)" className="text-amber-500">
                                 <Edit2 className="w-4 h-4" />
                             </Button>
@@ -346,10 +346,10 @@ export function OrderDetailModal({ order, onClose, onUpdateStatus, onUpdateOrder
                                         </div>
                                     )}
 
-                                    {/* Status Actions: hide for completed/cancelled/delivered (closed orders) unless admin */}
+                                    {/* Status Actions: hide for closed (fecha_cierre) / cancelled / delivered orders unless admin */}
                                     {order.status !== 'delivered' &&
                                         order.status !== 'cancelled' &&
-                                        order.status !== 'completed' && (
+                                        !order.fecha_cierre && (
                                             <div>
                                                 <h3 className="text-sm font-bold text-foreground mb-3">Cambiar estado</h3>
                                                 <div className="grid grid-cols-2 gap-2">
@@ -374,20 +374,30 @@ export function OrderDetailModal({ order, onClose, onUpdateStatus, onUpdateOrder
                                                 </div>
                                             </div>
                                         )}
-                                    {/* Closed badge for completed orders */}
-                                    {order.status === 'completed' && (
+                                    {/* Closed badge for closed orders */}
+                                    {order.fecha_cierre && (
                                         <div className="bg-muted/50 border border-border rounded-xl p-4 text-center mt-4">
                                             <p className="text-sm font-bold text-muted-foreground">✅ Orden Cerrada</p>
                                             <p className="text-xs text-muted-foreground mt-1 mb-3">
-                                                {isAdmin ? 'Como admin puedes editar los datos o reabrirla.' : 'Esta orden fue liquidada en el cierre de turno.'}
+                                                {isAdmin ? 'Como admin puedes editar los datos o reabrirla.' : 'Esta orden fue liquidada en el cierre de turno o cancelada.'}
                                             </p>
                                             {isAdmin && (
                                                 <Button
                                                     variant="outline"
                                                     size="sm"
-                                                    onClick={() => {
-                                                        if (confirm('¿Estás seguro de reabrir esta orden? Se moverá a estado "Entregado" y volverá a contabilizarse en ventas activas.')) {
-                                                            onUpdateStatus('delivered')
+                                                    onClick={async () => {
+                                                        if (confirm('¿Estás seguro de reabrir esta orden? Se removerá la fecha de cierre y volverá a estado "Entregado".')) {
+                                                            try {
+                                                                const { error } = await supabase
+                                                                    .from('orders')
+                                                                    .update({ fecha_cierre: null, status: 'delivered' })
+                                                                    .eq('id', order.id)
+                                                                if (error) throw error
+                                                                onUpdateStatus('delivered')
+                                                            } catch (err) {
+                                                                console.error(err)
+                                                                alert('Error al reabrir la orden')
+                                                            }
                                                         }
                                                     }}
                                                     className="w-full border-amber-500/30 text-amber-600 hover:bg-amber-500/10"
@@ -445,7 +455,7 @@ export function OrderDetailModal({ order, onClose, onUpdateStatus, onUpdateOrder
                     )}
 
                     {/* Delete: only for non-closed orders, or admin for any */}
-                    {!isEditing && (order.status !== 'completed' || isAdmin) && (
+                    {!isEditing && (!order.fecha_cierre || isAdmin) && (
                         <div className="pt-4 border-t border-border">
                             <button
                                 onClick={() => {
@@ -456,7 +466,7 @@ export function OrderDetailModal({ order, onClose, onUpdateStatus, onUpdateOrder
                                 className="w-full py-3 rounded-xl text-sm font-bold text-red-500 bg-red-500/10 hover:bg-red-500/20 transition-colors flex items-center justify-center gap-2"
                             >
                                 <Trash2 className="w-4 h-4" />
-                                {order.status === 'completed' && isAdmin ? 'Eliminar (Admin)' : 'Eliminar orden'}
+                                {order.fecha_cierre && isAdmin ? 'Eliminar (Admin)' : 'Eliminar orden'}
                             </button>
                         </div>
                     )}
