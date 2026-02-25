@@ -10,18 +10,6 @@ export function DashboardLayout() {
 
     return (
         <div className="flex h-screen overflow-hidden relative">
-            {/* Mobile Toggle Button */}
-            <div className="lg:hidden fixed top-4 left-4 z-50">
-                <Button
-                    variant="ghost"
-                    size="icon"
-                    className="bg-card shadow-md rounded-full border border-border"
-                    onClick={() => setIsSidebarOpen(true)}
-                >
-                    <Menu className="w-5 h-5" />
-                </Button>
-            </div>
-
             <Sidebar
                 isOpen={isSidebarOpen}
                 onClose={() => setIsSidebarOpen(false)}
@@ -29,9 +17,29 @@ export function DashboardLayout() {
                 onToggleCollapse={() => setIsCollapsed(c => !c)}
             />
 
-            <main className="flex-1 overflow-y-auto scrollbar-hide bg-background p-0 w-full min-w-0">
-                <Outlet />
-            </main>
+            <div className="flex-1 flex flex-col min-w-0 h-full overflow-hidden">
+                {/* Mobile Top Bar */}
+                <header className="lg:hidden h-16 border-b border-border bg-card flex items-center px-4 shrink-0 z-30">
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        className="hover:bg-primary/10 hover:text-primary transition-colors rounded-xl"
+                        onClick={() => setIsSidebarOpen(true)}
+                    >
+                        <Menu className="w-5 h-5" />
+                    </Button>
+                    <div className="ml-4 flex flex-col leading-none">
+                        <span className="font-black text-foreground text-sm tracking-tight uppercase">Gourmet</span>
+                        <div className="flex items-center gap-1">
+                            <span className="font-bold text-primary text-[10px] tracking-wider uppercase leading-none">Click Pro</span>
+                        </div>
+                    </div>
+                </header>
+
+                <main className="flex-1 overflow-y-auto scrollbar-hide bg-background p-0 w-full min-w-0">
+                    <Outlet />
+                </main>
+            </div>
         </div>
     )
 }

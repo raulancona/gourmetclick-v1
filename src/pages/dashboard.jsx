@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useAuth } from '../features/auth/auth-context'
 import { useTenant } from '../features/auth/tenant-context'
@@ -54,8 +54,8 @@ export function DashboardPage() {
         custom: 'Personalizado',
     }
 
-    const getDateRange = (range) => {
-        if (range === 'custom') {
+    const { start: startDate, end: endDate } = useMemo(() => {
+        if (timeRange === 'custom') {
             // Guard against invalid date string
             if (!customStart || !customEnd) {
                 const now = new Date()
@@ -75,7 +75,7 @@ export function DashboardPage() {
         const end = now.toISOString()
         let start = new Date()
 
-        switch (range) {
+        switch (timeRange) {
             case 'today':
                 start.setHours(0, 0, 0, 0)
                 break
@@ -104,9 +104,7 @@ export function DashboardPage() {
                 start.setDate(now.getDate() - 7)
         }
         return { start: start.toISOString(), end }
-    }
-
-    const { start: startDate, end: endDate } = getDateRange(timeRange)
+    }, [timeRange, customStart, customEnd])
 
     // Fetch product count
     const { data: productCount = 0 } = useQuery({
@@ -117,7 +115,7 @@ export function DashboardPage() {
 
     // Fetch order stats (Analytics Mode - Date Based)
     const { data: stats, isLoading: isLoadingStats } = useQuery({
-        queryKey: ['order-stats-dashboard', restaurantId, timeRange],
+        queryKey: ['order-stats-dashboard', restaurantId, timeRange, startDate, endDate],
         queryFn: () => getOrderStats(restaurantId, {
             filterByShift: false,
             startDate,
@@ -129,7 +127,7 @@ export function DashboardPage() {
 
     // Fetch sales analytics (Analytics Mode - Date Based)
     const { data: analytics, isLoading: isLoadingAnalytics } = useQuery({
-        queryKey: ['sales-analytics-dashboard', restaurantId, timeRange],
+        queryKey: ['sales-analytics-dashboard', restaurantId, timeRange, startDate, endDate],
         queryFn: () => getSalesAnalytics(restaurantId, {
             filterByShift: false,
             startDate,
@@ -141,7 +139,7 @@ export function DashboardPage() {
 
     // Fetch expenses for date range — for Utilidad Neta
     const { data: expenses = [] } = useQuery({
-        queryKey: ['dashboard-gastos', restaurantId, timeRange],
+        queryKey: ['dashboard-gastos', restaurantId, timeRange, startDate, endDate],
         queryFn: async () => {
             const { data, error } = await supabase
                 .from('gastos')
@@ -158,7 +156,7 @@ export function DashboardPage() {
 
     // Fetch recent orders for the dashboard view (Date Based) - always includes closed
     const { data: recentOrders = [] } = useQuery({
-        queryKey: ['recent-orders-dashboard', restaurantId, timeRange],
+        queryKey: ['recent-orders-dashboard', restaurantId, timeRange, startDate, endDate],
         queryFn: async () => {
             const all = await getOrders(restaurantId, {
                 includeClosed: true,
@@ -695,7 +693,7 @@ export function DashboardPage() {
                 isOpen={!!selectedKpi}
                 onClose={() => setSelectedKpi(null)}
                 kpi={selectedKpi}
-                queryKey={['kpi-modal-dashboard', restaurantId, selectedKpi?.label, timeRange]}
+                queryKey={['kpi-modal-dashboard', restaurantId, selectedKpi?.label, timeRange, startDate, endDate]}
                 fetchFn={async (page, pageSize) => {
                     if (selectedKpi?.type === 'gastos') {
                         const from = (page - 1) * pageSize
