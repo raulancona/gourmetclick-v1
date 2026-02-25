@@ -59,12 +59,18 @@ export function OrderDetailModal({ order, onClose, onUpdateStatus, onUpdateOrder
                                 <Clock className="w-3 h-3" />
                                 Creada: {new Date(order.fecha_creacion || order.created_at).toLocaleString('es-MX', { dateStyle: 'medium', timeStyle: 'short' })}
                             </span>
-                            {order.status === 'delivered' && !order.cash_cut_id && (
-                                <span className="flex items-center gap-1 text-amber-600 dark:text-amber-400 font-bold bg-amber-50 dark:bg-amber-900/20 px-2 py-0.5 rounded-lg border border-amber-200/50 w-fit mt-1">
+                            {order.cash_cut_id ? (
+                                <span className="flex items-center gap-1.5 text-stone-600 dark:text-stone-400 font-bold bg-stone-50 dark:bg-stone-900/30 px-2 py-1 rounded-lg border border-stone-200 dark:border-stone-700 w-fit mt-1 text-xs">
                                     <Lock className="w-3 h-3" />
-                                    Por Cortar (Pendiente de Cierre)
+                                    Incluida en Corte <span className="font-mono">#{order.cash_cut_id.slice(0, 8)}</span>
                                 </span>
-                            )}
+                            ) : (['delivered', 'completed'].includes(order.status)) ? (
+                                <span className="flex items-center gap-1 text-amber-600 dark:text-amber-400 font-bold bg-amber-50 dark:bg-amber-900/20 px-2 py-0.5 rounded-lg border border-amber-200/50 w-fit mt-1 text-xs">
+                                    <Lock className="w-3 h-3" />
+                                    ⏳ Pendiente de Corte
+                                </span>
+                            ) : null}
+
                             {order.fecha_cierre && (
                                 <span className="flex items-center gap-1 text-green-600 dark:text-green-400 font-medium">
                                     <CheckCircle2 className="w-3 h-3" />

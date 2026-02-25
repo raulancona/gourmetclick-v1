@@ -375,9 +375,10 @@ export async function getSalesAnalytics(restaurantId, { cashCutId = null, filter
 
     // 4. Prepare Chart Data
     // Top 5 Products
-    const topProducts = sortedProducts.slice(0, 5).map(p => ({
+    const topProducts = sortedProducts.slice(0, 10).map(p => ({
         name: p.name,
-        revenue: p.revenue
+        revenue: p.revenue,
+        quantity: p.quantity   // ← was missing, needed for "Más Vendidos"
     }))
 
     // Sales Trend (Last 7 days)
@@ -428,6 +429,7 @@ export async function getUnclosedOrders(restaurantId) {
         .select('*')
         .or(`restaurant_id.eq.${restaurantId},user_id.eq.${restaurantId}`)
         .eq('sesion_caja_id', activeSession.id)
+        .is('cash_cut_id', null)          // ← Exclude orders already in a cut
         .neq('status', 'completed')
         .neq('status', 'cancelled')
         .order('created_at', { ascending: false })

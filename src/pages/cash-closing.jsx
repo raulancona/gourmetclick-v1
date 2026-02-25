@@ -4,6 +4,7 @@ import { useAuth } from '../features/auth/auth-context'
 import { useTenant } from '../features/auth/tenant-context'
 import { useRealtimeSubscription } from '../features/realtime/realtime-context'
 import { getUnclosedOrders, createCashCut, updateOrderStatus, updateOrder, deleteOrder, getActiveSession } from '../lib/order-service'
+import { supabase as sb } from '../lib/supabase'
 import { generateClosingSummary, sendWhatsAppOrder } from '../lib/whatsapp-service'
 import { OrderDetailModal } from '../features/orders/order-detail-modal'
 import { BlindCashCut } from '../features/cash-closing/blind-cash-cut'
@@ -46,6 +47,21 @@ export function CashClosingPage() {
         queryKey: ['active-session', tenant?.id],
         queryFn: () => getActiveSession(tenant.id),
         enabled: !!tenant?.id,
+        refetchInterval: 30_000,
+    })
+
+    // Gastos de la sesión activa — para descontar del corte
+    const { data: sessionExpenses = [] } = useQuery({
+        queryKey: ['session-gastos', activeSession?.id],
+        queryFn: async () => {
+            const { data, error } = await sb
+                .from('gastos')
+                .select('id, descripcion, monto, categoria, created_at')
+                .eq('sesion_caja_id', activeSession.id)
+            if (error) throw error
+            return data || []
+        },
+        enabled: !!activeSession?.id,
         refetchInterval: 30_000,
     })
 
@@ -134,7 +150,7 @@ export function CashClosingPage() {
                     {/* Main Cut Component - 60% */}
                     <div className="lg:col-span-3">
                         {activeSession ? (
-                            <BlindCashCut onComplete={onCutComplete} session={activeSession} isAdmin={isAdmin} orders={orders} />
+                            <BlindCashCut onComplete={onCutComplete} session={activeSession} isAdmin={isAdmin} orders={orders} expenses={sessionExpenses} />
                         ) : (
                             <OpenSession onComplete={onCutComplete} />
                         )}

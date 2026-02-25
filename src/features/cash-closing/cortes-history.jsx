@@ -91,7 +91,14 @@ export function CortesHistory() {
                                                 </span>
                                                 <span className="flex items-center gap-1">
                                                     <User className="w-3 h-3" />
-                                                    {isClosed ? (session.nombre_cajero || 'Admin') : (session.empleado?.nombre || 'Admin')}
+                                                    {(() => {
+                                                        const raw = isClosed
+                                                            ? (session.nombre_cajero || session.empleado?.nombre || '')
+                                                            : (session.empleado?.nombre || session.nombre_cajero || '')
+                                                        // If it's an email, show username part before @
+                                                        const name = raw.includes('@') ? raw.split('@')[0] : raw
+                                                        return name || 'Administrador'
+                                                    })()}
                                                 </span>
                                             </div>
                                         </div>

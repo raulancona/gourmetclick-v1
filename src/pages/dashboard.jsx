@@ -1,30 +1,23 @@
 import { useState, useEffect } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useAuth } from '../features/auth/auth-context'
+import { useTenant } from '../features/auth/tenant-context'
 import { getProductCount } from '../lib/product-service'
 import { getOrderStats, getOrders, getSalesAnalytics, updateOrderStatus, updateOrder, deleteOrder, ORDER_STATUSES } from '../lib/order-service'
+import { supabase } from '../lib/supabase'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card'
 import { OrderDetailModal } from '../features/orders/order-detail-modal'
 import { toast } from 'sonner'
 import { formatCurrency } from '../lib/utils'
-import { supabase } from '../lib/supabase'
+
 
 import {
-    TrendingUp,
-    ShoppingBag,
-    Package,
-    Truck,
-    Store,
-    Armchair,
-    BadgeDollarSign,
-    CreditCard,
-    Banknote,
-    Clock,
-    Tag,
-    BarChart3,
-    LineChart as LineChartIcon,
-    Users,
-    Lock
+    TrendingUp, TrendingDown,
+    ShoppingBag, Package,
+    Truck, Store, Armchair,
+    BadgeDollarSign, CreditCard, Banknote,
+    Clock, Tag, BarChart3, LineChart as LineChartIcon,
+    Users, Lock, Receipt, Coins, PiggyBank, Coffee
 } from 'lucide-react'
 import {
     BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -33,6 +26,9 @@ import {
 
 export function DashboardPage() {
     const { user } = useAuth()
+    const { tenant } = useTenant()
+    // restaurantId: prefer tenant.id (accurate for multi-role), fallback to user.id
+    const restaurantId = tenant?.id || user?.id
     const queryClient = useQueryClient()
     const [selectedOrder, setSelectedOrder] = useState(null)
 
@@ -95,40 +91,57 @@ export function DashboardPage() {
 
     // Fetch order stats (Analytics Mode - Date Based)
     const { data: stats, isLoading: isLoadingStats } = useQuery({
-        queryKey: ['order-stats-dashboard', user?.id, timeRange],
-        queryFn: () => getOrderStats(user.id, {
+        queryKey: ['order-stats-dashboard', restaurantId, timeRange],
+        queryFn: () => getOrderStats(restaurantId, {
             filterByShift: false,
             startDate,
             endDate
         }),
-        enabled: !!user?.id,
-        refetchInterval: 60_000, // Auto-refresh every 60s
+        enabled: !!restaurantId,
+        refetchInterval: 60_000,
     })
 
     // Fetch sales analytics (Analytics Mode - Date Based)
     const { data: analytics, isLoading: isLoadingAnalytics } = useQuery({
-        queryKey: ['sales-analytics-dashboard', user?.id, timeRange],
-        queryFn: () => getSalesAnalytics(user.id, {
+        queryKey: ['sales-analytics-dashboard', restaurantId, timeRange],
+        queryFn: () => getSalesAnalytics(restaurantId, {
             filterByShift: false,
             startDate,
             endDate
         }),
-        enabled: !!user?.id,
+        enabled: !!restaurantId,
+        refetchInterval: 60_000,
+    })
+
+    // Fetch expenses for date range — for Utilidad Neta
+    const { data: expenses = [] } = useQuery({
+        queryKey: ['dashboard-gastos', restaurantId, timeRange],
+        queryFn: async () => {
+            const { data, error } = await supabase
+                .from('gastos')
+                .select('monto, categoria, descripcion, created_at')
+                .eq('restaurant_id', restaurantId)   // gastos uses restaurant_id
+                .gte('created_at', startDate)
+                .lte('created_at', endDate)
+            if (error) throw error
+            return data || []
+        },
+        enabled: !!restaurantId,
         refetchInterval: 60_000,
     })
 
     // Fetch recent orders for the dashboard view (Date Based) - always includes closed
     const { data: recentOrders = [] } = useQuery({
-        queryKey: ['recent-orders-dashboard', user?.id, timeRange],
+        queryKey: ['recent-orders-dashboard', restaurantId, timeRange],
         queryFn: async () => {
-            const all = await getOrders(user.id, {
+            const all = await getOrders(restaurantId, {
                 includeClosed: true,
                 startDate,
                 endDate
             })
             return all.data ? all.data.slice(0, 8) : []
         },
-        enabled: !!user?.id,
+        enabled: !!restaurantId,
         refetchInterval: 60_000,
     })
 
@@ -177,12 +190,20 @@ export function DashboardPage() {
         )
     }
 
+    // Derived metrics
+    const totalExpenses = expenses.reduce((sum, g) => sum + (parseFloat(g.monto) || 0), 0)
+    const netProfit = (stats?.revenue || 0) - totalExpenses
+    const avgTicket = analytics?.metrics?.averageTicket || 0
     const topPayment = stats?.topPayment ? paymentIcons[stats.topPayment] : null
 
-    // Prepare ABC Data for display
-    const productsA = analytics?.abcAnalysis?.filter(p => p.category === 'A') || []
-    const productsB = analytics?.abcAnalysis?.filter(p => p.category === 'B') || []
-    const productsC = analytics?.abcAnalysis?.filter(p => p.category === 'C') || []
+    // Top products derived from analytics
+    const topByQty = [...(analytics?.topProducts || [])]
+        .sort((a, b) => (b.quantity || 0) - (a.quantity || 0))
+        .slice(0, 5)
+    const topByRevenue = [...(analytics?.topProducts || [])]
+        .sort((a, b) => (b.revenue || 0) - (a.revenue || 0))
+        .slice(0, 5)
+
 
     return (
         <div className="p-4 sm:p-8 pb-16 space-y-6 max-w-7xl mx-auto">
@@ -216,71 +237,83 @@ export function DashboardPage() {
                 </div>
             </div>
 
-            {/* Main Metrics — Left-accent border pattern for clean Dark/Light Mode */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                {/* Revenue */}
-                <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 border-l-4 border-l-blue-500 shadow-sm p-6 flex flex-col gap-3">
+            {/* KPI Strip — 5 cards */}
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+                {/* Ventas Brutas */}
+                <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 border-l-4 border-l-blue-500 shadow-sm p-5 flex flex-col gap-2">
                     <div className="flex items-center gap-2">
-                        <div className="w-9 h-9 rounded-xl bg-blue-50 dark:bg-blue-900/30 flex items-center justify-center">
-                            <TrendingUp className="w-5 h-5 text-blue-500" />
+                        <div className="w-8 h-8 rounded-xl bg-blue-50 dark:bg-blue-900/30 flex items-center justify-center">
+                            <TrendingUp className="w-4 h-4 text-blue-500" />
                         </div>
-                        <span className="text-[11px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest">Ventas Totales</span>
+                        <span className="text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest">Ventas</span>
                     </div>
-                    <div className="text-3xl font-black text-gray-900 dark:text-white tracking-tight">{formatCurrency(stats?.revenue || 0)}</div>
-                    <p className="text-xs text-gray-400 dark:text-gray-500">Órdenes entregadas en el periodo</p>
+                    <div className="text-2xl font-black text-gray-900 dark:text-white tracking-tight">{formatCurrency(stats?.revenue || 0)}</div>
+                    <p className="text-[11px] text-gray-400 dark:text-gray-500">{stats?.total || 0} órdenes</p>
                 </div>
 
-                {/* Orders */}
-                <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 border-l-4 border-l-orange-500 shadow-sm p-6 flex flex-col gap-3">
+                {/* Gastos */}
+                <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 border-l-4 border-l-red-400 shadow-sm p-5 flex flex-col gap-2">
                     <div className="flex items-center gap-2">
-                        <div className="w-9 h-9 rounded-xl bg-orange-50 dark:bg-orange-900/30 flex items-center justify-center">
-                            <ShoppingBag className="w-5 h-5 text-orange-500" />
+                        <div className="w-8 h-8 rounded-xl bg-red-50 dark:bg-red-900/30 flex items-center justify-center">
+                            <Receipt className="w-4 h-4 text-red-400" />
                         </div>
-                        <span className="text-[11px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest">Órdenes</span>
+                        <span className="text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest">Gastos</span>
                     </div>
-                    <div className="text-3xl font-black text-gray-900 dark:text-white tracking-tight">{stats?.total || 0}</div>
-                    <div className="flex items-center gap-3 text-xs mt-1">
-                        <span className="flex items-center gap-1 text-amber-600 dark:text-amber-400 font-bold bg-amber-50 dark:bg-amber-900/20 px-2 py-0.5 rounded-md">
-                            <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse"></span>
-                            {stats?.active || 0} Activas
-                        </span>
-                        <span className="text-muted-foreground">
-                            {stats?.delivered || 0} Finalizadas
-                        </span>
-                    </div>
+                    <div className="text-2xl font-black text-red-500 tracking-tight">-{formatCurrency(totalExpenses)}</div>
+                    <p className="text-[11px] text-gray-400 dark:text-gray-500">{expenses.length} registros</p>
                 </div>
 
-                {/* Products */}
-                <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 border-l-4 border-l-purple-500 shadow-sm p-6 flex flex-col gap-3">
+                {/* Utilidad Neta — the key metric */}
+                <div className={`rounded-2xl border shadow-sm p-5 flex flex-col gap-2 border-l-4 ${netProfit >= 0
+                    ? 'bg-emerald-50 dark:bg-emerald-950/30 border-green-200 dark:border-emerald-800 border-l-emerald-500'
+                    : 'bg-red-50 dark:bg-red-950/30 border-red-200 dark:border-red-800 border-l-red-500'
+                    }`}>
                     <div className="flex items-center gap-2">
-                        <div className="w-9 h-9 rounded-xl bg-purple-50 dark:bg-purple-900/30 flex items-center justify-center">
-                            <Package className="w-5 h-5 text-purple-500" />
+                        <div className={`w-8 h-8 rounded-xl flex items-center justify-center ${netProfit >= 0 ? 'bg-emerald-100 dark:bg-emerald-900/40' : 'bg-red-100 dark:bg-red-900/40'
+                            }`}>
+                            <PiggyBank className={`w-4 h-4 ${netProfit >= 0 ? 'text-emerald-600' : 'text-red-500'}`} />
                         </div>
-                        <span className="text-[11px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest">Productos</span>
+                        <span className="text-[10px] font-black text-gray-500 dark:text-gray-400 uppercase tracking-widest">Utilidad Neta</span>
                     </div>
-                    <div className="text-3xl font-black text-gray-900 dark:text-white tracking-tight">{productCount}</div>
-                    <p className="text-xs text-gray-400 dark:text-gray-500">En tu catálogo activo</p>
+                    <div className={`text-2xl font-black tracking-tight ${netProfit >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-500'
+                        }`}>
+                        {netProfit >= 0 ? '' : '-'}{formatCurrency(Math.abs(netProfit))}
+                    </div>
+                    <p className="text-[11px] text-gray-400 dark:text-gray-500">Ventas − Gastos registrados</p>
+                    <p className="text-[10px] text-gray-300 dark:text-gray-600 italic">* No incluye costo de producto</p>
                 </div>
 
-                {/* Top Payment */}
-                <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 border-l-4 border-l-green-500 shadow-sm p-6 flex flex-col gap-3">
+                {/* Ticket Promedio */}
+                <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 border-l-4 border-l-amber-500 shadow-sm p-5 flex flex-col gap-2">
                     <div className="flex items-center gap-2">
-                        <div className="w-9 h-9 rounded-xl bg-green-50 dark:bg-green-900/30 flex items-center justify-center">
-                            <BadgeDollarSign className="w-5 h-5 text-green-500" />
+                        <div className="w-8 h-8 rounded-xl bg-amber-50 dark:bg-amber-900/30 flex items-center justify-center">
+                            <Coins className="w-4 h-4 text-amber-500" />
                         </div>
-                        <span className="text-[11px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest">Cobro Estelar</span>
+                        <span className="text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest">Ticket Prom.</span>
                     </div>
-                    <div className="flex items-center gap-3">
+                    <div className="text-2xl font-black text-gray-900 dark:text-white tracking-tight">{formatCurrency(avgTicket)}</div>
+                    <p className="text-[11px] text-gray-400 dark:text-gray-500">Por orden</p>
+                </div>
+
+                {/* Método Top */}
+                <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 border-l-4 border-l-violet-500 shadow-sm p-5 flex flex-col gap-2">
+                    <div className="flex items-center gap-2">
+                        <div className="w-8 h-8 rounded-xl bg-violet-50 dark:bg-violet-900/30 flex items-center justify-center">
+                            <BadgeDollarSign className="w-4 h-4 text-violet-500" />
+                        </div>
+                        <span className="text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest">Cobro Top</span>
+                    </div>
+                    <div className="flex items-center gap-2 mt-1">
                         {topPayment ? (
                             <>
-                                <topPayment.icon className="w-8 h-8" style={{ color: topPayment.color }} />
-                                <span className="text-2xl font-black text-gray-900 dark:text-white">{topPayment.label}</span>
+                                <topPayment.icon className="w-6 h-6" style={{ color: topPayment.color }} />
+                                <span className="text-xl font-black text-gray-900 dark:text-white">{topPayment.label}</span>
                             </>
                         ) : (
-                            <span className="text-2xl font-black text-gray-400">N/A</span>
+                            <span className="text-xl font-black text-gray-400">N/A</span>
                         )}
                     </div>
-                    <p className="text-xs text-gray-400 dark:text-gray-500">Método más frecuente</p>
+                    <p className="text-[11px] text-gray-400 dark:text-gray-500">Método frecuente</p>
                 </div>
             </div>
 
@@ -367,7 +400,7 @@ export function DashboardPage() {
                 </Card>
             </div>
 
-            {/* Secondary Metrics */}
+            {/* Secondary Metrics — Ticket Avg + Order Type Distribution */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <Card className="bg-white dark:bg-gray-800 border-2 border-emerald-100 dark:border-emerald-900/50 shadow-sm">
                     <CardHeader className="pb-2">
@@ -378,39 +411,63 @@ export function DashboardPage() {
                     </CardHeader>
                     <CardContent>
                         <div className="text-3xl font-black text-gray-900 dark:text-white mb-1">
-                            {formatCurrency(analytics?.metrics?.averageTicket || 0)}
+                            {formatCurrency(avgTicket)}
                         </div>
                         <p className="text-xs text-muted-foreground">Promedio histórico del periodo.</p>
                     </CardContent>
                 </Card>
 
-                <Card className="bg-white dark:bg-gray-800 border-2 border-blue-100 dark:border-blue-900/50 shadow-sm">
+                {/* Top 5 Más Vendidos */}
+                <Card className="bg-white dark:bg-gray-800 border-2 border-orange-100 dark:border-orange-900/50 shadow-sm">
                     <CardHeader className="pb-2">
-                        <CardTitle className="text-blue-600 dark:text-blue-400 text-lg flex items-center gap-2 uppercase text-[10px] tracking-widest font-black">
-                            <Clock className="w-5 h-5" />
-                            Tiempo de Preparación
+                        <CardTitle className="text-orange-600 dark:text-orange-400 text-lg flex items-center gap-2 uppercase text-[10px] tracking-widest font-black">
+                            <Coffee className="w-5 h-5" />
+                            Más Vendidos
                         </CardTitle>
+                        <CardDescription>Por cantidad de unidades</CardDescription>
                     </CardHeader>
                     <CardContent>
-                        <div className="text-3xl font-black text-gray-900 dark:text-white mb-1">
-                            {analytics?.metrics?.preparationTime || 'N/A'}
-                        </div>
-                        <p className="text-xs text-muted-foreground">Efectividad operativa.</p>
+                        {topByQty.length === 0 ? (
+                            <p className="text-xs text-muted-foreground italic">Sin datos aún</p>
+                        ) : (
+                            <ol className="space-y-2">
+                                {topByQty.map((p, i) => (
+                                    <li key={p.name} className="flex items-center gap-2 text-sm">
+                                        <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-black shrink-0 ${i === 0 ? 'bg-amber-400 text-white' : i === 1 ? 'bg-gray-300 text-gray-700' : i === 2 ? 'bg-amber-700/40 text-amber-900' : 'bg-muted text-muted-foreground'
+                                            }`}>{i + 1}</span>
+                                        <span className="flex-1 font-medium text-foreground truncate">{p.name}</span>
+                                        <span className="font-black text-orange-600 shrink-0">{p.quantity || 0}x</span>
+                                    </li>
+                                ))}
+                            </ol>
+                        )}
                     </CardContent>
                 </Card>
 
-                <Card className="bg-white dark:bg-gray-800 border-2 border-amber-100 dark:border-amber-900/50 shadow-sm">
+                {/* Top 5 Más Rentables */}
+                <Card className="bg-white dark:bg-gray-800 border-2 border-blue-100 dark:border-blue-900/50 shadow-sm">
                     <CardHeader className="pb-2">
-                        <CardTitle className="text-amber-600 dark:text-amber-400 text-lg flex items-center gap-2 uppercase text-[10px] tracking-widest font-black">
-                            <Users className="w-5 h-5" />
-                            Fidelización
+                        <CardTitle className="text-blue-600 dark:text-blue-400 text-lg flex items-center gap-2 uppercase text-[10px] tracking-widest font-black">
+                            <TrendingUp className="w-5 h-5" />
+                            Más Rentables
                         </CardTitle>
+                        <CardDescription>Por ingresos generados</CardDescription>
                     </CardHeader>
                     <CardContent>
-                        <div className="text-3xl font-black text-gray-900 dark:text-white mb-1">
-                            {Math.round(analytics?.metrics?.recurringCustomersPercentage || 0)}%
-                        </div>
-                        <p className="text-xs text-muted-foreground">Retorno de clientes.</p>
+                        {topByRevenue.length === 0 ? (
+                            <p className="text-xs text-muted-foreground italic">Sin datos aún</p>
+                        ) : (
+                            <ol className="space-y-2">
+                                {topByRevenue.map((p, i) => (
+                                    <li key={p.name} className="flex items-center gap-2 text-sm">
+                                        <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-black shrink-0 ${i === 0 ? 'bg-blue-500 text-white' : i === 1 ? 'bg-blue-300 text-white' : i === 2 ? 'bg-blue-200 text-blue-800' : 'bg-muted text-muted-foreground'
+                                            }`}>{i + 1}</span>
+                                        <span className="flex-1 font-medium text-foreground truncate">{p.name}</span>
+                                        <span className="font-black text-blue-600 shrink-0 text-xs">{formatCurrency(p.revenue || 0)}</span>
+                                    </li>
+                                ))}
+                            </ol>
+                        )}
                     </CardContent>
                 </Card>
             </div>

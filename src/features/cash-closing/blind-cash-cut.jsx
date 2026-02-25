@@ -9,7 +9,7 @@ import { closeSession } from '../../lib/order-service'
 import { useAuth } from '../auth/auth-context'
 import { formatCurrency } from '../../lib/utils'
 
-export function BlindCashCut({ onComplete, session, isAdmin, orders = [] }) {
+export function BlindCashCut({ onComplete, session, isAdmin, orders = [], expenses = [] }) {
     const { user } = useAuth()
     const [montoReal, setMontoReal] = useState('')
     const [isLoading, setIsLoading] = useState(false)
@@ -28,8 +28,9 @@ export function BlindCashCut({ onComplete, session, isAdmin, orders = [] }) {
             },
             { cash: 0, card: 0, transfer: 0 }
         )
-        return { totalSales, totalExpenses: 0, byPayment }
-    }, [orders])
+        const totalExpenses = expenses.reduce((sum, g) => sum + (parseFloat(g.monto) || 0), 0)
+        return { totalSales, totalExpenses, byPayment }
+    }, [orders, expenses])
 
     const handleSubmit = async (e) => {
         e.preventDefault()
@@ -160,8 +161,20 @@ export function BlindCashCut({ onComplete, session, isAdmin, orders = [] }) {
                                 <span className="font-black text-emerald-600">{formatCurrency(summary.totalSales)}</span>
                             </div>
                             <div className="flex justify-between items-center text-sm">
+                                <span className="text-muted-foreground font-bold italic">Gastos (-):</span>
                                 <span className="font-black text-red-600">-{formatCurrency(summary.totalExpenses)}</span>
                             </div>
+                            {expenses.length > 0 && (
+                                <div className="bg-red-500/5 rounded-xl p-3 space-y-1 border border-red-500/10">
+                                    <p className="text-[10px] uppercase font-black tracking-widest text-red-500/70 mb-1">Detalle de Gastos</p>
+                                    {expenses.map(g => (
+                                        <div key={g.id} className="flex justify-between text-xs">
+                                            <span className="text-muted-foreground truncate max-w-[60%]">{g.descripcion || g.categoria || 'Gasto'}</span>
+                                            <span className="font-bold text-red-600">-{formatCurrency(g.monto)}</span>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
 
                             {/* Payment Breakdown */}
                             <div className="bg-primary/5 rounded-xl p-3 space-y-2 border border-primary/10">

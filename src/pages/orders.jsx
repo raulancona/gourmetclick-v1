@@ -348,14 +348,15 @@ export function OrdersPage() {
                                                     {order.table_number && <span className="font-bold text-orange-600">#{order.table_number}</span>}
                                                     <span>{payment.icon} {payment.label}</span>
                                                     {order.cash_cut_id ? (
-                                                        <span className="text-[10px] bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded border border-gray-200">
-                                                            🔒 Corte
+                                                        <span className="text-[10px] bg-stone-100 dark:bg-stone-800 text-stone-600 dark:text-stone-400 px-1.5 py-0.5 rounded border border-stone-200 dark:border-stone-700 font-bold flex items-center gap-1">
+                                                            <Lock className="w-2.5 h-2.5" /> Corte #{order.cash_cut_id.slice(0, 6)}
                                                         </span>
-                                                    ) : order.status === 'delivered' ? (
-                                                        <span className="text-[10px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded border border-amber-200 font-bold flex items-center gap-1">
-                                                            <Lock className="w-2.5 h-2.5" /> Por Cortar
+                                                    ) : (['delivered', 'completed'].includes(order.status)) ? (
+                                                        <span className="text-[10px] bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-400 px-1.5 py-0.5 rounded border border-amber-300 dark:border-amber-700 font-black flex items-center gap-1">
+                                                            ⏳ Por Cortar
                                                         </span>
                                                     ) : null}
+
                                                     <span className="font-mono">#{order.id.slice(0, 6)}</span>
                                                 </div>
                                                 {items.length > 0 && (
