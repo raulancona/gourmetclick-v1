@@ -6,8 +6,9 @@ import { useTerminal } from '../features/auth/terminal-context'
 import { supabase } from '../lib/supabase'
 import {
     Search, Package, Clock, ChefHat, CheckCircle2, XCircle,
-    RefreshCw, Lock, CreditCard, Wifi, WifiOff, Flame, Archive, ChevronDown, AlertTriangle, X
+    RefreshCw, Lock, CreditCard, Wifi, WifiOff, Flame, Archive, ChevronDown, AlertTriangle, X, ChevronLeft, ChevronRight
 } from 'lucide-react'
+import { KpiDrilldownModal } from '../components/kpi-drilldown-modal'
 import { Button } from '../components/ui/button'
 import { Input } from '../components/ui/input'
 import { Card, CardContent } from '../components/ui/card'
@@ -32,7 +33,7 @@ export function OrdersPage() {
     const [selectedOrder, setSelectedOrder] = useState(null)
     const [isConnected, setIsConnected] = useState(true)
     const [lastUpdate, setLastUpdate] = useState(Date.now())
-    const [historyPageSize, setHistoryPageSize] = useState(50)
+    const [historyPage, setHistoryPage] = useState(1)
 
     const restaurantId = tenant?.id || user?.id
 
@@ -49,10 +50,11 @@ export function OrdersPage() {
 
     // ─── History Orders Query ─────────────────────────────────────────────────
     const { data: historyOrdersRaw, isLoading: isLoadingHistory, refetch: refetchHistory } = useQuery({
-        queryKey: ['orders-history', restaurantId, historyPageSize],
+        queryKey: ['orders-history', restaurantId, historyPage],
         queryFn: () => getOrders(restaurantId, {
             includeClosed: true,
-            pageSize: historyPageSize,
+            page: historyPage,
+            pageSize: 50,
             statuses: ['delivered', 'cancelled', 'completed']
         }),
         enabled: !!restaurantId && activeTab === 'historial',
@@ -220,21 +222,6 @@ export function OrdersPage() {
     }
 
     const tabStats = getTabStats()
-
-    const getKpiDetailOrders = () => {
-        if (!selectedKpi) return []
-
-        // Ensure we're pulling from the full raw active/history pool so search term doesn't hide KPI items
-        return allOrders.filter(order => {
-            if (selectedKpi.label === 'Pendientes') return order.status === 'pending'
-            if (selectedKpi.label === 'Activos') return ['preparing', 'ready', 'on_the_way'].includes(order.status)
-            if (selectedKpi.label === 'En Cola') return ['pending', 'confirmed', 'preparing', 'ready', 'on_the_way'].includes(order.status)
-            if (selectedKpi.label === 'Completadas') return ['delivered', 'completed'].includes(order.status)
-            if (selectedKpi.label === 'Desperdicio/Cancel.') return order.status === 'cancelled'
-            if (selectedKpi.label === 'Ingresos (Histórico)') return ['delivered', 'completed'].includes(order.status)
-            return true
-        })
-    }
 
     return (
         <div className="p-4 sm:p-6 max-w-6xl mx-auto pb-20">
@@ -486,16 +473,29 @@ export function OrdersPage() {
                 )}
 
                 {/* Pagination Button for History Tab */}
-                {activeTab === 'historial' && filteredOrders.length > 0 && filteredOrders.length < totalHistoryCount && (
-                    <div className="pt-4 flex justify-center w-full">
-                        <Button
-                            variant="outline"
-                            onClick={() => setHistoryPageSize(p => p + 50)}
-                            className="w-full sm:w-auto font-bold rounded-xl h-11 border-border/60 hover:bg-muted transition-all"
-                        >
-                            <ChevronDown className="w-4 h-4 mr-2" />
-                            Cargar más órdenes pasadas ({totalHistoryCount - filteredOrders.length} restantes)
-                        </Button>
+                {activeTab === 'historial' && (
+                    <div className="pt-4 flex items-center justify-between bg-card p-4 rounded-xl border border-border/60 mt-4">
+                        <p className="text-sm font-bold text-muted-foreground">
+                            Página {historyPage} de {Math.max(1, Math.ceil(totalHistoryCount / 50))} <span className="font-normal opacity-70">({totalHistoryCount} órdenes)</span>
+                        </p>
+                        <div className="flex gap-2">
+                            <Button
+                                variant="outline"
+                                onClick={() => setHistoryPage(p => Math.max(1, p - 1))}
+                                disabled={historyPage === 1 || isLoadingHistory}
+                                className="font-bold rounded-lg h-9"
+                            >
+                                <ChevronLeft className="w-4 h-4 mr-1" /> Anterior
+                            </Button>
+                            <Button
+                                variant="outline"
+                                onClick={() => setHistoryPage(p => Math.min(Math.ceil(totalHistoryCount / 50), p + 1))}
+                                disabled={historyPage >= Math.ceil(totalHistoryCount / 50) || isLoadingHistory}
+                                className="font-bold rounded-lg h-9"
+                            >
+                                Siguiente <ChevronRight className="w-4 h-4 ml-1" />
+                            </Button>
+                        </div>
                     </div>
                 )}
             </div>
@@ -515,69 +515,59 @@ export function OrdersPage() {
                 />
             )}
             {/* KPI Detail Modal */}
-            {selectedKpi && (
-                <div className="fixed inset-0 z-[60] flex items-center justify-center p-4" onClick={() => setSelectedKpi(null)}>
-                    <div className="absolute inset-0 bg-black/50 backdrop-blur-sm"></div>
-                    <div className="relative bg-card w-full max-w-2xl max-h-[85vh] flex flex-col rounded-2xl shadow-2xl overflow-hidden" onClick={e => e.stopPropagation()}>
-                        <div className="shrink-0 p-5 lg:p-6 border-b border-border/60 flex items-center justify-between bg-muted/30 z-10">
-                            <div className="flex items-center gap-3">
-                                <div className="w-12 h-12 rounded-xl flex items-center justify-center shadow-inner" style={{ background: `${selectedKpi.color}15`, color: selectedKpi.color }}>
-                                    <selectedKpi.icon className="w-6 h-6" />
-                                </div>
-                                <div>
-                                    <h2 className="text-xl font-black text-foreground">{selectedKpi.label}</h2>
-                                    <p className="text-sm font-medium text-muted-foreground mt-0.5">
-                                        Detalle de las <strong className="text-foreground">{selectedKpi.value}</strong> unidades calculadas o en pantalla
-                                    </p>
-                                </div>
-                            </div>
-                            <Button variant="ghost" size="icon" className="rounded-full hover:bg-black/5" onClick={() => setSelectedKpi(null)}>
-                                <X className="w-5 h-5" />
+            <KpiDrilldownModal
+                isOpen={!!selectedKpi}
+                onClose={() => setSelectedKpi(null)}
+                kpi={selectedKpi}
+                queryKey={['kpi-modal', restaurantId, selectedKpi?.label]}
+                fetchFn={async (page, pageSize) => {
+                    let statuses = null
+                    if (selectedKpi.label === 'Pendientes') statuses = ['pending']
+                    else if (selectedKpi.label === 'Activos') statuses = ['preparing', 'ready', 'on_the_way']
+                    else if (selectedKpi.label === 'En Cola') statuses = ['pending', 'confirmed', 'preparing', 'ready', 'on_the_way']
+                    else if (selectedKpi.label === 'Completadas') statuses = ['delivered', 'completed']
+                    else if (selectedKpi.label === 'Desperdicio/Cancel.') statuses = ['cancelled']
+                    else if (selectedKpi.label === 'Ingresos (Histórico)') statuses = ['delivered', 'completed']
+
+                    return await getOrders(restaurantId, {
+                        includeClosed: selectedKpi.label === 'Ingresos (Histórico)' || selectedKpi.label === 'Completadas' || selectedKpi.label === 'Desperdicio/Cancel.',
+                        page,
+                        pageSize,
+                        statuses
+                    })
+                }}
+                renderItem={(order) => (
+                    <div key={order.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-xl border border-border/60 hover:border-primary/40 bg-card transition-colors gap-3">
+                        <div>
+                            <p className="font-bold flex items-center gap-2">
+                                {order.customer_name || 'Cliente General'}
+                                <span className="text-[10px] font-mono font-bold opacity-60 bg-muted px-1.5 py-0.5 rounded">#{String(order.id).slice(0, 6)}</span>
+                            </p>
+                            <p className="text-sm text-foreground my-1 font-medium text-muted-foreground">
+                                <span className="font-bold text-foreground">Estado:</span> {ORDER_STATUSES[order.status]?.label || order.status}
+                            </p>
+                            <p className="text-xs text-muted-foreground flex items-center gap-1.5 font-medium">
+                                <Clock className="w-3.5 h-3.5" />
+                                {new Date(order.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                            </p>
+                        </div>
+                        <div className="text-right flex items-center gap-4">
+                            <p className="font-black text-lg text-primary">{formatCurrency(order.total)}</p>
+                            <Button
+                                variant="secondary"
+                                size="sm"
+                                className="h-8 text-xs font-bold"
+                                onClick={() => {
+                                    setSelectedKpi(null)
+                                    setSelectedOrder(order)
+                                }}
+                            >
+                                Ver
                             </Button>
                         </div>
-                        <div className="p-5 lg:p-6 overflow-y-auto space-y-2 flex-1">
-                            {getKpiDetailOrders().length === 0 ? (
-                                <div className="text-center py-10 opacity-70">
-                                    <selectedKpi.icon className="w-12 h-12 mx-auto mb-3 opacity-20" />
-                                    <p className="font-bold">No hay elementos detallados para mostrar de esta métrica en la página actual.</p>
-                                </div>
-                            ) : (
-                                getKpiDetailOrders().map(order => (
-                                    <div key={order.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-xl border border-border/60 hover:border-primary/40 bg-card transition-colors gap-3">
-                                        <div>
-                                            <p className="font-bold flex items-center gap-2">
-                                                {order.customer_name || 'Cliente General'}
-                                                <span className="text-[10px] font-mono font-bold opacity-60 bg-muted px-1.5 py-0.5 rounded">#{String(order.id).slice(0, 6)}</span>
-                                            </p>
-                                            <p className="text-sm text-foreground my-1 font-medium text-muted-foreground">
-                                                <span className="font-bold text-foreground">Estado:</span> {ORDER_STATUSES[order.status]?.label || order.status}
-                                            </p>
-                                            <p className="text-xs text-muted-foreground flex items-center gap-1.5 font-medium">
-                                                <Clock className="w-3.5 h-3.5" />
-                                                {new Date(order.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                                            </p>
-                                        </div>
-                                        <div className="text-right flex items-center gap-4">
-                                            <p className="font-black text-lg text-primary">{formatCurrency(order.total)}</p>
-                                            <Button
-                                                variant="secondary"
-                                                size="sm"
-                                                className="h-8 text-xs font-bold"
-                                                onClick={() => {
-                                                    setSelectedKpi(null)
-                                                    setSelectedOrder(order)
-                                                }}
-                                            >
-                                                Ver
-                                            </Button>
-                                        </div>
-                                    </div>
-                                ))
-                            )}
-                        </div>
                     </div>
-                </div>
-            )}
+                )}
+            />
         </div>
     )
 }

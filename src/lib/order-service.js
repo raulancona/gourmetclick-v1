@@ -34,7 +34,7 @@ function getNextStatuses(current) {
 
 export { ORDER_STATUSES, PAYMENT_METHODS, getNextStatuses }
 
-export async function getOrders(restaurantId, { includeClosed = false, startDate = null, endDate = null, page = 1, pageSize = 50, statuses = null } = {}) {
+export async function getOrders(restaurantId, { includeClosed = false, startDate = null, endDate = null, page = 1, pageSize = 50, statuses = null, paymentMethod = null } = {}) {
     // When hiding closed orders, we exclude by status AND by sesion_caja_id of closed sessions.
     // This prevents orphan orders from past shifts appearing in the active cashier view.
     let closedSessionIds = []
@@ -74,6 +74,9 @@ export async function getOrders(restaurantId, { includeClosed = false, startDate
     }
     if (statuses && statuses.length > 0) {
         query = query.in('status', statuses)
+    }
+    if (paymentMethod) {
+        query = query.eq('payment_method', paymentMethod)
     }
 
     const { data, error, count } = await query

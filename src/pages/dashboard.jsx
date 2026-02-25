@@ -7,8 +7,10 @@ import { getOrderStats, getOrders, getSalesAnalytics, updateOrderStatus, updateO
 import { supabase } from '../lib/supabase'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card'
 import { OrderDetailModal } from '../features/orders/order-detail-modal'
+import { KpiDrilldownModal } from '../components/kpi-drilldown-modal'
 import { toast } from 'sonner'
 import { formatCurrency } from '../lib/utils'
+import { Button } from '../components/ui/button'
 
 
 import {
@@ -31,6 +33,7 @@ export function DashboardPage() {
     const restaurantId = tenant?.id || user?.id
     const queryClient = useQueryClient()
     const [selectedOrder, setSelectedOrder] = useState(null)
+    const [selectedKpi, setSelectedKpi] = useState(null)
 
     // Date Filtering Logic
     const [timeRange, setTimeRange] = useState('today')
@@ -53,9 +56,19 @@ export function DashboardPage() {
 
     const getDateRange = (range) => {
         if (range === 'custom') {
-            return {
-                start: new Date(customStart + 'T00:00:00').toISOString(),
-                end: new Date(customEnd + 'T23:59:59').toISOString()
+            // Guard against invalid date string
+            if (!customStart || !customEnd) {
+                const now = new Date()
+                return { start: now.toISOString(), end: now.toISOString() }
+            }
+            try {
+                return {
+                    start: new Date(customStart + 'T00:00:00').toISOString(),
+                    end: new Date(customEnd + 'T23:59:59').toISOString()
+                }
+            } catch (e) {
+                const now = new Date()
+                return { start: now.toISOString(), end: now.toISOString() }
             }
         }
         const now = new Date()
@@ -150,9 +163,11 @@ export function DashboardPage() {
             const all = await getOrders(restaurantId, {
                 includeClosed: true,
                 startDate,
-                endDate
+                endDate,
+                page: 1,
+                pageSize: 8
             })
-            return all.data ? all.data.slice(0, 8) : []
+            return all.data || []
         },
         enabled: !!restaurantId,
         refetchInterval: 60_000,
@@ -283,7 +298,10 @@ export function DashboardPage() {
             {/* KPI Strip — 5 cards */}
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
                 {/* Ventas Brutas */}
-                <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 border-l-4 border-l-blue-500 shadow-sm p-5 flex flex-col gap-2">
+                <div
+                    onClick={() => setSelectedKpi({ type: 'ventas', label: 'Ventas Brutas', value: formatCurrency(stats?.revenue || 0), color: '#3B82F6', icon: TrendingUp })}
+                    className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 border-l-4 border-l-blue-500 shadow-sm p-5 flex flex-col gap-2 cursor-pointer transition-all hover:-translate-y-1 hover:shadow-md"
+                >
                     <div className="flex items-center gap-2">
                         <div className="w-8 h-8 rounded-xl bg-blue-50 dark:bg-blue-900/30 flex items-center justify-center">
                             <TrendingUp className="w-4 h-4 text-blue-500" />
@@ -295,7 +313,10 @@ export function DashboardPage() {
                 </div>
 
                 {/* Gastos */}
-                <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 border-l-4 border-l-red-400 shadow-sm p-5 flex flex-col gap-2">
+                <div
+                    onClick={() => setSelectedKpi({ type: 'gastos', label: 'Gastos Registrados', value: formatCurrency(totalExpenses), color: '#F87171', icon: Receipt })}
+                    className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 border-l-4 border-l-red-400 shadow-sm p-5 flex flex-col gap-2 cursor-pointer transition-all hover:-translate-y-1 hover:shadow-md"
+                >
                     <div className="flex items-center gap-2">
                         <div className="w-8 h-8 rounded-xl bg-red-50 dark:bg-red-900/30 flex items-center justify-center">
                             <Receipt className="w-4 h-4 text-red-400" />
@@ -339,7 +360,12 @@ export function DashboardPage() {
                 </div>
 
                 {/* Método Top */}
-                <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 border-l-4 border-l-violet-500 shadow-sm p-5 flex flex-col gap-2">
+                <div
+                    onClick={() => {
+                        if (topPayment) setSelectedKpi({ type: 'metodo', label: `Cobros con ${topPayment.label}`, value: `${stats?.paymentMethods?.[stats.topPayment] || 0} órdenes`, color: '#8B5CF6', icon: BadgeDollarSign })
+                    }}
+                    className={`bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 border-l-4 border-l-violet-500 shadow-sm p-5 flex flex-col gap-2 ${topPayment ? 'cursor-pointer transition-all hover:-translate-y-1 hover:shadow-md' : ''}`}
+                >
                     <div className="flex items-center gap-2">
                         <div className="w-8 h-8 rounded-xl bg-violet-50 dark:bg-violet-900/30 flex items-center justify-center">
                             <BadgeDollarSign className="w-4 h-4 text-violet-500" />
@@ -663,6 +689,101 @@ export function DashboardPage() {
                     />
                 )
             }
+
+            {/* KPI Detail Modal */}
+            <KpiDrilldownModal
+                isOpen={!!selectedKpi}
+                onClose={() => setSelectedKpi(null)}
+                kpi={selectedKpi}
+                queryKey={['kpi-modal-dashboard', restaurantId, selectedKpi?.label, timeRange]}
+                fetchFn={async (page, pageSize) => {
+                    if (selectedKpi?.type === 'gastos') {
+                        const from = (page - 1) * pageSize
+                        const to = from + pageSize - 1
+                        const { data, count, error } = await supabase
+                            .from('gastos')
+                            .select('*', { count: 'exact' })
+                            .eq('restaurant_id', restaurantId)
+                            .gte('created_at', startDate)
+                            .lte('created_at', endDate)
+                            .order('created_at', { ascending: false })
+                            .range(from, to)
+                        if (error) throw error
+                        return { data: data || [], count: count || 0 }
+                    }
+
+                    // For 'ventas' or 'metodo' (orders)
+                    let paymentMethod = null
+                    if (selectedKpi?.type === 'metodo') {
+                        paymentMethod = stats?.topPayment
+                    }
+
+                    return await getOrders(restaurantId, {
+                        includeClosed: true,
+                        startDate,
+                        endDate,
+                        page,
+                        pageSize,
+                        statuses: ['delivered', 'completed'],
+                        paymentMethod
+                    })
+                }}
+                renderItem={(item) => {
+                    if (selectedKpi?.type === 'gastos') {
+                        return (
+                            <div key={item.id} className="flex justify-between items-center p-4 bg-card rounded-xl border border-border">
+                                <div className="flex items-center gap-3">
+                                    <div className="w-10 h-10 rounded-lg bg-red-100 dark:bg-red-900/30 flex items-center justify-center text-red-500">
+                                        <Receipt className="w-5 h-5" />
+                                    </div>
+                                    <div>
+                                        <p className="font-bold">{item.categoria}</p>
+                                        <p className="text-sm text-muted-foreground">{item.descripcion || 'Sin descripción'}</p>
+                                        <p className="text-xs text-muted-foreground font-medium flex items-center gap-1 mt-1">
+                                            <Clock className="w-3 h-3" />
+                                            {new Date(item.created_at).toLocaleDateString()} {new Date(item.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                        </p>
+                                    </div>
+                                </div>
+                                <span className="font-black text-red-500 text-lg">-{formatCurrency(item.monto)}</span>
+                            </div>
+                        )
+                    }
+
+                    // Defaults to rendering an Order
+                    return (
+                        <div key={item.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-xl border border-border/60 hover:border-primary/40 bg-card transition-colors gap-3">
+                            <div>
+                                <p className="font-bold flex items-center gap-2">
+                                    {item.customer_name || 'Cliente General'}
+                                    <span className="text-[10px] font-mono font-bold opacity-60 bg-muted px-1.5 py-0.5 rounded">#{String(item.id).slice(0, 6)}</span>
+                                </p>
+                                <p className="text-sm text-foreground my-1 font-medium text-muted-foreground">
+                                    <span className="font-bold text-foreground">Estado:</span> {ORDER_STATUSES[item.status]?.label || item.status}
+                                </p>
+                                <p className="text-xs text-muted-foreground flex items-center gap-1.5 font-medium">
+                                    <Clock className="w-3.5 h-3.5" />
+                                    {new Date(item.created_at).toLocaleDateString()} {new Date(item.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                </p>
+                            </div>
+                            <div className="text-right flex items-center gap-4">
+                                <p className="font-black text-lg text-primary">{formatCurrency(item.total)}</p>
+                                <Button
+                                    variant="secondary"
+                                    size="sm"
+                                    className="h-8 text-xs font-bold"
+                                    onClick={() => {
+                                        setSelectedKpi(null)
+                                        setSelectedOrder(item)
+                                    }}
+                                >
+                                    Ver Orden
+                                </Button>
+                            </div>
+                        </div>
+                    )
+                }}
+            />
         </div >
     )
 }
