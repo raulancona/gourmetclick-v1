@@ -138,27 +138,33 @@ export async function createOrder(orderData) {
 
     const finalStatus = (!activeSession && isPublicOrder) ? 'pending' : (payload.status || 'pending')
 
+    // audit_log is internal — public (anon) orders skip it to avoid 401 on SELECT after INSERT
+    const auditEntry = isPublicOrder ? undefined : [{
+        action: 'CREATED',
+        timestamp: new Date().toISOString(),
+        user: 'Sistema/Staff',
+        details: 'Orden creada'
+    }]
+
     const finalPayload = {
         ...payload,
         sesion_caja_id: activeSession?.id || null,
         restaurant_id: searchTenantId,
-        user_id: payload.user_id || activeSession?.empleado_id || searchTenantId, // Fallback robusto que respete FK
+        user_id: payload.user_id || activeSession?.empleado_id || searchTenantId,
         status: finalStatus,
-        audit_log: [{
-            action: 'CREATED',
-            timestamp: new Date().toISOString(),
-            user: isPublicOrder ? (payload.customer_name || 'Cliente') : 'Sistema/Staff',
-            details: 'Orden creada'
-        }]
+        ...(auditEntry ? { audit_log: auditEntry } : {})
     }
 
     console.log('📦 Processed Payload:', finalPayload)
 
     try {
+        // Public orders use minimal select to avoid RLS issues on audit_log column
+        const selectFields = isPublicOrder ? 'id, folio, tracking_id, status' : '*'
+
         const { data, error } = await supabase
             .from('orders')
             .insert([finalPayload])
-            .select()
+            .select(selectFields)
             .single()
 
         if (error) {
