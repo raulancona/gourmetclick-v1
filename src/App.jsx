@@ -24,6 +24,7 @@ import { TrackingPage } from './pages/tracking'
 import { PublicMenuPage } from './pages/public-menu'
 import { PublicLinkCardPage } from './pages/public-link-card'
 import { Toaster } from 'sonner'
+import { PwaInstallButton } from './components/pwa-install-button'
 
 function App() {
   return (
@@ -74,6 +75,7 @@ function App() {
         </AuthProvider>
       </BrowserRouter>
       <Toaster position="top-right" richColors />
+      <PwaInstallButton />
     </ThemeProvider>
   )
 }
