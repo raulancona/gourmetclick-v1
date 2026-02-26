@@ -4,7 +4,7 @@ import {
     LayoutDashboard, UtensilsCrossed, FolderTree, ClipboardList,
     Settings, LogOut, Calculator, ChefHat, Home, Grid, Package,
     Sun, Moon, Globe, BarChart3, Receipt, Lock, ChevronLeft, ChevronRight,
-    PanelLeftClose, PanelLeftOpen
+    PanelLeftClose, PanelLeftOpen, Users
 } from 'lucide-react'
 import { useAuth } from '../auth/auth-context'
 import { useTerminal } from '../auth/terminal-context'
@@ -39,6 +39,7 @@ const NAV_GROUPS = [
     {
         label: 'Config',
         items: [
+            { name: 'Staff', href: '/staff', icon: Users, roles: ['admin'] },
             { name: 'Settings', href: '/settings', icon: Settings, roles: ['admin'] },
         ]
     }

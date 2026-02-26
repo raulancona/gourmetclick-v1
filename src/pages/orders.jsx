@@ -27,7 +27,7 @@ export function OrdersPage() {
     const queryClient = useQueryClient()
 
     // UI State
-    const [activeTab, setActiveTab] = useState('activas') // 'activas' | 'historial'
+    const [activeTab, setActiveTab] = useState('activas') // 'activas' | 'caja' | 'historial'
     const [searchTerm, setSearchTerm] = useState('')
     const [selectedKpi, setSelectedKpi] = useState(null)
     const [selectedOrder, setSelectedOrder] = useState(null)
@@ -48,25 +48,40 @@ export function OrdersPage() {
         refetchInterval: 8_000,
     })
 
-    // ─── History Orders Query ─────────────────────────────────────────────────
+    // ─── Caja Orders Query (ALL uncut delivered/cancelled) ────────────────
+    const { data: cajaOrdersRaw, isLoading: isLoadingCaja, refetch: refetchCaja } = useQuery({
+        queryKey: ['orders-caja', restaurantId],
+        queryFn: () => getOrders(restaurantId, {
+            includeClosed: true,
+            pageSize: 500,
+            statuses: ['delivered', 'cancelled'],
+            cashCutFilter: 'unpaid'  // NO date filter: all time uncut orders
+        }),
+        enabled: !!restaurantId && activeTab === 'caja',
+        refetchInterval: 15_000,
+    })
+
+    // ─── History Orders Query (Formally cut orders ONLY, paginated) ────────
     const { data: historyOrdersRaw, isLoading: isLoadingHistory, refetch: refetchHistory } = useQuery({
         queryKey: ['orders-history', restaurantId, historyPage],
         queryFn: () => getOrders(restaurantId, {
             includeClosed: true,
             page: historyPage,
             pageSize: 50,
-            statuses: ['delivered', 'cancelled']
+            statuses: ['delivered', 'cancelled'],
+            cashCutFilter: 'paid'  // Only orders with a cash_cut_id
         }),
         enabled: !!restaurantId && activeTab === 'historial',
         refetchInterval: 15_000,
     })
 
-    const allOrders = activeTab === 'activas' ? (activeOrdersRaw?.data || []) : (historyOrdersRaw?.data || [])
+    const allOrders = activeTab === 'activas' ? (activeOrdersRaw?.data || []) : activeTab === 'caja' ? (cajaOrdersRaw?.data || []) : (historyOrdersRaw?.data || [])
     const totalHistoryCount = historyOrdersRaw?.count || 0
-    const isLoading = activeTab === 'activas' ? isLoadingActive : isLoadingHistory
+    const isLoading = activeTab === 'activas' ? isLoadingActive : activeTab === 'caja' ? isLoadingCaja : isLoadingHistory
 
     const refetchAll = () => {
         refetchActive()
+        refetchCaja()
         refetchHistory()
     }
 
@@ -129,14 +144,9 @@ export function OrdersPage() {
                 order.id?.toLowerCase().includes(searchTerm.toLowerCase()) ||
                 String(order.folio || '').includes(searchTerm)
 
-            const isActiveStatus = ['pending', 'confirmed', 'preparing', 'ready', 'on_the_way'].includes(order.status)
-            const isHistoryStatus = ['delivered', 'cancelled'].includes(order.status)
-
-            const matchesTab = activeTab === 'activas' ? isActiveStatus : isHistoryStatus
-
-            return matchesSearch && matchesTab
+            return matchesSearch
         })
-    }, [allOrders, searchTerm, activeTab])
+    }, [allOrders, searchTerm])
 
     // ─── Mutations ────────────────────────────────────────────────────────────
     const getUserName = () => activeEmployee?.nombre || user?.email || 'Sistema'
@@ -212,11 +222,16 @@ export function OrdersPage() {
                 { label: 'Pendientes', value: stats.pending, color: '#F59E0B', icon: Clock },
                 { label: 'Activos', value: stats.active, color: '#3B82F6', icon: ChefHat },
             ]
+        } else if (activeTab === 'caja') {
+            return [
+                { label: 'Faltan de Corte', value: (allOrders.filter(o => o.status === 'delivered').length) || 0, color: '#F59E0B', icon: Lock },
+                { label: 'Canceladas Hoy', value: (allOrders.filter(o => o.status === 'cancelled').length) || 0, color: '#EF4444', icon: XCircle },
+                { label: 'Ingreso Estimado', value: formatCurrency(allOrders.filter(o => o.status === 'delivered').reduce((sum, o) => sum + (parseFloat(o.total) || 0), 0)), color: '#10B981', icon: CreditCard },
+            ]
         } else {
             return [
-                { label: 'Completadas', value: stats.delivered, color: '#22C55E', icon: CheckCircle2 },
-                { label: 'Desperdicio/Cancel.', value: (allOrders.filter(o => o.status === 'cancelled').length) || 0, color: '#EF4444', icon: XCircle },
-                { label: 'Ingresos (Histórico)', value: formatCurrency(stats.revenue || 0), color: '#10B981', icon: CreditCard },
+                { label: 'Completadas (Histórico)', value: stats.delivered, color: '#22C55E', icon: CheckCircle2 },
+                { label: 'Ingresos Históricos', value: formatCurrency(stats.revenue || 0), color: '#10B981', icon: Archive },
             ]
         }
     }
@@ -253,8 +268,8 @@ export function OrdersPage() {
                 </Button>
             </div>
 
-            {/* Dual Tabs */}
-            <div className="flex gap-2 p-1.5 bg-muted/50 rounded-2xl mb-6">
+            {/* Triple Tabs */}
+            <div className="flex flex-col sm:flex-row gap-2 p-1.5 bg-muted/50 rounded-2xl mb-6">
                 <button
                     onClick={() => setActiveTab('activas')}
                     className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl font-black text-sm transition-all ${activeTab === 'activas'
@@ -264,6 +279,16 @@ export function OrdersPage() {
                 >
                     <Flame className={`w-4 h-4 ${activeTab === 'activas' ? 'text-orange-500' : ''}`} />
                     Operación Activa
+                </button>
+                <button
+                    onClick={() => setActiveTab('caja')}
+                    className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl font-black text-sm transition-all ${activeTab === 'caja'
+                        ? 'bg-background shadow-md text-foreground scale-[1.01]'
+                        : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+                        }`}
+                >
+                    <Lock className={`w-4 h-4 ${activeTab === 'caja' ? 'text-amber-500' : ''}`} />
+                    Caja (Por Liquidar)
                 </button>
                 <button
                     onClick={() => setActiveTab('historial')}
@@ -301,9 +326,9 @@ export function OrdersPage() {
             )}
 
             {/* View Header / Search */}
-            <div className="flex items-center justify-between gap-4 mb-4">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-4">
                 <h2 className="text-xl font-black text-foreground">
-                    {activeTab === 'activas' ? 'Atención en Curso' : 'Órdenes Procesadas'}
+                    {activeTab === 'activas' ? 'Atención en Curso' : activeTab === 'caja' ? 'Entregado / Esperando Corte' : 'Auditoría Histórica'}
                 </h2>
                 <div className="relative w-full sm:w-72">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
@@ -327,10 +352,10 @@ export function OrdersPage() {
                     <div className="text-center py-20 bg-card rounded-2xl border border-border/50 shadow-sm mt-4">
                         <Package className="w-16 h-16 mx-auto mb-4 text-muted-foreground/20" />
                         <p className="text-foreground font-black text-xl mb-1">
-                            {searchTerm ? 'No se encontraron resultados' : (activeTab === 'activas' ? 'No hay trabajo pendiente' : 'El historial está vacío')}
+                            {searchTerm ? 'No se encontraron resultados' : (activeTab === 'activas' ? 'No hay trabajo pendiente' : activeTab === 'caja' ? 'No hay dinero pendiente de corte' : 'El historial está vacío')}
                         </p>
                         <p className="text-muted-foreground/80 text-sm font-medium">
-                            {searchTerm ? 'Intenta buscar con otros términos.' : (activeTab === 'activas' ? '¡Excelente trabajo! Las nuevas órdenes aparecerán aquí.' : 'Aún no hay órdenes completadas hoy.')}
+                            {searchTerm ? 'Intenta buscar con otros términos.' : (activeTab === 'activas' ? '¡Excelente trabajo! Las nuevas órdenes aparecerán aquí.' : activeTab === 'caja' ? 'Todo está liquidado formalmente.' : 'Aún no hayórdenes cortadas.')}
                         </p>
                     </div>
                 ) : (

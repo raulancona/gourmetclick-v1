@@ -307,7 +307,7 @@ export function DashboardPage() {
                         <span className="text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest">Ventas</span>
                     </div>
                     <div className="text-2xl font-black text-gray-900 dark:text-white tracking-tight">{formatCurrency(stats?.revenue || 0)}</div>
-                    <p className="text-[11px] text-gray-400 dark:text-gray-500">{stats?.total || 0} órdenes</p>
+                    <p className="text-[11px] text-gray-400 dark:text-gray-500">{stats?.delivered || 0} órdenes cobradas</p>
                 </div>
 
                 {/* Gastos */}

@@ -67,22 +67,22 @@ export function OrderDetailModal({ order, onClose, onUpdateStatus, onUpdateOrder
                                     <Lock className="w-3 h-3" />
                                     Incluida en Corte <span className="font-mono">#{order.cash_cut_id.slice(0, 8)}</span>
                                 </span>
-                            ) : order.fecha_cierre ? (
-                                <span className="flex items-center gap-1.5 text-stone-600 dark:text-stone-400 font-bold bg-stone-50 dark:bg-stone-900/30 px-2 py-1 rounded-lg border border-stone-200 dark:border-stone-700 w-fit mt-1 text-xs">
-                                    <Lock className="w-3 h-3" />
-                                    Cerrada en Turno <span className="font-mono text-[10px] ml-1 opacity-70">#{order.sesion_caja_id?.slice(0, 8) || 'N/A'}</span>
+                            ) : order.status === 'cancelled' ? (
+                                <span className="flex items-center gap-1.5 text-red-600 dark:text-red-400 font-bold bg-red-50 dark:bg-red-900/30 px-2 py-1 rounded-lg border border-red-200 dark:border-red-700 w-fit mt-1 text-xs">
+                                    <X className="w-3 h-3" />
+                                    Cancelada
                                 </span>
                             ) : order.status === 'delivered' ? (
                                 <span className="flex items-center gap-1 text-amber-600 dark:text-amber-400 font-bold bg-amber-50 dark:bg-amber-900/20 px-2 py-0.5 rounded-lg border border-amber-200/50 w-fit mt-1 text-xs">
-                                    <Lock className="w-3 h-3" />
-                                    ⏳ Pendiente de Corte
+                                    <CheckCircle2 className="w-3 h-3" />
+                                    Entregada - Pendiente de Corte
                                 </span>
                             ) : null}
 
                             {order.fecha_cierre && (
-                                <span className="flex items-center gap-1 text-green-600 dark:text-green-400 font-medium">
+                                <span className="flex items-center gap-1 text-green-600 dark:text-green-400 font-medium mt-1 text-xs">
                                     <CheckCircle2 className="w-3 h-3" />
-                                    Cerrada: {new Date(order.fecha_cierre).toLocaleString('es-MX', { dateStyle: 'medium', timeStyle: 'short' })}
+                                    {order.status === 'cancelled' ? 'Cancelada:' : 'Completada:'} {new Date(order.fecha_cierre).toLocaleString('es-MX', { dateStyle: 'medium', timeStyle: 'short' })}
                                 </span>
                             )}
                             {/* Only allow POS-edit for active (not closed by cashier/cancelled/delivered) orders.
@@ -375,11 +375,13 @@ export function OrderDetailModal({ order, onClose, onUpdateStatus, onUpdateOrder
                                             </div>
                                         )}
                                     {/* Closed badge for closed orders */}
-                                    {order.fecha_cierre && (
+                                    {(order.fecha_cierre || order.cash_cut_id) && (
                                         <div className="bg-muted/50 border border-border rounded-xl p-4 text-center mt-4">
-                                            <p className="text-sm font-bold text-muted-foreground">✅ Orden Cerrada</p>
+                                            <p className="text-sm font-bold text-muted-foreground">
+                                                {order.cash_cut_id ? '✅ Orden Liquidada en Corte' : order.status === 'cancelled' ? '❌ Orden Cancelada' : '✅ Orden Completada'}
+                                            </p>
                                             <p className="text-xs text-muted-foreground mt-1 mb-3">
-                                                {isAdmin ? 'Como admin puedes editar los datos o reabrirla.' : 'Esta orden fue liquidada en el cierre de turno o cancelada.'}
+                                                {order.cash_cut_id ? 'Esta orden ya fue liquidada en un cierre de caja.' : isAdmin ? 'Como admin puedes reabrirla.' : 'Esta orden ya fue completada o cancelada y está pendiente de corte.'}
                                             </p>
                                             {isAdmin && (
                                                 <Button

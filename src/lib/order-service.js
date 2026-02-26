@@ -33,18 +33,18 @@ function getNextStatuses(current) {
 
 export { ORDER_STATUSES, PAYMENT_METHODS, getNextStatuses }
 
-export async function getOrders(restaurantId, { includeClosed = false, startDate = null, endDate = null, page = 1, pageSize = 50, statuses = null, paymentMethod = null } = {}) {
-    // When hiding closed orders, we exclude by status AND by sesion_caja_id of closed sessions.
-    // This prevents orphan orders from past shifts appearing in the active cashier view.
-    let closedSessionIds = []
+export async function getOrders(restaurantId, { includeClosed = false, startDate = null, endDate = null, page = 1, pageSize = 50, statuses = null, paymentMethod = null, cashCutFilter = 'all' } = {}) {
+    // When hiding closed orders, we filter by active sessions instead of excluding closed sessions.
+    // This prevents the URL from becoming too long when there are hundreds of closed sessions.
+    let activeSessionIds = []
     if (!includeClosed) {
-        const { data: closedSessions } = await supabase
+        const { data: activeSessions } = await supabase
             .from('sesiones_caja')
             .select('id')
             .eq('restaurante_id', restaurantId)
-            .eq('estado', 'cerrada')
+            .eq('estado', 'abierta')
 
-        closedSessionIds = (closedSessions || []).map(s => s.id)
+        activeSessionIds = (activeSessions || []).map(s => s.id)
     }
 
     const from = (page - 1) * pageSize
@@ -58,10 +58,11 @@ export async function getOrders(restaurantId, { includeClosed = false, startDate
         .range(from, to)
 
     if (!includeClosed) {
-        // Exclude orders belonging to closed sessions, EXCEPT if they are still active.
-        // This ensures "ghost orders" are always visible to the staff so they can be managed.
-        if (closedSessionIds.length > 0) {
-            query = query.or(`sesion_caja_id.not.in.(${closedSessionIds.join(',')}),sesion_caja_id.is.null,status.in.(pending,confirmed,preparing,ready,on_the_way)`)
+        // Include orders belonging to active sessions, or ghost/active orders, or null sessions.
+        if (activeSessionIds.length > 0) {
+            query = query.or(`sesion_caja_id.in.(${activeSessionIds.join(',')}),sesion_caja_id.is.null,status.in.(pending,confirmed,preparing,ready,on_the_way)`)
+        } else {
+            query = query.or(`sesion_caja_id.is.null,status.in.(pending,confirmed,preparing,ready,on_the_way)`)
         }
     }
 
@@ -76,6 +77,11 @@ export async function getOrders(restaurantId, { includeClosed = false, startDate
     }
     if (paymentMethod) {
         query = query.eq('payment_method', paymentMethod)
+    }
+    if (cashCutFilter === 'unpaid') {
+        query = query.is('cash_cut_id', null)
+    } else if (cashCutFilter === 'paid') {
+        query = query.not('cash_cut_id', 'is', null)
     }
 
     const { data, error, count } = await query
@@ -289,11 +295,11 @@ export async function getOrderStats(restaurantId, { cashCutId = null, filterBySh
             .filter(o => o.status === 'delivered')
             .reduce((s, o) => s + parseFloat(o.total || 0), 0),
 
-        // Distribution of order types (all non-cancelled)
+        // Distribution of order types (only delivered/finalized sales)
         orderTypes: {
-            delivery: data.filter(o => o.order_type === 'delivery').length,
-            pickup: data.filter(o => o.order_type === 'pickup').length,
-            dine_in: data.filter(o => o.order_type === 'dine_in').length,
+            delivery: data.filter(o => o.order_type === 'delivery' && o.status === 'delivered').length,
+            pickup: data.filter(o => o.order_type === 'pickup' && o.status === 'delivered').length,
+            dine_in: data.filter(o => o.order_type === 'dine_in' && o.status === 'delivered').length,
         },
 
         // Most used payment method (from delivered sales)
@@ -321,7 +327,7 @@ export async function getSalesAnalytics(restaurantId, { cashCutId = null, filter
         .from('orders')
         .select('items, total, created_at, customer_phone, status')
         .or(`restaurant_id.eq.${restaurantId},user_id.eq.${restaurantId}`)
-        .neq('status', 'cancelled')
+        .eq('status', 'delivered')
 
     if (sessionId) {
         query = query.eq('sesion_caja_id', sessionId)
