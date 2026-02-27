@@ -32,7 +32,7 @@ export function RegisterForm() {
         try {
             await signUp(email, password)
             toast.success('Cuenta creada exitosamente')
-            navigate('/dashboard')
+            navigate('/onboarding')
         } catch (error) {
             toast.error(error.message || 'Error al crear la cuenta')
         } finally {

@@ -1,11 +1,13 @@
 import { Navigate, useLocation } from 'react-router-dom'
 import { useAuth } from './auth-context'
+import { useTenant } from './tenant-context'
 import { useTerminal } from './terminal-context'
 import { toast } from 'sonner'
 import { useEffect } from 'react'
 
 export function ProtectedRoute({ children }) {
-    const { user, loading } = useAuth()
+    const { user, loading: authLoading } = useAuth()
+    const { tenant, loading: tenantLoading } = useTenant()
     const { activeEmployee } = useTerminal()
     const location = useLocation()
 
@@ -21,7 +23,7 @@ export function ProtectedRoute({ children }) {
         }
     }, [activeEmployee, location.pathname])
 
-    if (loading) {
+    if (authLoading || tenantLoading) {
         return (
             <div className="flex h-screen items-center justify-center">
                 <div className="text-muted-foreground">Cargando...</div>
@@ -31,6 +33,11 @@ export function ProtectedRoute({ children }) {
 
     if (!user && !activeEmployee) {
         return <Navigate to="/login" replace />
+    }
+
+    // Authenticated but no restaurant configured → onboarding
+    if (user && !tenant && !activeEmployee) {
+        return <Navigate to="/onboarding" replace />
     }
 
     // Si hay un empleado logueado Y NO es admin, verificar ruta

@@ -14,6 +14,7 @@ import { SettingsPage } from './pages/settings'
 import { LinkCardConfigPage as MenuLinksPage } from './pages/link-card-config'
 import { LoginPage } from './pages/login'
 import { RegisterPage } from './pages/register'
+import { OnboardingPage } from './pages/onboarding'
 import { ThemeProvider } from './components/theme-provider'
 import { CashClosingPage } from './pages/cash-closing'
 import { ExpensesPage } from './pages/expenses'
@@ -37,6 +38,7 @@ function App() {
                 {/* Auth Routes */}
                 <Route path="/login" element={<LoginPage />} />
                 <Route path="/register" element={<RegisterPage />} />
+                <Route path="/onboarding" element={<ProtectedRoute><OnboardingPage /></ProtectedRoute>} />
 
                 {/* Operational Terminal */}
                 <Route path="/terminal" element={<ProtectedRoute><TerminalAccessPage /></ProtectedRoute>} />
