@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { CompanyProfileForm } from '../features/settings/company-profile-form'
 import { MenuAppearanceForm } from '../features/settings/menu-appearance-form'
 import { MobilePreview } from '../features/settings/mobile-preview'
+import { TerminalAccessCard } from '../features/settings/terminal-access-card'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs'
 import { Palette, Building2, Smartphone } from 'lucide-react'
@@ -39,14 +40,15 @@ export function SettingsPage() {
                         <div className="lg:col-span-2">
                             <CompanyProfileForm />
                         </div>
-                        <div className="space-y-6">
+                        <div className="space-y-4">
+                            <TerminalAccessCard />
                             <Card className="border-none shadow-sm bg-primary/5 border-l-4 border-l-primary">
                                 <CardHeader>
                                     <CardTitle className="text-sm">Consejo Pro</CardTitle>
                                 </CardHeader>
                                 <CardContent>
                                     <p className="text-xs text-muted-foreground leading-relaxed">
-                                        Completa la información de tu empresa para que tus clientes puedan contactarte fácilmente vía WhatsApp y encontrar tu ubicación física.
+                                        Comparte la URL de tu terminal con tu equipo para que puedan acceder desde cualquier dispositivo con su PIN.
                                     </p>
                                 </CardContent>
                             </Card>

@@ -502,15 +502,25 @@ export function OrderDetailModal({ order, onClose, onUpdateStatus, onUpdateOrder
                         </div>
                     )}
 
-                    {/* Delete */}
-                    {!isEditing && (!isClosed || isAdmin) && (
+                    {/* Delete — ADMIN ONLY */}
+                    {!isEditing && isAdmin && (
                         <div className="pt-4 border-t border-border">
+                            {isClosed && (
+                                <p className="text-[11px] text-amber-600 dark:text-amber-400 font-bold text-center mb-2 bg-amber-500/10 rounded-lg py-1.5 px-3">
+                                    ⚠️ Esta orden está en el corte #{order.cash_cut_id?.slice(0, 8)}. Eliminarla afectará la integridad del corte.
+                                </p>
+                            )}
                             <button
-                                onClick={() => { if (confirm('¿Eliminar esta orden? Esta acción no se puede deshacer.')) onDelete() }}
+                                onClick={() => {
+                                    const msg = isClosed
+                                        ? `⚠️ ADVERTENCIA: Esta orden está incluida en un corte de caja (#${order.cash_cut_id?.slice(0, 8)}). ¿Seguro que deseas eliminarla? Esta acción no se puede deshacer.`
+                                        : '¿Eliminar esta orden? Esta acción no se puede deshacer.'
+                                    if (confirm(msg)) onDelete()
+                                }}
                                 className="w-full py-3 rounded-xl text-sm font-bold text-red-500 bg-red-500/10 hover:bg-red-500/20 transition-colors flex items-center justify-center gap-2"
                             >
                                 <Trash2 className="w-4 h-4" />
-                                {isClosed && isAdmin ? 'Eliminar (Admin)' : 'Eliminar Orden'}
+                                {isClosed ? '🔒 Eliminar del Historial (Admin)' : 'Eliminar Orden'}
                             </button>
                         </div>
                     )}

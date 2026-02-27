@@ -251,17 +251,36 @@ export function OrdersPage() {
 
     const handleBulkDelete = async () => {
         if (selectedIds.size === 0) return
-        if (!confirm(`¿Eliminar ${selectedIds.size} órdenes seleccionadas? Esta acción no se puede deshacer.`)) return
+
+        // Split protected (in cash cut) vs deletable
+        const safeOrders = filteredOrders.filter(o => selectedIds.has(o.id) && !o.cash_cut_id)
+        const protectedOrders = filteredOrders.filter(o => selectedIds.has(o.id) && !!o.cash_cut_id)
+
+        const msg = protectedOrders.length > 0
+            ? `¿Eliminar ${safeOrders.length} órdenes? ⚠️ ${protectedOrders.length} orden(es) en corte de caja NO se eliminarán.`
+            : `¿Eliminar ${safeOrders.length} órdenes seleccionadas? Esta acción no se puede deshacer.`
+
+        if (!confirm(msg)) return
+
+        if (safeOrders.length === 0) {
+            toast.warning('Ninguna de las órdenes seleccionadas puede eliminarse — todas están en un corte de caja.')
+            return
+        }
+
         setIsBulkProcessing(true)
-        const ids = Array.from(selectedIds)
         let success = 0, failed = 0
-        for (const id of ids) {
-            try { await deleteOrder(id, restaurantId); success++ } catch { failed++ }
+        for (const order of safeOrders) {
+            try { await deleteOrder(order.id, restaurantId); success++ } catch { failed++ }
         }
         setIsBulkProcessing(false)
         clearSelection()
         invalidateAll()
-        toast.success(`${success} órdenes eliminadas${failed > 0 ? ` · ${failed} fallaron` : ''}`)
+
+        if (protectedOrders.length > 0) {
+            toast.warning(`${success} eliminadas · ${protectedOrders.length} protegidas (en corte de caja)`, { duration: 6000 })
+        } else {
+            toast.success(`${success} órdenes eliminadas${failed > 0 ? ` · ${failed} fallaron` : ''}`)
+        }
     }
 
     const getTimeAgo = (dateStr) => {
@@ -273,7 +292,7 @@ export function OrdersPage() {
         return hrs < 24 ? `${hrs}h` : `${Math.floor(hrs / 24)}d`
     }
 
-    const isAdmin = !activeEmployee || activeEmployee.rol === 'admin'
+    const isAdmin = !activeEmployee || activeEmployee.rol === 'admin' || activeEmployee.rol === 'gerente'
     const PAYMENT_LABELS = PAYMENT_METHODS
     const allSelected = filteredOrders.length > 0 && selectedIds.size === filteredOrders.length
     const someSelected = selectedIds.size > 0 && selectedIds.size < filteredOrders.length

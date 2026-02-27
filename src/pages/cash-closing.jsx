@@ -34,7 +34,7 @@ export function CashClosingPage() {
     const [selectedOrder, setSelectedOrder] = useState(null)
 
     // Admin if no terminal session (direct owner) or terminal role is admin
-    const isAdmin = !activeEmployee || activeEmployee.rol === 'admin'
+    const isAdmin = !activeEmployee || activeEmployee.rol === 'admin' || activeEmployee.rol === 'gerente'
 
     const { data: orders = [], isLoading: loadingOrders } = useQuery({
         queryKey: ['unclosed-orders', tenant?.id],

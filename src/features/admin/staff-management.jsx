@@ -131,8 +131,10 @@ export function StaffManagement() {
                                 onChange={e => setFormData({ ...formData, rol: e.target.value })}
                                 className="w-full h-11 px-4 rounded-xl border border-primary/20 bg-background font-bold text-sm outline-none focus:ring-2 focus:ring-primary/20"
                             >
-                                <option value="mesero">Mesero (Solo POS)</option>
-                                <option value="cajero">Cajero (POS, Órdenes, Caja)</option>
+                                <option value="mesero">Mesero — Solo POS</option>
+                                <option value="cajero">Cajero — POS, Órdenes, Caja</option>
+                                <option value="gerente">Gerente — Permisos completos</option>
+                                <option value="admin">Admin — Permisos completos</option>
                             </select>
                         </div>
                         <Button
@@ -156,9 +158,11 @@ export function StaffManagement() {
                             <div>
                                 <h4 className="font-bold text-foreground leading-tight">{member.nombre}</h4>
                                 <div className="flex items-center gap-2 mt-0.5">
-                                    <span className={`text-[10px] font-black px-2 py-0.5 rounded-full uppercase tracking-widest ${member.rol === 'cajero' ? 'bg-amber-100 text-amber-600' : 'bg-blue-100 text-blue-600'
+                                    <span className={`text-[10px] font-black px-2 py-0.5 rounded-full uppercase tracking-widest ${member.rol === 'cajero' ? 'bg-amber-100 text-amber-600 dark:bg-amber-900/20 dark:text-amber-400'
+                                            : member.rol === 'gerente' || member.rol === 'admin' ? 'bg-primary/10 text-primary'
+                                                : 'bg-blue-100 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400'
                                         }`}>
-                                        {member.rol}
+                                        {member.rol === 'gerente' ? '⭐ Gerente' : member.rol === 'admin' ? '🔑 Admin' : member.rol}
                                     </span>
                                     <span className="text-[10px] text-muted-foreground font-mono font-bold">PIN: ****</span>
                                 </div>

@@ -262,7 +262,22 @@ export async function updateOrder(orderId, updates, restaurantId, userName = 'Si
     return data
 }
 
-export async function deleteOrder(orderId, restaurantId) {
+export async function deleteOrder(orderId, restaurantId, { force = false } = {}) {
+    // Guard: never delete orders that are part of a cash cut (historial)
+    const { data: order, error: fetchError } = await supabase
+        .from('orders')
+        .select('cash_cut_id, status, folio')
+        .eq('id', orderId)
+        .single()
+
+    if (fetchError) throw fetchError
+
+    if (order?.cash_cut_id && !force) {
+        throw new Error(
+            `La orden #${order.folio || orderId.slice(0, 6)} está incluida en un corte de caja y no puede eliminarse. Contacta a tu administrador.`
+        )
+    }
+
     const { error } = await supabase
         .from('orders')
         .delete()
