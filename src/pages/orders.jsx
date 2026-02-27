@@ -128,10 +128,10 @@ export function OrdersPage() {
 
     const refetchAll = () => { refetchActive(); refetchCaja(); refetchHistory() }
 
-    // ─── Stats Query ─────────────────────────────────────────────────────────
+    // ─── Stats Query — must match same date window as list queries ───────────
     const { data: stats } = useQuery({
-        queryKey: ['order-stats-live', restaurantId],
-        queryFn: () => getOrderStats(restaurantId),
+        queryKey: ['order-stats-live', restaurantId, startDate, endDate],
+        queryFn: () => getOrderStats(restaurantId, { startDate, endDate }),
         enabled: !!restaurantId,
         refetchInterval: 10_000,
     })
@@ -311,8 +311,8 @@ export function OrdersPage() {
             { label: 'Ingreso Pendiente', value: formatCurrency(stats.cajaSection?.pendingRevenue ?? 0), color: '#10B981', icon: CreditCard },
         ]
         return [
-            { label: 'Completadas', value: stats.delivered, color: '#22C55E', icon: CheckCircle2 },
-            { label: 'Ingresos Históricos', value: formatCurrency(stats.revenue || 0), color: '#10B981', icon: Archive },
+            { label: 'En Corte de Caja', value: stats.historialSection?.total ?? 0, color: '#22C55E', icon: CheckCircle2, kpiId: 'historial-total' },
+            { label: 'Ingresos Confirmados', value: formatCurrency(stats.historialSection?.revenue ?? 0), color: '#10B981', icon: Archive, kpiId: 'historial-revenue' },
         ]
     }
     const tabStats = getTabStats()

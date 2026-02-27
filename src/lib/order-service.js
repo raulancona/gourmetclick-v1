@@ -290,7 +290,7 @@ export async function deleteOrder(orderId, restaurantId, { force = false } = {})
 export async function getOrderStats(restaurantId, { cashCutId = null, filterByShift = false, startDate = null, endDate = null, sessionId = null } = {}) {
     let query = supabase
         .from('orders')
-        .select('status, total, order_type, payment_method, created_at')
+        .select('status, total, order_type, payment_method, created_at, cash_cut_id')
         .or(`restaurant_id.eq.${restaurantId},user_id.eq.${restaurantId}`)
 
     if (sessionId) {
@@ -326,6 +326,13 @@ export async function getOrderStats(restaurantId, { cashCutId = null, filterBySh
             cancelledUncut: data.filter(o => o.status === 'cancelled' && !o.cash_cut_id).length,
             pendingRevenue: data
                 .filter(o => o.status === 'delivered' && !o.cash_cut_id)
+                .reduce((s, o) => s + parseFloat(o.total || 0), 0),
+        },
+        // Historial: ONLY orders formally closed in a cash cut
+        historialSection: {
+            total: data.filter(o => !!o.cash_cut_id).length,
+            revenue: data
+                .filter(o => !!o.cash_cut_id && o.status === 'delivered')
                 .reduce((s, o) => s + parseFloat(o.total || 0), 0),
         },
         revenue: data
@@ -529,26 +536,16 @@ export async function getSalesAnalytics(restaurantId, { cashCutId = null, filter
 }
 
 /**
- * Fetch orders pending closing (Delivered status, linked to the active session)
+ * Fetch orders pending closing — matches exactly what Por Liquidar shows:
+ * ANY order (delivered OR cancelled) without a cash_cut_id, any session.
  */
 export async function getUnclosedOrders(restaurantId) {
-    const { data: activeSession } = await supabase
-        .from('sesiones_caja')
-        .select('id, opened_at')
-        .eq('restaurante_id', restaurantId)
-        .eq('estado', 'abierta')
-        .maybeSingle()
-
-    // If no active session, no orders to show
-    if (!activeSession) return []
-
     const { data, error } = await supabase
         .from('orders')
         .select('*')
         .or(`restaurant_id.eq.${restaurantId},user_id.eq.${restaurantId}`)
-        .eq('sesion_caja_id', activeSession.id)
-        .is('cash_cut_id', null)          // ← Exclude orders already in a cut
-        .neq('status', 'cancelled')
+        .in('status', ['delivered', 'cancelled'])
+        .is('cash_cut_id', null)
         .order('created_at', { ascending: false })
 
     if (error) throw error
@@ -761,7 +758,7 @@ export async function openSession(restaurantId, employeeId, initialAmount) {
 }
 
 export async function closeSession(sessionId, montoReal, userId, closedByName, expectedBalance) {
-    // 1. Get session details and financial summary
+    // 1. Get session details
     const { data: session, error: sessionError } = await supabase
         .from('sesiones_caja')
         .select('*')
@@ -770,7 +767,9 @@ export async function closeSession(sessionId, montoReal, userId, closedByName, e
 
     if (sessionError) throw sessionError
 
-    // 2. Calculate totals for THIS session
+    const restaurantId = session.restaurante_id
+
+    // 2. Calculate totals for THIS session (only delivered orders contribute to revenue)
     const { data: orders, error: ordersError } = await supabase
         .from('orders')
         .select('total, payment_method')
@@ -786,7 +785,7 @@ export async function closeSession(sessionId, montoReal, userId, closedByName, e
 
     if (gastosError) throw gastosError
 
-    // Security: Recalculate everything server-side using ONLY cash payments for physical balance
+    // Security: Recalculate server-side using ONLY cash payments for physical balance
     const cashSales = (orders || [])
         .filter(o => (o.payment_method || 'cash') === 'cash')
         .reduce((sum, o) => sum + (parseFloat(o.total) || 0), 0)
@@ -796,7 +795,7 @@ export async function closeSession(sessionId, montoReal, userId, closedByName, e
     const finalExpectedBalance = parseFloat(session.fondo_inicial || 0) + cashSales - totalExpenses
     const diferencia = parseFloat(montoReal) - finalExpectedBalance
 
-    // 3. Update session
+    // 3. Close the session
     const { data: closedSession, error: updateError } = await supabase
         .from('sesiones_caja')
         .update({
@@ -813,6 +812,20 @@ export async function closeSession(sessionId, montoReal, userId, closedByName, e
         .single()
 
     if (updateError) throw updateError
+
+    // 4. *** CRITICAL: Create cash_cuts record and stamp ALL Por Liquidar orders ***
+    //    RPC (SECURITY DEFINER) bypasses RLS, creates the cash_cuts record,
+    //    and stamps delivered + cancelled orders with the new cut's ID.
+    const { error: stampError } = await supabase.rpc('stamp_cash_cut_orders', {
+        p_session_id: sessionId,
+        p_restaurant_id: restaurantId,
+        p_user_id: userId || null
+    })
+
+    if (stampError) {
+        console.error('Error stamping cash_cut_id on orders:', stampError)
+        // Non-fatal: session is already closed, log and continue
+    }
 
     return closedSession
 }
