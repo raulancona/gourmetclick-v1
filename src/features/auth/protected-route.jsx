@@ -36,7 +36,7 @@ export function ProtectedRoute({ children }) {
     }
 
     // Authenticated but no restaurant configured → onboarding
-    if (user && !tenant && !activeEmployee) {
+    if (user && !tenant && !activeEmployee && location.pathname !== '/onboarding') {
         return <Navigate to="/onboarding" replace />
     }
 
