@@ -1,113 +1,124 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useTenant } from '../features/auth/tenant-context'
-import { getSessionsHistory } from '../lib/order-service'
+import { getExecutiveSummary } from '../lib/reports-service'
 import { formatCurrency } from '../lib/utils'
-import {
-    Loader2, CheckCircle2, TrendingUp, TrendingDown,
-    Clock, User, Shield, Download, ClipboardList
-} from 'lucide-react'
-import { Button } from '../components/ui/button'
-import { CortesHistory } from '../features/cash-closing/cortes-history'
+import { DateRangePicker } from '../components/ui/date-range-picker'
+import { SalesTab } from '../features/reports/sales-tab'
+import { ExpensesTab } from '../features/reports/expenses-tab'
+import { AuditTab } from '../features/reports/audit-tab'
+import { Loader2, TrendingUp, TrendingDown, LayoutDashboard, Wallet, PiggyBank, ReceiptText } from 'lucide-react'
 
 export function ReportsPage() {
     const { tenant } = useTenant()
 
-    const { data: history = [], isLoading } = useQuery({
-        queryKey: ['sessions-history', tenant?.id],
-        queryFn: () => getSessionsHistory(tenant.id),
+    // Default: Last 7 days
+    const [dateRange, setDateRange] = useState(() => {
+        const end = new Date()
+        end.setHours(23, 59, 59, 999)
+        const start = new Date()
+        start.setDate(start.getDate() - 7)
+        start.setHours(0, 0, 0, 0)
+        return { start, end, label: 'Últimos 7 días' }
+    })
+
+    const [activeTab, setActiveTab] = useState('sales')
+
+    // Executive Summary (Top Bar)
+    const { data: summary, isLoading: loadingSummary } = useQuery({
+        queryKey: ['reports-executive-summary', tenant?.id, dateRange.start, dateRange.end],
+        queryFn: () => getExecutiveSummary(tenant.id, dateRange.start, dateRange.end),
         enabled: !!tenant?.id
     })
 
-    const closedSessions = history.filter(s => s.estado === 'cerrada')
-
-    // Audit KPIs — from closed sessions
-    const totalDeclared = closedSessions.reduce((sum, s) => sum + parseFloat(s.monto_real || 0), 0)
-    const totalExpenses = closedSessions.reduce((sum, s) => sum + parseFloat(s.total_gastos || 0), 0)
-    const totalDiff = closedSessions.reduce((sum, s) => sum + parseFloat(s.diferencia || 0), 0)
-    const totalSessions = closedSessions.length
-    const perfectCuts = closedSessions.filter(s => parseFloat(s.diferencia || 0) === 0).length
-
-    const handleExportCSV = () => {
-        if (closedSessions.length === 0) return
-
-        const headers = ['ID Sesion', 'Fecha Apertura', 'Fecha Cierre', 'Cajero', 'Fondo Inicial', 'Ventas Esperadas', 'Monto Real', 'Diferencia', 'Gastos']
-        const rows = closedSessions.map(s => [
-            s.id.slice(0, 8),
-            new Date(s.opened_at).toLocaleString('es-MX'),
-            s.closed_at ? new Date(s.closed_at).toLocaleString('es-MX') : 'N/A',
-            s.nombre_cajero || s.empleado?.nombre || 'Administrador',
-            s.fondo_inicial,
-            s.monto_esperado,
-            s.monto_real,
-            s.diferencia,
-            s.total_gastos || 0
-        ])
-
-        const csv = [headers, ...rows].map(r => r.join(',')).join('\n')
-        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
-        const url = URL.createObjectURL(blob)
-        const link = document.createElement('a')
-        link.href = url
-        link.download = `auditoria_caja_${new Date().toISOString().split('T')[0]}.csv`
-        document.body.appendChild(link)
-        link.click()
-        document.body.removeChild(link)
-    }
-
-    if (isLoading) {
-        return <div className="p-8 flex items-center justify-center min-h-[400px]"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>
-    }
-
     return (
         <div className="p-4 sm:p-8 space-y-6 max-w-7xl mx-auto pb-20">
-            {/* Header */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            {/* Header & Date Picker */}
+            <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
                 <div>
                     <h1 className="text-3xl font-black tracking-tight text-foreground flex items-center gap-2">
-                        <ClipboardList className="w-8 h-8 text-primary" />
-                        Auditoría de Caja
+                        <LayoutDashboard className="w-8 h-8 text-primary" />
+                        Panel de Reportes
                     </h1>
-                    <p className="text-muted-foreground font-medium">Bitácora de turnos y cortes de caja por cajero</p>
+                    <p className="text-muted-foreground font-medium mt-1">Visión financiera interactiva</p>
                 </div>
-                <Button
-                    onClick={handleExportCSV}
-                    disabled={closedSessions.length === 0}
-                    className="bg-primary hover:bg-primary/90 text-primary-foreground font-bold rounded-xl px-6 h-12 shadow-lg shadow-primary/20"
+
+                <div className="w-full md:w-auto">
+                    <label className="text-xs font-bold text-muted-foreground uppercase tracking-widest pl-1 mb-1 block">Filtro de Fecha</label>
+                    <DateRangePicker
+                        dateRange={dateRange}
+                        onChange={setDateRange}
+                    />
+                </div>
+            </div>
+
+            {/* Executive Summary Cards */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div className="bg-card border border-border rounded-3xl p-6 shadow-sm relative overflow-hidden group hover:border-emerald-500/30 transition-colors">
+                    <div className="absolute top-4 right-4 w-12 h-12 bg-emerald-500/10 rounded-2xl flex items-center justify-center">
+                        <TrendingUp className="w-6 h-6 text-emerald-500" />
+                    </div>
+                    <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-2">Ingresos (Ventas)</p>
+                    {loadingSummary ? (
+                        <div className="h-8 w-32 bg-muted animate-pulse rounded-lg"></div>
+                    ) : (
+                        <p className="text-3xl font-black text-foreground">{formatCurrency(summary?.totalSales)}</p>
+                    )}
+                </div>
+
+                <div className="bg-card border border-border rounded-3xl p-6 shadow-sm relative overflow-hidden group hover:border-red-500/30 transition-colors">
+                    <div className="absolute top-4 right-4 w-12 h-12 bg-red-500/10 rounded-2xl flex items-center justify-center">
+                        <TrendingDown className="w-6 h-6 text-red-500" />
+                    </div>
+                    <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-2">Egresos (Gastos)</p>
+                    {loadingSummary ? (
+                        <div className="h-8 w-32 bg-muted animate-pulse rounded-lg"></div>
+                    ) : (
+                        <p className="text-3xl font-black text-foreground">{formatCurrency(summary?.totalExpenses)}</p>
+                    )}
+                </div>
+
+                <div className="bg-primary border border-primary-foreground/10 xl:border-none rounded-3xl p-6 shadow-lg shadow-primary/20 relative overflow-hidden text-primary-foreground">
+                    <div className="absolute top-4 right-4 w-12 h-12 bg-black/10 rounded-2xl flex items-center justify-center">
+                        <PiggyBank className="w-6 h-6 text-white" />
+                    </div>
+                    <p className="text-[10px] font-black text-primary-foreground/80 uppercase tracking-widest mb-2 cursor-help" title="Ventas Entregadas menos Gastos Operativos">Beneficio Neto Estimado</p>
+                    {loadingSummary ? (
+                        <div className="h-8 w-32 bg-primary-foreground/10 animate-pulse rounded-lg"></div>
+                    ) : (
+                        <p className="text-3xl font-black text-white">{formatCurrency(summary?.netProfit)}</p>
+                    )}
+                </div>
+            </div>
+
+            {/* Tab Navigation */}
+            <div className="flex overflow-x-auto hide-scrollbar gap-2 p-1 bg-muted/40 rounded-2xl border border-border/50">
+                <button
+                    onClick={() => setActiveTab('sales')}
+                    className={`flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-xl text-sm font-bold transition-all whitespace-nowrap ${activeTab === 'sales' ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground hover:bg-background/50'}`}
                 >
-                    <Download className="w-5 h-5 mr-2" />
-                    Exportar CSV
-                </Button>
+                    <TrendingUp className="w-4 h-4" /> Ventas
+                </button>
+                <button
+                    onClick={() => setActiveTab('expenses')}
+                    className={`flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-xl text-sm font-bold transition-all whitespace-nowrap ${activeTab === 'expenses' ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground hover:bg-background/50'}`}
+                >
+                    <ReceiptText className="w-4 h-4" /> Gastos
+                </button>
+                <button
+                    onClick={() => setActiveTab('audit')}
+                    className={`flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-xl text-sm font-bold transition-all whitespace-nowrap ${activeTab === 'audit' ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground hover:bg-background/50'}`}
+                >
+                    <Wallet className="w-4 h-4" /> Auditoría de Caja
+                </button>
             </div>
 
-            {/* Audit KPI Strip */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div className="bg-card border border-border rounded-2xl p-5 shadow-sm border-l-4 border-l-primary">
-                    <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-1">Turnos Cerrados</p>
-                    <p className="text-3xl font-black text-foreground">{totalSessions}</p>
-                    <p className="text-xs text-muted-foreground mt-1">{perfectCuts} cuadres perfectos</p>
-                </div>
-                <div className="bg-card border border-border rounded-2xl p-5 shadow-sm border-l-4 border-l-amber-500">
-                    <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-1">Total Declarado</p>
-                    <p className="text-3xl font-black text-foreground">{formatCurrency(totalDeclared)}</p>
-                    <p className="text-xs text-muted-foreground mt-1">Suma de montos reales</p>
-                </div>
-                <div className="bg-card border border-border rounded-2xl p-5 shadow-sm border-l-4 border-l-red-500">
-                    <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-1">Gastos Operativos</p>
-                    <p className="text-3xl font-black text-foreground">{formatCurrency(totalExpenses)}</p>
-                    <p className="text-xs text-muted-foreground mt-1">Total registrado en turnos</p>
-                </div>
-                <div className="bg-card border border-border rounded-2xl p-5 shadow-sm border-l-4 border-l-emerald-500">
-                    <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-1">Diferencia acumulada</p>
-                    <p className={`text-3xl font-black ${totalDiff < 0 ? 'text-red-500' : totalDiff > 0 ? 'text-emerald-500' : 'text-foreground'}`}>
-                        {totalDiff >= 0 ? '+' : ''}{formatCurrency(totalDiff)}
-                    </p>
-                    <p className="text-xs text-muted-foreground mt-1">{totalDiff < 0 ? 'Faltante acumulado' : totalDiff > 0 ? 'Sobrante acumulado' : 'Sin diferencias'}</p>
-                </div>
+            {/* Tab Content */}
+            <div className="mt-8">
+                {activeTab === 'sales' && <SalesTab tenantId={tenant?.id} dateRange={dateRange} />}
+                {activeTab === 'expenses' && <ExpensesTab tenantId={tenant?.id} dateRange={dateRange} />}
+                {activeTab === 'audit' && <AuditTab tenantId={tenant?.id} dateRange={dateRange} />}
             </div>
-
-            {/* Cortes History */}
-            <CortesHistory />
         </div>
     )
 }
