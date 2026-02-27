@@ -33,56 +33,66 @@ function getNextStatuses(current) {
 
 export { ORDER_STATUSES, PAYMENT_METHODS, getNextStatuses }
 
-export async function getOrders(restaurantId, { includeClosed = false, startDate = null, endDate = null, page = 1, pageSize = 50, statuses = null, paymentMethod = null, cashCutFilter = 'all' } = {}) {
-    // When hiding closed orders, we filter by active sessions instead of excluding closed sessions.
-    // This prevents the URL from becoming too long when there are hundreds of closed sessions.
-    let activeSessionIds = []
-    if (!includeClosed) {
-        const { data: activeSessions } = await supabase
-            .from('sesiones_caja')
-            .select('id')
-            .eq('restaurante_id', restaurantId)
-            .eq('estado', 'abierta')
-
-        activeSessionIds = (activeSessions || []).map(s => s.id)
-    }
-
+/**
+ * getOrders — Single source of truth for all three order sections.
+ *
+ * mode:
+ *   'active'   → status NOT IN (delivered, cancelled)  [Operación Activa]
+ *   'caja'     → status IN (delivered, cancelled) AND cash_cut_id IS NULL  [Por Liquidar]
+ *   'historial'→ cash_cut_id IS NOT NULL  [Historial y Auditoría]
+ *   null/other → legacy fallback using includeClosed + statuses filters
+ */
+export async function getOrders(restaurantId, {
+    mode = null,
+    includeClosed = false,
+    startDate = null,
+    endDate = null,
+    page = 1,
+    pageSize = 50,
+    statuses = null,
+    paymentMethod = null,
+    cashCutFilter = 'all'
+} = {}) {
     const from = (page - 1) * pageSize
     const to = from + pageSize - 1
 
     let query = supabase
         .from('orders')
-        .select('*', { count: 'exact' }) // Request count for pagination metadata
+        .select('*', { count: 'exact' })
         .or(`restaurant_id.eq.${restaurantId},user_id.eq.${restaurantId}`)
         .order('created_at', { ascending: false })
         .range(from, to)
 
-    if (!includeClosed) {
-        // Include orders belonging to active sessions, or ghost/active orders, or null sessions.
-        if (activeSessionIds.length > 0) {
-            query = query.or(`sesion_caja_id.in.(${activeSessionIds.join(',')}),sesion_caja_id.is.null,status.in.(pending,confirmed,preparing,ready,on_the_way)`)
-        } else {
-            query = query.or(`sesion_caja_id.is.null,status.in.(pending,confirmed,preparing,ready,on_the_way)`)
+    // Mode-based filtering (canonical logic, replaces session-lookup approach)
+    if (mode === 'active') {
+        // All live orders regardless of session
+        query = query.not('status', 'in', '(delivered,cancelled)')
+    } else if (mode === 'caja') {
+        // Delivered or cancelled but not yet part of a cash cut
+        query = query
+            .in('status', ['delivered', 'cancelled'])
+            .is('cash_cut_id', null)
+    } else if (mode === 'historial') {
+        // Only orders formally closed by a cash cut
+        query = query.not('cash_cut_id', 'is', null)
+    } else {
+        // Legacy fallback for backwards-compat (reports, analytics, etc.)
+        if (!includeClosed) {
+            query = query.not('status', 'in', '(delivered,cancelled)')
+        }
+        if (statuses && statuses.length > 0) {
+            query = query.in('status', statuses)
+        }
+        if (cashCutFilter === 'unpaid') {
+            query = query.is('cash_cut_id', null)
+        } else if (cashCutFilter === 'paid') {
+            query = query.not('cash_cut_id', 'is', null)
         }
     }
 
-    if (startDate) {
-        query = query.gte('created_at', startDate)
-    }
-    if (endDate) {
-        query = query.lte('created_at', endDate)
-    }
-    if (statuses && statuses.length > 0) {
-        query = query.in('status', statuses)
-    }
-    if (paymentMethod) {
-        query = query.eq('payment_method', paymentMethod)
-    }
-    if (cashCutFilter === 'unpaid') {
-        query = query.is('cash_cut_id', null)
-    } else if (cashCutFilter === 'paid') {
-        query = query.not('cash_cut_id', 'is', null)
-    }
+    if (startDate) query = query.gte('created_at', startDate)
+    if (endDate) query = query.lte('created_at', endDate)
+    if (paymentMethod) query = query.eq('payment_method', paymentMethod)
 
     const { data, error, count } = await query
     if (error) throw error
@@ -275,57 +285,91 @@ export async function getOrderStats(restaurantId, { cashCutId = null, filterBySh
     } else if (filterByShift) {
         query = query.is('cash_cut_id', null)
     } else {
-        // Analytics Mode: Filter by date range
-        if (startDate) {
-            query = query.gte('created_at', startDate)
-        }
-        if (endDate) {
-            query = query.lte('created_at', endDate)
-        }
+        if (startDate) query = query.gte('created_at', startDate)
+        if (endDate) query = query.lte('created_at', endDate)
     }
 
     const { data, error } = await query
-
     if (error) throw error
+
+    const ACTIVE_STATUSES = ['pending', 'confirmed', 'preparing', 'ready', 'on_the_way']
 
     const stats = {
         total: data.length,
         pending: data.filter(o => o.status === 'pending').length,
-        // Active: Orders in progress (pending, confirmed, preparing, ready, on_the_way)
-        active: data.filter(o => ['pending', 'confirmed', 'preparing', 'ready', 'on_the_way'].includes(o.status)).length,
-        // Count delivered
+        active: data.filter(o => ACTIVE_STATUSES.includes(o.status)).length,
         delivered: data.filter(o => o.status === 'delivered').length,
         cancelled: data.filter(o => o.status === 'cancelled').length,
-        // Revenue includes delivered orders
+        // Stats per section
+        activeSection: {
+            total: data.filter(o => ACTIVE_STATUSES.includes(o.status)).length,
+            pending: data.filter(o => o.status === 'pending').length,
+            inProgress: data.filter(o => ['confirmed', 'preparing', 'ready', 'on_the_way'].includes(o.status)).length,
+        },
+        cajaSection: {
+            deliveredUncut: data.filter(o => o.status === 'delivered' && !o.cash_cut_id).length,
+            cancelledUncut: data.filter(o => o.status === 'cancelled' && !o.cash_cut_id).length,
+            pendingRevenue: data
+                .filter(o => o.status === 'delivered' && !o.cash_cut_id)
+                .reduce((s, o) => s + parseFloat(o.total || 0), 0),
+        },
         revenue: data
             .filter(o => o.status === 'delivered')
             .reduce((s, o) => s + parseFloat(o.total || 0), 0),
-
-        // Distribution of order types (only delivered/finalized sales)
         orderTypes: {
             delivery: data.filter(o => o.order_type === 'delivery' && o.status === 'delivered').length,
             pickup: data.filter(o => o.order_type === 'pickup' && o.status === 'delivered').length,
             dine_in: data.filter(o => o.order_type === 'dine_in' && o.status === 'delivered').length,
         },
-
-        // Most used payment method (from delivered sales)
         paymentMethods: data
             .filter(o => o.status === 'delivered')
             .reduce((acc, o) => {
-                if (o.payment_method) {
-                    acc[o.payment_method] = (acc[o.payment_method] || 0) + 1
-                }
+                if (o.payment_method) acc[o.payment_method] = (acc[o.payment_method] || 0) + 1
                 return acc
             }, {}),
     }
 
-    // Identify most used payment
     const payments = Object.entries(stats.paymentMethods)
     stats.topPayment = payments.length > 0
         ? payments.sort((a, b) => b[1] - a[1])[0][0]
         : null
 
     return stats
+}
+
+/**
+ * Reopen a delivered/closed order — removes cash_cut_id and fecha_cierre,
+ * puts it back into 'delivered' so it shows in the Caja (Por Liquidar) section.
+ */
+export async function reopenOrder(orderId, restaurantId, userName = 'Admin') {
+    const { data: current } = await supabase
+        .from('orders')
+        .select('audit_log')
+        .eq('id', orderId)
+        .single()
+
+    const auditLog = current?.audit_log || []
+
+    const { data, error } = await supabase
+        .from('orders')
+        .update({
+            fecha_cierre: null,
+            status: 'delivered',
+            updated_at: new Date().toISOString(),
+            audit_log: [...auditLog, {
+                action: 'REOPENED',
+                timestamp: new Date().toISOString(),
+                user: userName,
+                details: 'Orden reabierta por administrador'
+            }]
+        })
+        .eq('id', orderId)
+        .or(`restaurant_id.eq.${restaurantId},user_id.eq.${restaurantId}`)
+        .select()
+        .single()
+
+    if (error) throw error
+    return data
 }
 
 export async function getSalesAnalytics(restaurantId, { cashCutId = null, filterByShift = false, startDate = null, endDate = null, sessionId = null } = {}) {
