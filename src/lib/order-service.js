@@ -288,70 +288,18 @@ export async function deleteOrder(orderId, restaurantId, { force = false } = {})
 }
 
 export async function getOrderStats(restaurantId, { cashCutId = null, filterByShift = false, startDate = null, endDate = null, sessionId = null } = {}) {
-    let query = supabase
-        .from('orders')
-        .select('status, total, order_type, payment_method, created_at, cash_cut_id')
-        .or(`restaurant_id.eq.${restaurantId},user_id.eq.${restaurantId}`)
+    const { data: stats, error } = await supabase.rpc('get_order_stats_v2', {
+        p_restaurant_id: restaurantId,
+        p_start_date: startDate,
+        p_end_date: endDate,
+        p_session_id: sessionId,
+        p_cash_cut_id: cashCutId,
+        p_filter_by_shift: filterByShift
+    })
 
-    if (sessionId) {
-        query = query.eq('sesion_caja_id', sessionId)
-    } else if (cashCutId) {
-        query = query.eq('cash_cut_id', cashCutId)
-    } else if (filterByShift) {
-        query = query.is('cash_cut_id', null)
-    } else {
-        if (startDate) query = query.gte('created_at', startDate)
-        if (endDate) query = query.lte('created_at', endDate)
-    }
-
-    const { data, error } = await query
     if (error) throw error
 
-    const ACTIVE_STATUSES = ['pending', 'confirmed', 'preparing', 'ready', 'on_the_way']
-
-    const stats = {
-        total: data.length,
-        pending: data.filter(o => o.status === 'pending').length,
-        active: data.filter(o => ACTIVE_STATUSES.includes(o.status)).length,
-        delivered: data.filter(o => o.status === 'delivered').length,
-        cancelled: data.filter(o => o.status === 'cancelled').length,
-        // Stats per section
-        activeSection: {
-            total: data.filter(o => ACTIVE_STATUSES.includes(o.status)).length,
-            pending: data.filter(o => o.status === 'pending').length,
-            inProgress: data.filter(o => ['confirmed', 'preparing', 'ready', 'on_the_way'].includes(o.status)).length,
-        },
-        cajaSection: {
-            deliveredUncut: data.filter(o => o.status === 'delivered' && !o.cash_cut_id).length,
-            cancelledUncut: data.filter(o => o.status === 'cancelled' && !o.cash_cut_id).length,
-            pendingRevenue: data
-                .filter(o => o.status === 'delivered' && !o.cash_cut_id)
-                .reduce((s, o) => s + parseFloat(o.total || 0), 0),
-        },
-        // Historial: ONLY orders formally closed in a cash cut
-        historialSection: {
-            total: data.filter(o => !!o.cash_cut_id).length,
-            revenue: data
-                .filter(o => !!o.cash_cut_id && o.status === 'delivered')
-                .reduce((s, o) => s + parseFloat(o.total || 0), 0),
-        },
-        revenue: data
-            .filter(o => o.status === 'delivered')
-            .reduce((s, o) => s + parseFloat(o.total || 0), 0),
-        orderTypes: {
-            delivery: data.filter(o => o.order_type === 'delivery' && o.status === 'delivered').length,
-            pickup: data.filter(o => o.order_type === 'pickup' && o.status === 'delivered').length,
-            dine_in: data.filter(o => o.order_type === 'dine_in' && o.status === 'delivered').length,
-        },
-        paymentMethods: data
-            .filter(o => o.status === 'delivered')
-            .reduce((acc, o) => {
-                if (o.payment_method) acc[o.payment_method] = (acc[o.payment_method] || 0) + 1
-                return acc
-            }, {}),
-    }
-
-    const payments = Object.entries(stats.paymentMethods)
+    const payments = Object.entries(stats.paymentMethods || {})
     stats.topPayment = payments.length > 0
         ? payments.sort((a, b) => b[1] - a[1])[0][0]
         : null
@@ -395,142 +343,51 @@ export async function reopenOrder(orderId, restaurantId, userName = 'Admin') {
 }
 
 export async function getSalesAnalytics(restaurantId, { cashCutId = null, filterByShift = false, startDate = null, endDate = null, sessionId = null } = {}) {
-    let query = supabase
-        .from('orders')
-        .select('items, total, created_at, customer_phone, status')
-        .or(`restaurant_id.eq.${restaurantId},user_id.eq.${restaurantId}`)
-        .eq('status', 'delivered')
-
-    if (sessionId) {
-        query = query.eq('sesion_caja_id', sessionId)
-    } else if (cashCutId) {
-        query = query.eq('cash_cut_id', cashCutId)
-    } else if (filterByShift) {
-        query = query.is('cash_cut_id', null)
-    } else {
-        // Analytics Mode: Filter by date range
-        if (startDate) {
-            query = query.gte('created_at', startDate)
-        }
-        if (endDate) {
-            query = query.lte('created_at', endDate)
-        }
-    }
-
-    const { data: orders, error } = await query
+    const { data: analytics, error } = await supabase.rpc('get_sales_analytics_v2', {
+        p_restaurant_id: restaurantId,
+        p_start_date: startDate,
+        p_end_date: endDate,
+        p_session_id: sessionId,
+        p_cash_cut_id: cashCutId,
+        p_filter_by_shift: filterByShift
+    })
 
     if (error) throw error
 
-    // 1. Aggregate Sales by Product
-    const productSales = {}
-    let totalRevenue = 0
-
-    orders.forEach(order => {
-        // Ensure items is an array (handle potential legacy data or parse errors)
-        const items = Array.isArray(order.items) ? order.items : []
-        items.forEach(item => {
-            // Use subtotal if available (best snapshot), otherwise calc from unit_price or price
-            const itemRevenue = item.subtotal !== undefined
-                ? parseFloat(item.subtotal)
-                : (item.unit_price !== undefined ? parseFloat(item.unit_price) : parseFloat(item.price)) * item.quantity
-
-            if (!productSales[item.name]) {
-                productSales[item.name] = {
-                    id: item.product_id || item.id || item.name, // Fallback to name if id missing
-                    name: item.name,
-                    revenue: 0,
-                    quantity: 0
-                }
-            }
-            productSales[item.name].revenue += itemRevenue
-            productSales[item.name].quantity += item.quantity
-            totalRevenue += itemRevenue
-        })
-    })
-
-    // 2. Sort and Classify (ABC Analysis)
-    const sortedProducts = Object.values(productSales).sort((a, b) => b.revenue - a.revenue)
-
-    let accumulatedRevenue = 0
-    const abcData = sortedProducts.map(p => {
-        accumulatedRevenue += p.revenue
-        const percentage = (accumulatedRevenue / totalRevenue) * 100
-
-        let category = 'C'
-        if (percentage <= 80) category = 'A'
-        else if (percentage <= 95) category = 'B'
-
-        return { ...p, category, percentage: (p.revenue / totalRevenue) * 100 }
-    })
-
-    // 3. New Metrics Calculation
-
-    // Average Ticket (Total stats are already filtered by neq cancelled in this query?)
-    // The current query filters neq 'cancelled'.
-    const validOrdersCount = orders.length
-    const averageTicket = validOrdersCount > 0 ? totalRevenue / validOrdersCount : 0
-
-    // Preparation Time (Placeholder as per request)
-    const preparationTime = "Calculando..."
-
-    // Recurring Customers
-    const phoneCounts = {}
-    let recurringOrdersCount = 0
-
-    orders.forEach(order => {
-        if (order.customer_phone) {
-            // Normalize phone (simple trim)
-            const phone = order.customer_phone.trim()
-            if (phone) {
-                phoneCounts[phone] = (phoneCounts[phone] || 0) + 1
-            }
-        }
-    })
-
-    // Count orders that belong to a recurring phone (appears > 1 time)
-    orders.forEach(order => {
-        const phone = order.customer_phone?.trim()
-        if (phone && phoneCounts[phone] > 1) {
-            recurringOrdersCount++
-        }
-    })
-
-    const recurringCustomersPercentage = validOrdersCount > 0
-        ? (recurringOrdersCount / validOrdersCount) * 100
-        : 0
-
-
-    // 4. Prepare Chart Data
-    // Top 5 Products
-    const topProducts = sortedProducts.slice(0, 10).map(p => ({
-        name: p.name,
-        revenue: p.revenue,
-        quantity: p.quantity   // ← was missing, needed for "Más Vendidos"
-    }))
-
-    // Sales Trend (Last 7 days)
+    // Ensure backwards compatibility by formatting empty arrays or padding dates if needed
+    // Calculate full 7 days for salesTrend if necessary:
     const last7Days = [...Array(7)].map((_, i) => {
         const d = new Date()
         d.setDate(d.getDate() - i)
         return d.toISOString().split('T')[0]
     }).reverse()
 
-    const salesTrend = last7Days.map(date => {
-        const dayRevenue = orders
-            .filter(o => o.created_at.startsWith(date))
-            .reduce((sum, o) => sum + (parseFloat(o.total) || 0), 0)
-        return { date, revenue: dayRevenue }
-    })
+    const salesTrendMap = new Map((analytics.salesTrend || []).map(st => [st.date, parseFloat(st.revenue) || 0]))
+    const paddedSalesTrend = last7Days.map(date => ({
+        date,
+        revenue: salesTrendMap.get(date) || 0
+    }))
+
+    // Calculate ABC analysis locally relative to total revenue is fine, as topProducts handles most of the rank constraint.
+    // However, topProducts from RPC only limits to 10 for dashboard display.
+    const productSales = analytics.topProducts || []
+
+    // Add "quantity" fallback if it wasn't captured correctly in legacy rows
+    const topProducts = productSales.map(p => ({
+        name: p.name,
+        revenue: parseFloat(p.revenue || 0),
+        quantity: parseInt(p.quantity || 0)
+    }))
 
     return {
-        abcAnalysis: abcData, // Keeping this if needed elsewhere, but UI will ignore it
+        abcAnalysis: topProducts, // Minimal fallback
         topProducts,
-        salesTrend,
-        totalRevenue,
+        salesTrend: (analytics.salesTrend && analytics.salesTrend.length > 0) ? analytics.salesTrend : paddedSalesTrend,
+        totalRevenue: analytics.totalRevenue || 0,
         metrics: {
-            averageTicket,
-            preparationTime,
-            recurringCustomersPercentage
+            averageTicket: analytics.metrics?.averageTicket || 0,
+            preparationTime: analytics.metrics?.preparationTime || "Calculando...",
+            recurringCustomersPercentage: analytics.metrics?.recurringCustomersPercentage || 0
         }
     }
 }
@@ -830,13 +687,17 @@ export async function closeSession(sessionId, montoReal, userId, closedByName, e
     return closedSession
 }
 
-export async function getSessionsHistory(restaurantId) {
-    const { data, error } = await supabase
+export async function getSessionsHistory(restaurantId, { page = 1, pageSize = 50 } = {}) {
+    const from = (page - 1) * pageSize
+    const to = from + pageSize - 1
+
+    const { data, error, count } = await supabase
         .from('sesiones_caja')
-        .select('*, empleado:empleado_id(nombre)')
+        .select('*, empleado:empleado_id(nombre)', { count: 'exact' })
         .eq('restaurante_id', restaurantId)
         .order('opened_at', { ascending: false })
+        .range(from, to)
 
     if (error) throw error
-    return data || []
+    return { data: data || [], count }
 }

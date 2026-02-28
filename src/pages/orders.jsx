@@ -1,9 +1,10 @@
-import { useMemo, useState, useEffect, useCallback } from 'react'
+import { useMemo, useState, useEffect, useCallback, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useTenant } from '../features/auth/tenant-context'
 import { useAuth } from '../features/auth/auth-context'
 import { useTerminal } from '../features/auth/terminal-context'
 import { supabase } from '../lib/supabase'
+import { useVirtualizer } from '@tanstack/react-virtual'
 import {
     Search, Package, Clock, ChefHat, CheckCircle2, XCircle,
     RefreshCw, Lock, CreditCard, Wifi, WifiOff, Flame, Archive,
@@ -87,6 +88,8 @@ export function OrdersPage() {
     const [selectedIds, setSelectedIds] = useState(new Set())
     const [showBulkBar, setShowBulkBar] = useState(false)
     const [bulkStatus, setBulkStatus] = useState('')
+
+    const parentRef = useRef(null)
 
     const restaurantId = tenant?.id || user?.id
 
@@ -541,137 +544,104 @@ export function OrdersPage() {
                         </p>
                     </div>
                 ) : (
-                    <div className={activeTab === 'activas' ? 'grid grid-cols-1 md:grid-cols-2 gap-4' : 'flex flex-col gap-2'}>
-                        {filteredOrders.map(order => {
-                            const statusInfo = ORDER_STATUSES[order.status] || ORDER_STATUSES.pending
-                            const payment = PAYMENT_LABELS[order.payment_method] || PAYMENT_LABELS.cash
-                            const items = Array.isArray(order.items) ? order.items : []
-                            const isSelected = selectedIds.has(order.id)
-                            const isGhostOrder = activeTab === 'activas' && (Date.now() - new Date(order.created_at).getTime()) > (8 * 60 * 60 * 1000)
+                    <div ref={parentRef} className="h-[calc(100vh-280px)] min-h-[400px] overflow-y-auto pr-2 custom-scrollbar relative">
+                        {/* We use standard mapping for "activas" since they use a grid and are usually few. 
+                            We virtualize the vertical list for "caja" and "historial" which can be huge. */}
+                        {activeTab === 'activas' ? (
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                {filteredOrders.map(order => {
+                                    const statusInfo = ORDER_STATUSES[order.status] || ORDER_STATUSES.pending
+                                    const payment = PAYMENT_LABELS[order.payment_method] || PAYMENT_LABELS.cash
+                                    const items = Array.isArray(order.items) ? order.items : []
+                                    const isSelected = selectedIds.has(order.id)
+                                    const isGhostOrder = (Date.now() - new Date(order.created_at).getTime()) > (8 * 60 * 60 * 1000)
 
-                            if (activeTab === 'activas') {
-                                return (
-                                    <div key={order.id}
-                                        className={`bg-card border rounded-2xl p-5 cursor-pointer transition-all hover:shadow-lg hover:-translate-y-0.5 relative overflow-hidden ${isSelected
-                                            ? 'border-primary/60 shadow-md shadow-primary/10 ring-2 ring-primary/20'
-                                            : isGhostOrder ? 'border-red-500/50'
-                                                : order.status === 'pending' ? 'border-amber-400/50 dark:border-amber-500/30 bg-amber-50/50 dark:bg-amber-900/10'
-                                                    : 'border-border/60 hover:border-primary/40'}`}
-                                    >
-                                        {isGhostOrder && (
-                                            <div className="absolute top-0 left-0 w-full bg-red-500 text-white text-[10px] uppercase font-black tracking-widest text-center py-0.5 flex items-center justify-center gap-1.5">
-                                                <AlertTriangle className="w-3 h-3" /> Orden antigua — Requiere Acción
-                                            </div>
-                                        )}
-
-                                        <div className={`flex items-start gap-3 mb-4 ${isGhostOrder ? 'mt-4' : ''}`}>
-                                            {/* Checkbox */}
-                                            <button
-                                                onClick={e => { e.stopPropagation(); toggleSelect(order.id) }}
-                                                className="mt-1 shrink-0 text-muted-foreground hover:text-primary transition-colors"
-                                            >
-                                                {isSelected
-                                                    ? <CheckSquare className="w-5 h-5 text-primary" />
-                                                    : <Square className="w-5 h-5" />
-                                                }
-                                            </button>
-
-                                            <div className="flex-1 min-w-0" onClick={() => setSelectedOrder(order)}>
-                                                <div className="flex items-center gap-2 flex-wrap mb-1.5">
-                                                    <span className="font-black text-lg text-foreground tracking-tight">{order.customer_name || 'Cliente General'}</span>
-                                                    <span className="text-[10px] uppercase tracking-widest font-black px-2 py-1 rounded-md text-white shrink-0 shadow-sm" style={{ background: statusInfo.color }}>
-                                                        {statusInfo.label}
-                                                    </span>
+                                    return (
+                                        <div key={order.id}
+                                            className={`bg-card border rounded-2xl p-5 cursor-pointer transition-all hover:shadow-lg hover:-translate-y-0.5 relative overflow-hidden ${isSelected
+                                                ? 'border-primary/60 shadow-md shadow-primary/10 ring-2 ring-primary/20'
+                                                : isGhostOrder ? 'border-red-500/50'
+                                                    : order.status === 'pending' ? 'border-amber-400/50 dark:border-amber-500/30 bg-amber-50/50 dark:bg-amber-900/10'
+                                                        : 'border-border/60 hover:border-primary/40'}`}
+                                        >
+                                            {isGhostOrder && (
+                                                <div className="absolute top-0 left-0 w-full bg-red-500 text-white text-[10px] uppercase font-black tracking-widest text-center py-0.5 flex items-center justify-center gap-1.5">
+                                                    <AlertTriangle className="w-3 h-3" /> Orden antigua — Requiere Acción
                                                 </div>
-                                                <div className="flex items-center flex-wrap gap-x-3 gap-y-1.5 text-xs font-semibold text-muted-foreground">
-                                                    <span className="bg-muted px-2 py-0.5 rounded-md text-foreground">
-                                                        {order.order_type === 'delivery' ? '🛵 Domicilio' : order.order_type === 'dine_in' ? '🪑 Mesa' : '🏪 Llevar'}
-                                                    </span>
-                                                    {order.table_number && <span className="text-orange-600 dark:text-orange-400 font-bold bg-orange-100 dark:bg-orange-950/50 px-2 py-0.5 rounded-md">Mesa {order.table_number}</span>}
-                                                    <span className="opacity-70">#{order.folio || order.id.slice(0, 5)}</span>
-                                                    <span className="flex items-center gap-1 opacity-70"><Clock className="w-3 h-3" />{getTimeAgo(order.created_at)}</span>
+                                            )}
+
+                                            <div className={`flex items-start gap-3 mb-4 ${isGhostOrder ? 'mt-4' : ''}`}>
+                                                {/* Checkbox */}
+                                                <button
+                                                    onClick={e => { e.stopPropagation(); toggleSelect(order.id) }}
+                                                    className="mt-1 shrink-0 text-muted-foreground hover:text-primary transition-colors"
+                                                >
+                                                    {isSelected
+                                                        ? <CheckSquare className="w-5 h-5 text-primary" />
+                                                        : <Square className="w-5 h-5" />
+                                                    }
+                                                </button>
+
+                                                <div className="flex-1 min-w-0" onClick={() => setSelectedOrder(order)}>
+                                                    <div className="flex items-center gap-2 flex-wrap mb-1.5">
+                                                        <span className="font-black text-lg text-foreground tracking-tight">{order.customer_name || 'Cliente General'}</span>
+                                                        <span className="text-[10px] uppercase tracking-widest font-black px-2 py-1 rounded-md text-white shrink-0 shadow-sm" style={{ background: statusInfo.color }}>
+                                                            {statusInfo.label}
+                                                        </span>
+                                                    </div>
+                                                    <div className="flex items-center flex-wrap gap-x-3 gap-y-1.5 text-xs font-semibold text-muted-foreground">
+                                                        <span className="bg-muted px-2 py-0.5 rounded-md text-foreground">
+                                                            {order.order_type === 'delivery' ? '🛵 Domicilio' : order.order_type === 'dine_in' ? '🪑 Mesa' : '🏪 Llevar'}
+                                                        </span>
+                                                        {order.table_number && <span className="text-orange-600 dark:text-orange-400 font-bold bg-orange-100 dark:bg-orange-950/50 px-2 py-0.5 rounded-md">Mesa {order.table_number}</span>}
+                                                        <span className="opacity-70">#{order.folio || order.id.slice(0, 5)}</span>
+                                                        <span className="flex items-center gap-1 opacity-70"><Clock className="w-3 h-3" />{getTimeAgo(order.created_at)}</span>
+                                                    </div>
+                                                </div>
+                                                <div className="shrink-0 text-right" onClick={() => setSelectedOrder(order)}>
+                                                    <p className="font-black text-foreground text-sm">{formatCurrency(order.total)}</p>
                                                 </div>
                                             </div>
-                                            <div className="shrink-0 text-right" onClick={() => setSelectedOrder(order)}>
-                                                <p className="font-black text-foreground text-sm">{formatCurrency(order.total)}</p>
+
+                                            <div className="bg-muted/40 rounded-xl p-3 mb-4 space-y-1" onClick={() => setSelectedOrder(order)}>
+                                                {items.slice(0, 3).map((item, idx) => (
+                                                    <div key={idx} className="flex text-sm">
+                                                        <span className="font-medium text-foreground truncate pr-4">
+                                                            <span className="font-black text-muted-foreground mr-1.5">{item.quantity}x</span>
+                                                            {item.product?.name || item.name || 'Producto'}
+                                                        </span>
+                                                    </div>
+                                                ))}
+                                                {items.length > 3 && <p className="text-xs font-bold text-muted-foreground pt-1">+ {items.length - 3} más</p>}
+                                            </div>
+
+                                            <div className="flex gap-2">
+                                                {getNextStatuses(order.status).map(next => {
+                                                    const nextInfo = ORDER_STATUSES[next]
+                                                    if (!nextInfo) return null
+                                                    return (
+                                                        <button key={next}
+                                                            onClick={e => { e.stopPropagation(); updateStatusMutation.mutate({ orderId: order.id, status: next }) }}
+                                                            className="flex-1 py-2.5 rounded-xl text-xs font-black text-white hover:brightness-110 active:scale-95 transition-all shadow-sm"
+                                                            style={{ background: nextInfo.color }}>
+                                                            {nextInfo.emoji} {nextInfo.label}
+                                                        </button>
+                                                    )
+                                                })}
                                             </div>
                                         </div>
-
-                                        <div className="bg-muted/40 rounded-xl p-3 mb-4 space-y-1" onClick={() => setSelectedOrder(order)}>
-                                            {items.slice(0, 3).map((item, idx) => (
-                                                <div key={idx} className="flex text-sm">
-                                                    <span className="font-medium text-foreground truncate pr-4">
-                                                        <span className="font-black text-muted-foreground mr-1.5">{item.quantity}x</span>
-                                                        {item.product?.name || item.name || 'Producto'}
-                                                    </span>
-                                                </div>
-                                            ))}
-                                            {items.length > 3 && <p className="text-xs font-bold text-muted-foreground pt-1">+ {items.length - 3} más</p>}
-                                        </div>
-
-                                        <div className="flex gap-2">
-                                            {getNextStatuses(order.status).map(next => {
-                                                const nextInfo = ORDER_STATUSES[next]
-                                                if (!nextInfo) return null
-                                                return (
-                                                    <button key={next}
-                                                        onClick={e => { e.stopPropagation(); updateStatusMutation.mutate({ orderId: order.id, status: next }) }}
-                                                        className="flex-1 py-2.5 rounded-xl text-xs font-black text-white hover:brightness-110 active:scale-95 transition-all shadow-sm"
-                                                        style={{ background: nextInfo.color }}>
-                                                        {nextInfo.emoji} {nextInfo.label}
-                                                    </button>
-                                                )
-                                            })}
-                                        </div>
-                                    </div>
-                                )
-                            }
-
-                            // List style for Caja & Historial
-                            return (
-                                <div key={order.id}
-                                    className={`bg-card border rounded-xl p-3 cursor-pointer transition-all hover:bg-muted/30 flex items-center gap-3 ${isSelected
-                                        ? 'border-primary/60 shadow-sm shadow-primary/10 ring-2 ring-primary/20'
-                                        : 'border-border/50'}`}
-                                >
-                                    {/* Checkbox */}
-                                    <button
-                                        onClick={e => { e.stopPropagation(); toggleSelect(order.id) }}
-                                        className="shrink-0 text-muted-foreground hover:text-primary transition-colors"
-                                    >
-                                        {isSelected ? <CheckSquare className="w-5 h-5 text-primary" /> : <Square className="w-5 h-5" />}
-                                    </button>
-
-                                    <div className="flex items-center gap-3 flex-1 min-w-0" onClick={() => setSelectedOrder(order)}>
-                                        <div className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0 text-lg" style={{ background: `${statusInfo.color}15` }}>
-                                            {statusInfo.emoji}
-                                        </div>
-                                        <div className="flex-1 min-w-0">
-                                            <div className="flex items-center gap-2 mb-0.5">
-                                                <span className="font-bold text-sm text-foreground truncate">{order.customer_name || 'Cliente General'}</span>
-                                                <span className="text-[10px] font-black uppercase px-1.5 py-0.5 rounded shrink-0" style={{ color: statusInfo.color, background: `${statusInfo.color}15` }}>
-                                                    {statusInfo.label}
-                                                </span>
-                                                {activeTab === 'historial' && order.cash_cut_id && (
-                                                    <span className="text-[10px] font-bold text-stone-500 bg-stone-100 dark:bg-stone-800 px-1.5 py-0.5 rounded shrink-0">🔒 Cortada</span>
-                                                )}
-                                            </div>
-                                            <div className="flex items-center gap-2 text-xs text-muted-foreground font-medium flex-wrap">
-                                                <span>#{order.folio || order.id.slice(0, 6)}</span>
-                                                <span className="w-1 h-1 rounded-full bg-border" />
-                                                <span>{payment.icon} {payment.label}</span>
-                                                <span className="w-1 h-1 rounded-full bg-border" />
-                                                <span>{new Date(order.created_at).toLocaleDateString('es-MX', { day: '2-digit', month: 'short' })} {new Date(order.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div className="text-right shrink-0 pr-1" onClick={() => setSelectedOrder(order)}>
-                                        <p className="font-black text-foreground">{formatCurrency(order.total)}</p>
-                                        <p className="text-[10px] text-muted-foreground uppercase font-bold">{items.length} items</p>
-                                    </div>
-                                </div>
-                            )
-                        })}
+                                    )
+                                })}
+                            </div>
+                        ) : (
+                            <VirtualOrderList
+                                orders={filteredOrders}
+                                toggleSelect={toggleSelect}
+                                selectedIds={selectedIds}
+                                setSelectedOrder={setSelectedOrder}
+                                parentRef={parentRef}
+                            />
+                        )}
                     </div>
                 )}
 
@@ -752,3 +722,89 @@ export function OrdersPage() {
         </div>
     )
 }
+
+function VirtualOrderList({ orders, toggleSelect, selectedIds, setSelectedOrder, parentRef }) {
+    const rowVirtualizer = useVirtualizer({
+        count: orders.length,
+        getScrollElement: () => parentRef.current,
+        estimateSize: () => 76, // Approximate height of the list item
+        overscan: 10,
+    })
+
+    const PAYMENT_LABELS = PAYMENT_METHODS
+
+    return (
+        <div
+            style={{
+                height: `${rowVirtualizer.getTotalSize()}px`,
+                width: '100%',
+                position: 'relative',
+            }}
+        >
+            {rowVirtualizer.getVirtualItems().map((virtualItem) => {
+                const order = orders[virtualItem.index]
+                const statusInfo = ORDER_STATUSES[order.status] || ORDER_STATUSES.pending
+                const payment = PAYMENT_LABELS[order.payment_method] || PAYMENT_LABELS.cash
+                const items = Array.isArray(order.items) ? order.items : []
+                const isSelected = selectedIds.has(order.id)
+
+                return (
+                    <div
+                        key={virtualItem.key}
+                        style={{
+                            position: 'absolute',
+                            top: 0,
+                            left: 0,
+                            width: '100%',
+                            height: `${virtualItem.size}px`,
+                            transform: `translateY(${virtualItem.start}px)`,
+                            paddingBottom: '8px' // Gap between items
+                        }}
+                    >
+                        <div
+                            className={`bg-card border rounded-xl p-3 cursor-pointer transition-all hover:bg-muted/30 flex items-center gap-3 h-full ${isSelected
+                                ? 'border-primary/60 shadow-sm shadow-primary/10 ring-2 ring-primary/20'
+                                : 'border-border/50'}`}
+                        >
+                            <button
+                                onClick={e => { e.stopPropagation(); toggleSelect(order.id) }}
+                                className="shrink-0 text-muted-foreground hover:text-primary transition-colors"
+                            >
+                                {isSelected ? <CheckSquare className="w-5 h-5 text-primary" /> : <Square className="w-5 h-5" />}
+                            </button>
+
+                            <div className="flex items-center gap-3 flex-1 min-w-0" onClick={() => setSelectedOrder(order)}>
+                                <div className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0 text-lg" style={{ background: `${statusInfo.color}15` }}>
+                                    {statusInfo.emoji}
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                    <div className="flex items-center gap-2 mb-0.5">
+                                        <span className="font-bold text-sm text-foreground truncate">{order.customer_name || 'Cliente General'}</span>
+                                        <span className="text-[10px] font-black uppercase px-1.5 py-0.5 rounded shrink-0" style={{ color: statusInfo.color, background: `${statusInfo.color}15` }}>
+                                            {statusInfo.label}
+                                        </span>
+                                        {order.cash_cut_id && (
+                                            <span className="text-[10px] font-bold text-stone-500 bg-stone-100 dark:bg-stone-800 px-1.5 py-0.5 rounded shrink-0">🔒 Cortada</span>
+                                        )}
+                                    </div>
+                                    <div className="flex items-center gap-2 text-xs text-muted-foreground font-medium flex-wrap">
+                                        <span>#{order.folio || order.id.slice(0, 6)}</span>
+                                        <span className="w-1 h-1 rounded-full bg-border" />
+                                        <span>{payment.icon} {payment.label}</span>
+                                        <span className="w-1 h-1 rounded-full bg-border" />
+                                        <span>{new Date(order.created_at).toLocaleDateString('es-MX', { day: '2-digit', month: 'short' })} {new Date(order.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div className="text-right shrink-0 pr-1" onClick={() => setSelectedOrder(order)}>
+                                <p className="font-black text-foreground">{formatCurrency(order.total)}</p>
+                                <p className="text-[10px] text-muted-foreground uppercase font-bold">{items.length} items</p>
+                            </div>
+                        </div>
+                    </div>
+                )
+            })}
+        </div>
+    )
+}
+
