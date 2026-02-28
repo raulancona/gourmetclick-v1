@@ -33,6 +33,7 @@ export function TenantProvider({ children }) {
                     const { data, error } = await supabase
                         .from('restaurants')
                         .select('id, name, slug')
+                        .eq('owner_id', user.id)
                         .limit(1)
                         .maybeSingle()
 
