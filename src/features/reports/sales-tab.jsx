@@ -1,17 +1,25 @@
+import { useState, useEffect } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { getSalesAnalytics } from '../../lib/reports-service'
 import { exportSalesCSV } from '../../lib/reports-export'
 import { formatCurrency } from '../../lib/utils'
-import { Loader2, TrendingUp, Receipt, Download, AlertCircle } from 'lucide-react'
+import { Loader2, TrendingUp, Receipt, Download, AlertCircle, ChevronLeft, ChevronRight } from 'lucide-react'
 import { Button } from '../../components/ui/button'
 import { Area, AreaChart, ResponsiveContainer, Tooltip, XAxis, YAxis, CartesianGrid } from 'recharts'
 
 export function SalesTab({ tenantId, dateRange }) {
+    const [page, setPage] = useState(1)
+    const pageSize = 15
+
     const { data, isLoading, error } = useQuery({
         queryKey: ['reports-sales', tenantId, dateRange.start, dateRange.end],
         queryFn: () => getSalesAnalytics(tenantId, dateRange.start, dateRange.end),
         enabled: !!tenantId
     })
+
+    useEffect(() => {
+        setPage(1)
+    }, [dateRange.start, dateRange.end])
 
     if (isLoading) {
         return <div className="p-12 flex justify-center"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>
@@ -22,6 +30,9 @@ export function SalesTab({ tenantId, dateRange }) {
     }
 
     const { kpis, chartData, deliveredOrders, rawOrders } = data
+
+    const totalPages = Math.ceil((rawOrders?.length || 0) / pageSize)
+    const currentOrders = rawOrders ? rawOrders.slice((page - 1) * pageSize, page * pageSize) : []
 
     return (
         <div className="space-y-6 animate-in fade-in duration-500">
@@ -113,45 +124,74 @@ export function SalesTab({ tenantId, dateRange }) {
                     <h4 className="text-sm font-black text-foreground">Detalle de Órdenes</h4>
                 </div>
                 {rawOrders.length > 0 ? (
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-sm text-left">
-                            <thead className="text-[10px] text-muted-foreground uppercase tracking-wider bg-muted/50">
-                                <tr>
-                                    <th className="px-6 py-3 font-black">Folio</th>
-                                    <th className="px-6 py-3 font-black">Fecha</th>
-                                    <th className="px-6 py-3 font-black">Cliente</th>
-                                    <th className="px-6 py-3 font-black">Método</th>
-                                    <th className="px-6 py-3 font-black">Estado</th>
-                                    <th className="px-6 py-3 font-black text-right">Total</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-border/50">
-                                {rawOrders.map(order => (
-                                    <tr key={order.id} className="hover:bg-muted/20">
-                                        <td className="px-6 py-4 font-bold text-foreground">#{order.folio}</td>
-                                        <td className="px-6 py-4 text-muted-foreground whitespace-nowrap">
-                                            {new Date(order.created_at).toLocaleDateString('es-MX')} <br />
-                                            <span className="text-xs">{new Date(order.created_at).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })}</span>
-                                        </td>
-                                        <td className="px-6 py-4 font-medium">{order.customer_name || 'General'}</td>
-                                        <td className="px-6 py-4">
-                                            <span className="bg-muted px-2 py-1 rounded-md text-xs font-bold uppercase">
-                                                {order.payment_method || 'N/A'}
-                                            </span>
-                                        </td>
-                                        <td className="px-6 py-4">
-                                            <span className={`px-2 py-1 rounded-md text-xs font-bold uppercase ${order.status === 'delivered' ? 'bg-emerald-100 text-emerald-700' :
+                    <div className="flex flex-col">
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-sm text-left">
+                                <thead className="text-[10px] text-muted-foreground uppercase tracking-wider bg-muted/50">
+                                    <tr>
+                                        <th className="px-6 py-3 font-black">Folio</th>
+                                        <th className="px-6 py-3 font-black">Fecha</th>
+                                        <th className="px-6 py-3 font-black">Cliente</th>
+                                        <th className="px-6 py-3 font-black">Método</th>
+                                        <th className="px-6 py-3 font-black">Estado</th>
+                                        <th className="px-6 py-3 font-black text-right">Total</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-border/50">
+                                    {currentOrders.map(order => (
+                                        <tr key={order.id} className="hover:bg-muted/20">
+                                            <td className="px-6 py-4 font-bold text-foreground">#{order.folio}</td>
+                                            <td className="px-6 py-4 text-muted-foreground whitespace-nowrap">
+                                                {new Date(order.created_at).toLocaleDateString('es-MX')} <br />
+                                                <span className="text-xs">{new Date(order.created_at).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })}</span>
+                                            </td>
+                                            <td className="px-6 py-4 font-medium">{order.customer_name || 'General'}</td>
+                                            <td className="px-6 py-4">
+                                                <span className="bg-muted px-2 py-1 rounded-md text-xs font-bold uppercase">
+                                                    {order.payment_method || 'N/A'}
+                                                </span>
+                                            </td>
+                                            <td className="px-6 py-4">
+                                                <span className={`px-2 py-1 rounded-md text-xs font-bold uppercase ${order.status === 'delivered' ? 'bg-emerald-100 text-emerald-700' :
                                                     order.status === 'cancelled' ? 'bg-red-100 text-red-700' :
                                                         'bg-blue-100 text-blue-700'
-                                                }`}>
-                                                {order.status}
-                                            </span>
-                                        </td>
-                                        <td className="px-6 py-4 font-black text-right">{formatCurrency(order.total)}</td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
+                                                    }`}>
+                                                    {order.status}
+                                                </span>
+                                            </td>
+                                            <td className="px-6 py-4 font-black text-right">{formatCurrency(order.total)}</td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                        {totalPages > 1 && (
+                            <div className="flex items-center justify-between px-6 py-3 border-t border-border/50 bg-muted/20">
+                                <span className="text-xs text-muted-foreground font-medium">
+                                    Página {page} de {totalPages} ({rawOrders.length} registros)
+                                </span>
+                                <div className="flex items-center gap-2">
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => setPage(p => Math.max(1, p - 1))}
+                                        disabled={page === 1}
+                                        className="h-8 w-8 p-0"
+                                    >
+                                        <ChevronLeft className="h-4 w-4" />
+                                    </Button>
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                                        disabled={page === totalPages}
+                                        className="h-8 w-8 p-0"
+                                    >
+                                        <ChevronRight className="h-4 w-4" />
+                                    </Button>
+                                </div>
+                            </div>
+                        )}
                     </div>
                 ) : (
                     <div className="p-8 text-center text-muted-foreground text-sm font-medium">No hay órdenes en este período.</div>

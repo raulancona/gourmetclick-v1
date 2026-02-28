@@ -19,6 +19,7 @@ export function TenantProvider({ children }) {
     const { user, profile, loading: authLoading } = useAuth()
     const [tenant, setTenant] = useState(null)
     const [loading, setLoading] = useState(true)
+    const [lastFetchedUserId, setLastFetchedUserId] = useState(null)
 
     useEffect(() => {
         const fetchTenant = async () => {
@@ -45,6 +46,7 @@ export function TenantProvider({ children }) {
                             role: profile.role
                         })
                         clearTimeout(timeout)
+                        setLastFetchedUserId(user.id)
                         setLoading(false)
                         return
                     }
@@ -85,6 +87,7 @@ export function TenantProvider({ children }) {
             }
 
             setTenant(null)
+            setLastFetchedUserId(user?.id || null)
             setLoading(false)
         }
 
@@ -93,9 +96,12 @@ export function TenantProvider({ children }) {
         }
     }, [user, profile, authLoading, window.location.pathname])
 
+    // Prevent immediate redirect in ProtectedRoute when user updates but tenant hasn't yet finished resolving
+    const isFetchingForUser = user && lastFetchedUserId !== user.id;
+
     const value = {
         tenant,
-        loading: loading || authLoading
+        loading: loading || authLoading || isFetchingForUser
     }
 
     return (
