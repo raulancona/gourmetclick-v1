@@ -35,7 +35,7 @@ NAMING RULES:
 
 RULES:
 1. Follow project-planner.md Phase -1 (Context Check)
-2. Follow project-planner.md Phase 0 (Socratic Gate)
+2. Follow project-planner.md Phase 0 (Socratic Gate)a
 3. Create PLAN-{slug}.md with task breakdown
 4. DO NOT write any code files
 5. REPORT the exact file name created

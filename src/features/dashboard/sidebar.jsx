@@ -53,7 +53,7 @@ export function Sidebar({ isOpen, onClose, isCollapsed, onToggleCollapse }) {
     const { theme, setTheme } = useTheme()
 
     const isSuperAdmin = profile?.role === 'superadmin'
-    const isOwner = profile?.role === 'owner'
+    const isOwner = profile?.role === 'owner' || (user && !activeEmployee)
     const isAdmin = (isOwner || isSuperAdmin) && !activeEmployee
     const isMesero = activeEmployee?.rol === 'mesero'
 
