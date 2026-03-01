@@ -160,7 +160,6 @@ export async function createOrder(orderData) {
         ...payload,
         sesion_caja_id: activeSession?.id || null,
         restaurant_id: searchTenantId,
-        user_id: payload.user_id || activeSession?.empleado_id || searchTenantId,
         status: finalStatus,
         ...(auditEntry ? { audit_log: auditEntry } : {})
     }
@@ -563,7 +562,7 @@ export async function createBlindCashCut(restaurantId, montoReal) {
 export async function getActiveSession(restaurantId) {
     const { data: sessions, error } = await supabase
         .from('sesiones_caja')
-        .select('*, empleado:empleado_id(nombre)')
+        .select('*')
         .eq('restaurante_id', restaurantId)
         .eq('estado', 'abierta')
         .order('opened_at', { ascending: false })
@@ -693,7 +692,7 @@ export async function getSessionsHistory(restaurantId, { page = 1, pageSize = 50
 
     const { data, error, count } = await supabase
         .from('sesiones_caja')
-        .select('*, empleado:empleado_id(nombre)', { count: 'exact' })
+        .select('*', { count: 'exact' })
         .eq('restaurante_id', restaurantId)
         .order('opened_at', { ascending: false })
         .range(from, to)

@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState } from 'react'
+import { createContext, useContext, useEffect, useState, useRef } from 'react'
 import { useAuth } from './auth-context'
 import { supabase } from '../../lib/supabase'
 
@@ -20,11 +20,20 @@ export function TenantProvider({ children }) {
     const [tenant, setTenant] = useState(null)
     const [loading, setLoading] = useState(true)
     const [lastFetchedUserId, setLastFetchedUserId] = useState(null)
+    const isFetchingRef = useRef(false)
 
     useEffect(() => {
         const fetchTenant = async () => {
+            if (isFetchingRef.current) return;
+            isFetchingRef.current = true;
             // Priority 1: If we have an authenticated owner/admin
             if (user && profile) {
+                // Prevent infinite loop if tenant is already resolved for the given session user
+                if (tenant && lastFetchedUserId === user.id) {
+                    setLoading(false)
+                    return
+                }
+
                 const timeout = setTimeout(() => {
                     setLoading(false)
                 }, 5000)
@@ -93,7 +102,9 @@ export function TenantProvider({ children }) {
         }
 
         if (!authLoading) {
-            fetchTenant()
+            fetchTenant().finally(() => {
+                isFetchingRef.current = false;
+            })
         }
     }, [user, profile, authLoading, window.location.pathname])
 

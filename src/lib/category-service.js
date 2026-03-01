@@ -27,7 +27,6 @@ export async function createCategory(categoryData, userId) {
         .from('categories')
         .insert([{
             ...categoryData,
-            user_id: userId,
             restaurant_id: categoryData.restaurant_id || userId // Fallback al owner ID
         }])
         .select()
@@ -76,7 +75,6 @@ export async function reorderCategories(categories, userId) {
         id: cat.id,
         name: cat.name, // Required for upsert to work with non-null constraint
         sort_order: index,
-        user_id: cat.user_id || userId,
         restaurant_id: cat.restaurant_id || userId,
         updated_at: new Date().toISOString()
     }))

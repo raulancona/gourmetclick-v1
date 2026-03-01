@@ -42,7 +42,7 @@ export async function getExecutiveSummary(restaurantId, startDate, endDate) {
     const { data: expensesError, data: expenses } = await supabase
         .from('gastos')
         .select('monto')
-        .eq('restaurante_id', restaurantId)
+        .eq('restaurant_id', restaurantId)
         .gte('created_at', startIso)
         .lte('created_at', endIso)
 
@@ -120,8 +120,8 @@ export async function getExpensesAnalytics(restaurantId, startDate, endDate) {
 
     const { data: expenses, error } = await supabase
         .from('gastos')
-        .select('*, empleado:empleado_id(nombre)')
-        .eq('restaurante_id', restaurantId)
+        .select('*')
+        .eq('restaurant_id', restaurantId)
         .gte('created_at', startIso)
         .lte('created_at', endIso)
         .order('created_at', { ascending: false })
@@ -157,8 +157,8 @@ export async function getCashCutAnalytics(restaurantId, startDate, endDate) {
 
     const { data: cuts, error } = await supabase
         .from('sesiones_caja')
-        .select('*, empleado:empleado_id(nombre)')
-        .eq('restaurante_id', restaurantId)
+        .select('*')
+        .eq('restaurant_id', restaurantId)
         .eq('estado', 'cerrada')
         .gte('closed_at', startIso)
         .lte('closed_at', endIso)
