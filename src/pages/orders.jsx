@@ -6,11 +6,12 @@ import { useTerminal } from '../features/auth/terminal-context'
 import { supabase } from '../lib/supabase'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import {
-    Search, Package, Clock, ChefHat, CheckCircle2, XCircle,
-    RefreshCw, Lock, CreditCard, Wifi, WifiOff, Flame, Archive,
-    AlertTriangle, ChevronLeft, ChevronRight, Calendar, CalendarDays,
-    CheckSquare, Square, Trash2, ChevronDown, X, SlidersHorizontal
+    Search, Filter, Plus, FileText, ArrowUpDown, MoreHorizontal,
+    Wifi, WifiOff, RefreshCw, Flame, Lock, Archive, Clock, ChefHat, Package, AlertTriangle, CreditCard, XCircle,
+    CalendarDays, ChevronLeft, ChevronRight, Store, Settings,
+    CheckSquare, Square, Trash2, ChevronDown, X, SlidersHorizontal, LayoutGrid, List
 } from 'lucide-react'
+import { KanbanBoard } from '../features/orders/kanban-board'
 import { KpiDrilldownModal } from '../components/kpi-drilldown-modal'
 import { Button } from '../components/ui/button'
 import { Input } from '../components/ui/input'
@@ -72,11 +73,11 @@ export function OrdersPage() {
 
     // UI State
     const [activeTab, setActiveTab] = useState('activas')
+    const [viewMode, setViewMode] = useState('kanban')
     const [searchTerm, setSearchTerm] = useState('')
     const [selectedKpi, setSelectedKpi] = useState(null)
     const [selectedOrder, setSelectedOrder] = useState(null)
     const [isConnected, setIsConnected] = useState(true)
-    const [historyPage, setHistoryPage] = useState(1)
 
     // Time filter state
     const [timePreset, setTimePreset] = useState('all')
@@ -98,7 +99,6 @@ export function OrdersPage() {
     // ─── Queries ────────────────────────────────────────────────────────────
     const activeQueryKey = ['orders-active', restaurantId, startDate, endDate]
     const cajaQueryKey = ['orders-caja', restaurantId, startDate, endDate]
-    const historyQueryKey = ['orders-history', restaurantId, historyPage, startDate, endDate]
 
     const { data: activeOrdersRaw, isLoading: isLoadingActive, refetch: refetchActive } = useQuery({
         queryKey: activeQueryKey,
@@ -114,22 +114,13 @@ export function OrdersPage() {
         refetchInterval: 15_000,
     })
 
-    const { data: historyOrdersRaw, isLoading: isLoadingHistory, refetch: refetchHistory } = useQuery({
-        queryKey: historyQueryKey,
-        queryFn: () => getOrders(restaurantId, { mode: 'historial', page: historyPage, pageSize: 50, startDate, endDate }),
-        enabled: !!restaurantId && activeTab === 'historial',
-        refetchInterval: 30_000,
-    })
-
     const allOrders = activeTab === 'activas'
         ? (activeOrdersRaw?.data || [])
-        : activeTab === 'caja'
-            ? (cajaOrdersRaw?.data || [])
-            : (historyOrdersRaw?.data || [])
-    const totalHistoryCount = historyOrdersRaw?.count || 0
-    const isLoading = activeTab === 'activas' ? isLoadingActive : activeTab === 'caja' ? isLoadingCaja : isLoadingHistory
+        : (cajaOrdersRaw?.data || [])
 
-    const refetchAll = () => { refetchActive(); refetchCaja(); refetchHistory() }
+    const isLoading = activeTab === 'activas' ? isLoadingActive : isLoadingCaja
+
+    const refetchAll = () => { refetchActive(); refetchCaja(); }
 
     // ─── Stats Query — must match same date window as list queries ───────────
     const { data: stats } = useQuery({
@@ -149,7 +140,6 @@ export function OrdersPage() {
                 if (orderId && orderId !== restaurantId) return
                 queryClient.invalidateQueries({ queryKey: ['orders-active', restaurantId] })
                 queryClient.invalidateQueries({ queryKey: ['orders-caja', restaurantId] })
-                queryClient.invalidateQueries({ queryKey: ['orders-history', restaurantId] })
                 queryClient.invalidateQueries({ queryKey: ['order-stats-live', restaurantId] })
                 if (payload.eventType === 'INSERT') {
                     try { new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3').play().catch(() => { }) } catch { }
@@ -203,7 +193,6 @@ export function OrdersPage() {
     const invalidateAll = () => {
         queryClient.invalidateQueries({ queryKey: ['orders-active', restaurantId] })
         queryClient.invalidateQueries({ queryKey: ['orders-caja', restaurantId] })
-        queryClient.invalidateQueries({ queryKey: ['orders-history', restaurantId] })
         queryClient.invalidateQueries({ queryKey: ['order-stats-live', restaurantId] })
     }
 
@@ -313,10 +302,7 @@ export function OrdersPage() {
             { label: 'Canceladas s/corte', value: stats.cajaSection?.cancelledUncut ?? 0, color: '#EF4444', icon: XCircle },
             { label: 'Ingreso Pendiente', value: formatCurrency(stats.cajaSection?.pendingRevenue ?? 0), color: '#10B981', icon: CreditCard },
         ]
-        return [
-            { label: 'En Corte de Caja', value: stats.historialSection?.total ?? 0, color: '#22C55E', icon: CheckCircle2, kpiId: 'historial-total' },
-            { label: 'Ingresos Confirmados', value: formatCurrency(stats.historialSection?.revenue ?? 0), color: '#10B981', icon: Archive, kpiId: 'historial-revenue' },
-        ]
+        return []
     }
     const tabStats = getTabStats()
 
@@ -343,8 +329,7 @@ export function OrdersPage() {
             <div className="flex flex-col sm:flex-row gap-2 p-1.5 bg-muted/50 rounded-2xl mb-4">
                 {[
                     { id: 'activas', label: 'Operación Activa', icon: Flame, iconColor: 'text-orange-500', badge: stats?.activeSection?.total },
-                    { id: 'caja', label: 'Por Liquidar', icon: Lock, iconColor: 'text-amber-500', badge: stats?.cajaSection?.deliveredUncut },
-                    { id: 'historial', label: 'Historial', icon: Archive, iconColor: 'text-primary', badge: null },
+                    { id: 'caja', label: 'Por Liquidar', icon: Lock, iconColor: 'text-amber-500', badge: stats?.cajaSection?.deliveredUncut }
                 ].map(tab => (
                     <button key={tab.id} onClick={() => setActiveTab(tab.id)}
                         className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl font-black text-sm transition-all ${activeTab === tab.id
@@ -373,7 +358,6 @@ export function OrdersPage() {
                             onClick={() => {
                                 setTimePreset(preset.id)
                                 setShowCustomPicker(preset.id === 'custom')
-                                setHistoryPage(1)
                             }}
                             className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${timePreset === preset.id
                                 ? 'bg-primary text-primary-foreground shadow-sm'
@@ -464,10 +448,17 @@ export function OrdersPage() {
                         </span>
                     </button>
 
-                    <h2 className="text-sm font-black text-muted-foreground">
-                        {filteredOrders.length} {activeTab === 'activas' ? 'activas' : activeTab === 'caja' ? 'por liquidar' : 'en historial'}
+                    <h2 className="text-sm font-black text-muted-foreground mr-4">
+                        {filteredOrders.length} {activeTab === 'activas' ? 'activas' : 'por liquidar'}
                         {timePreset !== 'all' && <span className="text-primary ml-1">· {TIME_PRESETS.find(p => p.id === timePreset)?.label}</span>}
                     </h2>
+
+                    {activeTab === 'activas' && (
+                        <div className="bg-muted/50 p-1 rounded-lg flex items-center shrink-0">
+                            <button onClick={() => setViewMode('list')} className={`p-1.5 rounded-md transition-all ${viewMode === 'list' ? 'bg-background shadow-sm text-primary' : 'text-muted-foreground hover:text-foreground'}`} title="Vista de Lista"><List className="w-4 h-4" /></button>
+                            <button onClick={() => setViewMode('kanban')} className={`p-1.5 rounded-md transition-all ${viewMode === 'kanban' ? 'bg-background shadow-sm text-primary' : 'text-muted-foreground hover:text-foreground'}`} title="Vista de Tablero Kanban"><LayoutGrid className="w-4 h-4" /></button>
+                        </div>
+                    )}
                 </div>
                 <div className="relative w-full sm:w-72">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
@@ -545,94 +536,102 @@ export function OrdersPage() {
                     </div>
                 ) : (
                     <div ref={parentRef} className="h-[calc(100vh-280px)] min-h-[400px] overflow-y-auto pr-2 custom-scrollbar relative">
-                        {/* We use standard mapping for "activas" since they use a grid and are usually few. 
-                            We virtualize the vertical list for "caja" and "historial" which can be huge. */}
+                        {/* We use standard mapping for "activas" list view since they use a grid and are usually few. 
+                            We virtualize the vertical list for "caja" which can be huge. */}
                         {activeTab === 'activas' ? (
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                {filteredOrders.map(order => {
-                                    const statusInfo = ORDER_STATUSES[order.status] || ORDER_STATUSES.pending
-                                    const payment = PAYMENT_LABELS[order.payment_method] || PAYMENT_LABELS.cash
-                                    const items = Array.isArray(order.items) ? order.items : []
-                                    const isSelected = selectedIds.has(order.id)
-                                    const isGhostOrder = (Date.now() - new Date(order.created_at).getTime()) > (8 * 60 * 60 * 1000)
+                            viewMode === 'kanban' ? (
+                                <KanbanBoard
+                                    orders={filteredOrders}
+                                    onOrderClick={setSelectedOrder}
+                                    onAdvanceStatus={(orderId, status) => updateStatusMutation.mutate({ orderId, status })}
+                                />
+                            ) : (
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    {filteredOrders.map(order => {
+                                        const statusInfo = ORDER_STATUSES[order.status] || ORDER_STATUSES.pending
+                                        const payment = PAYMENT_LABELS[order.payment_method] || PAYMENT_LABELS.cash
+                                        const items = Array.isArray(order.items) ? order.items : []
+                                        const isSelected = selectedIds.has(order.id)
+                                        const isGhostOrder = (Date.now() - new Date(order.created_at).getTime()) > (8 * 60 * 60 * 1000)
 
-                                    return (
-                                        <div key={order.id}
-                                            className={`bg-card border rounded-2xl p-5 cursor-pointer transition-all hover:shadow-lg hover:-translate-y-0.5 relative overflow-hidden ${isSelected
-                                                ? 'border-primary/60 shadow-md shadow-primary/10 ring-2 ring-primary/20'
-                                                : isGhostOrder ? 'border-red-500/50'
-                                                    : order.status === 'pending' ? 'border-amber-400/50 dark:border-amber-500/30 bg-amber-50/50 dark:bg-amber-900/10'
-                                                        : 'border-border/60 hover:border-primary/40'}`}
-                                        >
-                                            {isGhostOrder && (
-                                                <div className="absolute top-0 left-0 w-full bg-red-500 text-white text-[10px] uppercase font-black tracking-widest text-center py-0.5 flex items-center justify-center gap-1.5">
-                                                    <AlertTriangle className="w-3 h-3" /> Orden antigua — Requiere Acción
-                                                </div>
-                                            )}
-
-                                            <div className={`flex items-start gap-3 mb-4 ${isGhostOrder ? 'mt-4' : ''}`}>
-                                                {/* Checkbox */}
-                                                <button
-                                                    onClick={e => { e.stopPropagation(); toggleSelect(order.id) }}
-                                                    className="mt-1 shrink-0 text-muted-foreground hover:text-primary transition-colors"
-                                                >
-                                                    {isSelected
-                                                        ? <CheckSquare className="w-5 h-5 text-primary" />
-                                                        : <Square className="w-5 h-5" />
-                                                    }
-                                                </button>
-
-                                                <div className="flex-1 min-w-0" onClick={() => setSelectedOrder(order)}>
-                                                    <div className="flex items-center gap-2 flex-wrap mb-1.5">
-                                                        <span className="font-black text-lg text-foreground tracking-tight">{order.customer_name || 'Cliente General'}</span>
-                                                        <span className="text-[10px] uppercase tracking-widest font-black px-2 py-1 rounded-md text-white shrink-0 shadow-sm" style={{ background: statusInfo.color }}>
-                                                            {statusInfo.label}
-                                                        </span>
+                                        return (
+                                            <div key={order.id}
+                                                className={`bg-card border rounded-2xl p-5 cursor-pointer transition-all hover:shadow-lg hover:-translate-y-0.5 relative overflow-hidden ${isSelected
+                                                    ? 'border-primary/60 shadow-md shadow-primary/10 ring-2 ring-primary/20'
+                                                    : isGhostOrder ? 'border-red-500/50'
+                                                        : order.status === 'pending' ? 'border-amber-400/50 dark:border-amber-500/30 bg-amber-50/50 dark:bg-amber-900/10'
+                                                            : 'border-border/60 hover:border-primary/40'}`}
+                                            >
+                                                {isGhostOrder && (
+                                                    <div className="absolute top-0 left-0 w-full bg-red-500 text-white text-[10px] uppercase font-black tracking-widest text-center py-0.5 flex items-center justify-center gap-1.5">
+                                                        <AlertTriangle className="w-3 h-3" /> Orden antigua — Requiere Acción
                                                     </div>
-                                                    <div className="flex items-center flex-wrap gap-x-3 gap-y-1.5 text-xs font-semibold text-muted-foreground">
-                                                        <span className="bg-muted px-2 py-0.5 rounded-md text-foreground">
-                                                            {order.order_type === 'delivery' ? '🛵 Domicilio' : order.order_type === 'dine_in' ? '🪑 Mesa' : '🏪 Llevar'}
-                                                        </span>
-                                                        {order.table_number && <span className="text-orange-600 dark:text-orange-400 font-bold bg-orange-100 dark:bg-orange-950/50 px-2 py-0.5 rounded-md">Mesa {order.table_number}</span>}
-                                                        <span className="opacity-70">#{order.folio || order.id.slice(0, 5)}</span>
-                                                        <span className="flex items-center gap-1 opacity-70"><Clock className="w-3 h-3" />{getTimeAgo(order.created_at)}</span>
+                                                )}
+
+                                                <div className={`flex items-start gap-3 mb-4 ${isGhostOrder ? 'mt-4' : ''}`}>
+                                                    {/* Checkbox */}
+                                                    <button
+                                                        onClick={e => { e.stopPropagation(); toggleSelect(order.id) }}
+                                                        className="mt-1 shrink-0 text-muted-foreground hover:text-primary transition-colors"
+                                                    >
+                                                        {isSelected
+                                                            ? <CheckSquare className="w-5 h-5 text-primary" />
+                                                            : <Square className="w-5 h-5" />
+                                                        }
+                                                    </button>
+
+                                                    <div className="flex-1 min-w-0" onClick={() => setSelectedOrder(order)}>
+                                                        <div className="flex items-center gap-2 flex-wrap mb-1.5">
+                                                            <span className="font-black text-lg text-foreground tracking-tight">{order.customer_name || 'Cliente General'}</span>
+                                                            <span className="text-[10px] uppercase tracking-widest font-black px-2 py-1 rounded-md text-white shrink-0 shadow-sm" style={{ background: statusInfo.color }}>
+                                                                {statusInfo.label}
+                                                            </span>
+                                                        </div>
+                                                        <div className="flex items-center flex-wrap gap-x-3 gap-y-1.5 text-xs font-semibold text-muted-foreground">
+                                                            <span className="bg-muted px-2 py-0.5 rounded-md text-foreground">
+                                                                {order.order_type === 'delivery' ? '🛵 Domicilio' : order.order_type === 'dine_in' ? '🪑 Mesa' : '🏪 Llevar'}
+                                                            </span>
+                                                            {order.table_number && <span className="text-orange-600 dark:text-orange-400 font-bold bg-orange-100 dark:bg-orange-950/50 px-2 py-0.5 rounded-md">Mesa {order.table_number}</span>}
+                                                            <span className="opacity-70">#{order.folio || order.id.slice(0, 5)}</span>
+                                                            <span className="flex items-center gap-1 opacity-70"><Clock className="w-3 h-3" />{getTimeAgo(order.created_at)}</span>
+                                                        </div>
+                                                    </div>
+                                                    <div className="shrink-0 text-right" onClick={() => setSelectedOrder(order)}>
+                                                        <p className="font-black text-foreground text-sm">{formatCurrency(order.total)}</p>
                                                     </div>
                                                 </div>
-                                                <div className="shrink-0 text-right" onClick={() => setSelectedOrder(order)}>
-                                                    <p className="font-black text-foreground text-sm">{formatCurrency(order.total)}</p>
+
+                                                <div className="bg-muted/40 rounded-xl p-3 mb-4 space-y-1" onClick={() => setSelectedOrder(order)}>
+                                                    {items.slice(0, 3).map((item, idx) => (
+                                                        <div key={idx} className="flex text-sm">
+                                                            <span className="font-medium text-foreground truncate pr-4">
+                                                                <span className="font-black text-muted-foreground mr-1.5">{item.quantity}x</span>
+                                                                {item.product?.name || item.name || 'Producto'}
+                                                            </span>
+                                                        </div>
+                                                    ))}
+                                                    {items.length > 3 && <p className="text-xs font-bold text-muted-foreground pt-1">+ {items.length - 3} más</p>}
+                                                </div>
+
+                                                <div className="flex gap-2">
+                                                    {getNextStatuses(order.status).map(next => {
+                                                        const nextInfo = ORDER_STATUSES[next]
+                                                        if (!nextInfo) return null
+                                                        return (
+                                                            <button key={next}
+                                                                onClick={e => { e.stopPropagation(); updateStatusMutation.mutate({ orderId: order.id, status: next }) }}
+                                                                className="flex-1 py-2.5 rounded-xl text-xs font-black text-white hover:brightness-110 active:scale-95 transition-all shadow-sm"
+                                                                style={{ background: nextInfo.color }}>
+                                                                {nextInfo.emoji} {nextInfo.label}
+                                                            </button>
+                                                        )
+                                                    })}
                                                 </div>
                                             </div>
-
-                                            <div className="bg-muted/40 rounded-xl p-3 mb-4 space-y-1" onClick={() => setSelectedOrder(order)}>
-                                                {items.slice(0, 3).map((item, idx) => (
-                                                    <div key={idx} className="flex text-sm">
-                                                        <span className="font-medium text-foreground truncate pr-4">
-                                                            <span className="font-black text-muted-foreground mr-1.5">{item.quantity}x</span>
-                                                            {item.product?.name || item.name || 'Producto'}
-                                                        </span>
-                                                    </div>
-                                                ))}
-                                                {items.length > 3 && <p className="text-xs font-bold text-muted-foreground pt-1">+ {items.length - 3} más</p>}
-                                            </div>
-
-                                            <div className="flex gap-2">
-                                                {getNextStatuses(order.status).map(next => {
-                                                    const nextInfo = ORDER_STATUSES[next]
-                                                    if (!nextInfo) return null
-                                                    return (
-                                                        <button key={next}
-                                                            onClick={e => { e.stopPropagation(); updateStatusMutation.mutate({ orderId: order.id, status: next }) }}
-                                                            className="flex-1 py-2.5 rounded-xl text-xs font-black text-white hover:brightness-110 active:scale-95 transition-all shadow-sm"
-                                                            style={{ background: nextInfo.color }}>
-                                                            {nextInfo.emoji} {nextInfo.label}
-                                                        </button>
-                                                    )
-                                                })}
-                                            </div>
-                                        </div>
-                                    )
-                                })}
-                            </div>
+                                        )
+                                    })}
+                                </div>
+                            )
                         ) : (
                             <VirtualOrderList
                                 orders={filteredOrders}
@@ -642,26 +641,6 @@ export function OrdersPage() {
                                 parentRef={parentRef}
                             />
                         )}
-                    </div>
-                )}
-
-                {/* Pagination */}
-                {activeTab === 'historial' && (
-                    <div className="pt-4 flex items-center justify-between bg-card p-4 rounded-xl border border-border/60 mt-4">
-                        <p className="text-sm font-bold text-muted-foreground">
-                            Página {historyPage} de {Math.max(1, Math.ceil(totalHistoryCount / 50))}
-                            <span className="font-normal opacity-70 ml-1">({totalHistoryCount} órdenes)</span>
-                        </p>
-                        <div className="flex gap-2">
-                            <Button variant="outline" onClick={() => setHistoryPage(p => Math.max(1, p - 1))}
-                                disabled={historyPage === 1 || isLoadingHistory} className="font-bold rounded-lg h-9">
-                                <ChevronLeft className="w-4 h-4 mr-1" /> Anterior
-                            </Button>
-                            <Button variant="outline" onClick={() => setHistoryPage(p => Math.min(Math.ceil(totalHistoryCount / 50), p + 1))}
-                                disabled={historyPage >= Math.ceil(totalHistoryCount / 50) || isLoadingHistory} className="font-bold rounded-lg h-9">
-                                Siguiente <ChevronRight className="w-4 h-4 ml-1" />
-                            </Button>
-                        </div>
                     </div>
                 )}
             </div>
@@ -691,9 +670,15 @@ export function OrdersPage() {
                 fetchFn={async (page, pageSize) => {
                     const label = selectedKpi?.label
                     const mode = (label === 'En Cola' || label === 'Pendientes' || label === 'En Preparación') ? 'active'
-                        : (label === 'Por Cortar' || label === 'Canceladas s/corte' || label === 'Ingreso Pendiente') ? 'caja'
-                            : 'historial'
-                    return await getOrders(restaurantId, { mode, page, pageSize, startDate, endDate })
+                        : 'caja'
+
+                    let statuses = null
+                    if (label === 'En Cola' || label === 'Pendientes') statuses = ['pending']
+                    else if (label === 'En Preparación') statuses = ['confirmed', 'preparing']
+                    else if (label === 'Por Cortar') statuses = ['delivered']
+                    else if (label === 'Canceladas s/corte') statuses = ['cancelled']
+
+                    return await getOrders(restaurantId, { mode, page, pageSize, startDate, endDate, statuses })
                 }}
                 renderItem={(order) => {
                     const si = ORDER_STATUSES[order.status] || ORDER_STATUSES.pending

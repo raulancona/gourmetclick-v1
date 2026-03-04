@@ -3,12 +3,11 @@ import { Link, useLocation, useNavigate } from 'react-router-dom'
 import {
     LayoutDashboard, UtensilsCrossed, FolderTree, ClipboardList,
     Settings, LogOut, Calculator, ChefHat, Home, Grid, Package,
-    Sun, Moon, Globe, BarChart3, Receipt, Lock, ChevronLeft, ChevronRight,
+    Globe, BarChart3, Receipt, Lock, ChevronLeft, ChevronRight,
     PanelLeftClose, PanelLeftOpen, Users
 } from 'lucide-react'
 import { useAuth } from '../auth/auth-context'
 import { useTerminal } from '../auth/terminal-context'
-import { useTheme } from '../../components/theme-provider'
 import { toast } from 'sonner'
 
 // Nav groups with sections
@@ -50,7 +49,6 @@ export function Sidebar({ isOpen, onClose, isCollapsed, onToggleCollapse }) {
     const navigate = useNavigate()
     const { user, signOut, profile } = useAuth()
     const { activeEmployee, logout: terminalLock } = useTerminal()
-    const { theme, setTheme } = useTheme()
 
     const isSuperAdmin = profile?.role === 'superadmin'
     const isOwner = profile?.role === 'owner' || (user && !activeEmployee)
@@ -212,13 +210,6 @@ export function Sidebar({ isOpen, onClose, isCollapsed, onToggleCollapse }) {
 
                     {/* Action buttons */}
                     <div className={`flex gap-1.5 ${isCollapsed ? 'flex-col items-center' : 'items-center'}`}>
-                        <button
-                            onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-                            title={theme === 'dark' ? 'Modo Claro' : 'Modo Oscuro'}
-                            className="flex-1 h-9 flex items-center justify-center text-muted-foreground hover:text-primary hover:bg-primary/10 rounded-xl transition-all"
-                        >
-                            {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
-                        </button>
 
                         {activeEmployee ? (
                             <button

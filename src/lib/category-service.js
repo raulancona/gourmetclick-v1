@@ -27,6 +27,7 @@ export async function createCategory(categoryData, userId) {
         .from('categories')
         .insert([{
             ...categoryData,
+            user_id: categoryData.user_id || userId,
             restaurant_id: categoryData.restaurant_id || userId // Fallback al owner ID
         }])
         .select()

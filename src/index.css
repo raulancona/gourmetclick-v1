@@ -6,50 +6,34 @@
 
 @layer base {
   :root {
-    /* Light Mode (Clean & Professional) */
-    --background: 0 0% 100%;
-    --foreground: 240 10% 3.9%;
+    /* New Light Theme (Navy & Gold Palette) */
+    --background: 210 20% 96%;
+    /* Soft off-white to reduce glare */
+    --foreground: 216 100% 3.9%;
+    /* #000814 - Deepest Blue */
     --card: 0 0% 100%;
-    --card-foreground: 240 10% 3.9%;
+    --card-foreground: 216 100% 3.9%;
     --popover: 0 0% 100%;
-    --popover-foreground: 240 10% 3.9%;
-    --primary: 240 5.9% 10%;
-    --primary-foreground: 0 0% 98%;
-    --secondary: 240 4.8% 95.9%;
-    --secondary-foreground: 240 5.9% 10%;
-    --muted: 240 4.8% 95.9%;
-    --muted-foreground: 240 3.8% 46.1%;
-    --accent: 240 4.8% 95.9%;
-    --accent-foreground: 240 5.9% 10%;
+    --popover-foreground: 216 100% 3.9%;
+    --primary: 209 100% 20%;
+    /* #003566 - Medium Navy */
+    --primary-foreground: 0 0% 100%;
+    --secondary: 211 100% 12%;
+    /* #001d3d - Deep Navy */
+    --secondary-foreground: 0 0% 100%;
+    --muted: 210 20% 92%;
+    --muted-foreground: 211 20% 40%;
+    --accent: 50 100% 52%;
+    /* #ffd60a - Gold */
+    --accent-foreground: 216 100% 3.9%;
+    /* Dark text on gold */
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 0 0% 98%;
-    --border: 240 5.9% 90%;
-    --input: 240 5.9% 90%;
-    --ring: 240 5.9% 10%;
+    --border: 210 20% 86%;
+    --input: 210 20% 86%;
+    --ring: 50 100% 52%;
+    /* Gold focus rings */
     --radius: 0.75rem;
-  }
-
-  .dark {
-    /* Gourmet Click: Dark & Gold Theme */
-    --background: 240 10% 3.9%;
-    --foreground: 0 0% 98%;
-    --card: 240 10% 3.9%;
-    --card-foreground: 0 0% 98%;
-    --popover: 240 10% 3.9%;
-    --popover-foreground: 0 0% 98%;
-    --primary: 46 62% 52%;
-    --primary-foreground: 240 10% 3.9%;
-    --secondary: 240 3.7% 15.9%;
-    --secondary-foreground: 0 0% 98%;
-    --muted: 240 3.7% 15.9%;
-    --muted-foreground: 240 5% 64.9%;
-    --accent: 240 3.7% 15.9%;
-    --accent-foreground: 0 0% 98%;
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 240 3.7% 15.9%;
-    --input: 240 3.7% 15.9%;
-    --ring: 46 62% 52%;
   }
 }
 
@@ -86,63 +70,6 @@
   }
 }
 
-/* ── Global Dark Mode Form Fix ─────────────────────────────────────────────── */
-/* Ensures ALL inputs/textareas/selects are readable in dark mode
-   regardless of whether individual components use dark: variants or not */
-@layer base {
-
-  .dark input,
-  .dark textarea,
-  .dark select {
-    color-scheme: dark;
-    color: hsl(var(--foreground));
-    background-color: hsl(var(--secondary));
-    border-color: hsl(var(--border));
-  }
-
-  .dark input::placeholder,
-  .dark textarea::placeholder {
-    color: hsl(var(--muted-foreground));
-    opacity: 1;
-  }
-
-  /* Fix hardcoded bg-white/bg-gray-* inputs that don't have dark: variants */
-  .dark input[class*="bg-white"],
-  .dark input[class*="bg-gray"],
-  .dark textarea[class*="bg-white"],
-  .dark textarea[class*="bg-gray"] {
-    background-color: hsl(240 3.7% 15.9%) !important;
-    color: hsl(0 0% 98%) !important;
-  }
-
-  .dark input[class*="border-gray"],
-  .dark textarea[class*="border-gray"],
-  .dark select[class*="border-gray"] {
-    border-color: hsl(240 3.7% 25%) !important;
-  }
-
-  /* Fix placeholder in hardcoded gray inputs in dark mode */
-  .dark input[class*="bg-gray"]::placeholder,
-  .dark input[class*="bg-white"]::placeholder,
-  .dark textarea[class*="bg-gray"]::placeholder,
-  .dark textarea[class*="bg-white"]::placeholder {
-    color: hsl(240 5% 64.9%) !important;
-  }
-
-  /* Scrollbar in dark mode */
-  .dark ::-webkit-scrollbar-track {
-    background: hsl(240 10% 6%);
-  }
-
-  .dark ::-webkit-scrollbar-thumb {
-    background: hsl(240 3.7% 25%);
-    border-radius: 4px;
-  }
-
-  .dark ::-webkit-scrollbar-thumb:hover {
-    background: hsl(240 3.7% 35%);
-  }
-}
 
 /* ── Public Menu: Always Light Mode ────────────────────────────────────────── */
 /* The public customer menu should ALWAYS appear in light mode for clarity.

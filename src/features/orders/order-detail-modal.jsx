@@ -83,15 +83,15 @@ export function OrderDetailModal({ order, onClose, onUpdateStatus, onUpdateOrder
 
                             {/* Lifecycle Badge */}
                             {isClosed ? (
-                                <span className="flex items-center gap-1.5 text-stone-600 dark:text-stone-400 font-bold bg-stone-50 dark:bg-stone-900/30 px-2 py-1 rounded-lg border border-stone-200 dark:border-stone-700 w-fit mt-1">
-                                    <Lock className="w-3 h-3" /> Incluida en Corte <span className="font-mono">#{order.cash_cut_id.slice(0, 8)}</span>
+                                <span className="flex items-center gap-1.5 text-white font-bold bg-secondary px-2.5 py-1 rounded-lg w-fit mt-1 shadow-sm border border-secondary">
+                                    <Lock className="w-3 h-3" /> Incluida en Corte <span className="font-mono opacity-80">#{order.cash_cut_id.slice(0, 8)}</span>
                                 </span>
                             ) : isPendingCut && order.status === 'delivered' ? (
-                                <span className="flex items-center gap-1 text-amber-600 dark:text-amber-400 font-bold bg-amber-50 dark:bg-amber-900/20 px-2 py-0.5 rounded-lg border border-amber-200/50 w-fit mt-1">
+                                <span className="flex items-center gap-1 text-white font-bold bg-secondary px-2.5 py-1 rounded-lg w-fit mt-1 shadow-sm border border-secondary">
                                     <CheckCircle2 className="w-3 h-3" /> Entregada · Pendiente de Corte de Caja
                                 </span>
                             ) : isPendingCut && order.status === 'cancelled' ? (
-                                <span className="flex items-center gap-1 text-red-600 dark:text-red-400 font-bold bg-red-50 dark:bg-red-900/20 px-2 py-0.5 rounded-lg border border-red-200/50 w-fit mt-1">
+                                <span className="flex items-center gap-1 text-white font-bold bg-red-600 px-2.5 py-1 rounded-lg w-fit mt-1 shadow-sm border border-red-700">
                                     <X className="w-3 h-3" /> Cancelada · Pendiente de Corte de Caja
                                 </span>
                             ) : null}
@@ -411,11 +411,11 @@ export function OrderDetailModal({ order, onClose, onUpdateStatus, onUpdateOrder
 
                                     {/* Por Liquidar Context: info badge + reopen */}
                                     {isPendingCut && (
-                                        <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-4 text-center">
-                                            <p className="text-sm font-bold text-amber-600 dark:text-amber-400 mb-1">
-                                                ⏳ Pendiente de Corte de Caja
+                                        <div className="bg-secondary rounded-xl p-4 text-center shadow-sm">
+                                            <p className="text-sm font-bold text-white mb-1 flex items-center gap-2 justify-center">
+                                                <Clock className="w-4 h-4 text-accent" /> Pendiente de Corte de Caja
                                             </p>
-                                            <p className="text-xs text-muted-foreground mb-3">
+                                            <p className="text-xs text-white/70 mb-3">
                                                 Esta orden se incluirá en el próximo corte de caja.
                                                 {isAdmin && ' Como admin puedes reabrirla.'}
                                             </p>
@@ -428,7 +428,7 @@ export function OrderDetailModal({ order, onClose, onUpdateStatus, onUpdateOrder
                                                             onReopenOrder()
                                                         }
                                                     }}
-                                                    className="w-full border-amber-500/30 text-amber-600 hover:bg-amber-500/10"
+                                                    className="w-full border-white/20 text-white hover:bg-white/10"
                                                 >
                                                     <RotateCcw className="w-4 h-4 mr-2" /> Reabrir Orden (Admin)
                                                 </Button>

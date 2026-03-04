@@ -241,7 +241,7 @@ export function DashboardPage() {
 
                 {/* Date Filter Selector — presets + custom range */}
                 <div className="flex flex-col gap-2 items-end">
-                    <div className="flex flex-wrap items-center gap-1 bg-white dark:bg-gray-800 p-1 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-sm">
+                    <div className="flex flex-wrap items-center gap-1 bg-card p-1.5 rounded-2xl border border-border shadow-sm">
                         {[
                             { id: 'today', label: 'Hoy' },
                             { id: 'yesterday', label: 'Ayer' },
@@ -249,14 +249,14 @@ export function DashboardPage() {
                             { id: '30d', label: '30 Días' },
                             { id: 'month', label: 'Este Mes' },
                             { id: '3m', label: '3 Meses' },
-                            { id: 'custom', label: '📅 Personalizado' },
+                            { id: 'custom', label: '📅 Rango' },
                         ].map(range => (
                             <button
                                 key={range.id}
                                 onClick={() => setTimeRange(range.id)}
-                                className={`px-3 py-1.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-all ${timeRange === range.id
-                                    ? 'bg-primary text-white shadow-md'
-                                    : 'text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700'
+                                className={`px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-all ${timeRange === range.id
+                                    ? 'bg-primary text-primary-foreground shadow-md'
+                                    : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground'
                                     }`}
                             >
                                 {range.label}
@@ -265,7 +265,7 @@ export function DashboardPage() {
                     </div>
                     {/* Custom date range inputs */}
                     {timeRange === 'custom' && (
-                        <div className="flex items-center gap-2 bg-white dark:bg-gray-800 p-2 rounded-2xl border border-primary/30 shadow-sm">
+                        <div className="flex items-center gap-2 bg-card p-2 rounded-2xl border border-border shadow-sm">
                             <div className="flex items-center gap-1">
                                 <span className="text-[10px] font-black text-muted-foreground uppercase">Desde</span>
                                 <input
@@ -273,7 +273,7 @@ export function DashboardPage() {
                                     value={customStart}
                                     max={customEnd}
                                     onChange={e => setCustomStart(e.target.value)}
-                                    className="text-xs font-bold border border-border rounded-lg px-2 py-1 bg-background text-foreground focus:ring-1 focus:ring-primary outline-none"
+                                    className="text-xs font-bold border border-border rounded-lg px-2 py-1.5 bg-background text-foreground focus:ring-1 focus:ring-accent outline-none"
                                 />
                             </div>
                             <span className="text-muted-foreground font-bold">→</span>
@@ -285,7 +285,7 @@ export function DashboardPage() {
                                     min={customStart}
                                     max={new Date().toISOString().split('T')[0]}
                                     onChange={e => setCustomEnd(e.target.value)}
-                                    className="text-xs font-bold border border-border rounded-lg px-2 py-1 bg-background text-foreground focus:ring-1 focus:ring-primary outline-none"
+                                    className="text-xs font-bold border border-border rounded-lg px-2 py-1.5 bg-background text-foreground focus:ring-1 focus:ring-accent outline-none"
                                 />
                             </div>
                         </div>
@@ -298,63 +298,63 @@ export function DashboardPage() {
                 {/* Ventas Brutas */}
                 <div
                     onClick={() => setSelectedKpi({ type: 'ventas', label: 'Ventas Brutas', value: formatCurrency(stats?.revenue || 0), color: '#3B82F6', icon: TrendingUp })}
-                    className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 border-l-4 border-l-blue-500 shadow-sm p-5 flex flex-col gap-2 cursor-pointer transition-all hover:-translate-y-1 hover:shadow-md"
+                    className="bg-secondary rounded-2xl shadow-md p-6 flex flex-col gap-2 cursor-pointer transition-all hover:-translate-y-1 hover:shadow-lg border border-secondary"
                 >
-                    <div className="flex items-center gap-2">
-                        <div className="w-8 h-8 rounded-xl bg-blue-50 dark:bg-blue-900/30 flex items-center justify-center">
-                            <TrendingUp className="w-4 h-4 text-blue-500" />
+                    <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-lg bg-primary/40 flex items-center justify-center">
+                            <TrendingUp className="w-4 h-4 text-blue-400" />
                         </div>
-                        <span className="text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest">Ventas</span>
+                        <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Ventas</span>
                     </div>
-                    <div className="text-2xl font-black text-gray-900 dark:text-white tracking-tight">{formatCurrency(stats?.revenue || 0)}</div>
-                    <p className="text-[11px] text-gray-400 dark:text-gray-500">{stats?.delivered || 0} órdenes cobradas</p>
+                    <div className="text-3xl font-black text-white tracking-tight mt-1">{formatCurrency(stats?.revenue || 0)}</div>
+                    <p className="text-xs text-gray-400 font-medium">{stats?.delivered || 0} órdenes cobradas</p>
                 </div>
 
                 {/* Gastos */}
                 <div
                     onClick={() => setSelectedKpi({ type: 'gastos', label: 'Gastos Registrados', value: formatCurrency(totalExpenses), color: '#F87171', icon: Receipt })}
-                    className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 border-l-4 border-l-red-400 shadow-sm p-5 flex flex-col gap-2 cursor-pointer transition-all hover:-translate-y-1 hover:shadow-md"
+                    className="bg-secondary rounded-2xl shadow-md p-6 flex flex-col gap-2 cursor-pointer transition-all hover:-translate-y-1 hover:shadow-lg border border-secondary"
                 >
-                    <div className="flex items-center gap-2">
-                        <div className="w-8 h-8 rounded-xl bg-red-50 dark:bg-red-900/30 flex items-center justify-center">
-                            <Receipt className="w-4 h-4 text-red-400" />
+                    <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-lg bg-red-900/30 flex items-center justify-center">
+                            <Receipt className="w-4 h-4 text-red-500" />
                         </div>
-                        <span className="text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest">Gastos</span>
+                        <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Gastos</span>
                     </div>
-                    <div className="text-2xl font-black text-red-500 tracking-tight">-{formatCurrency(totalExpenses)}</div>
-                    <p className="text-[11px] text-gray-400 dark:text-gray-500">{expenses.length} registros</p>
+                    <div className="text-3xl font-black text-red-500 tracking-tight mt-1">-{formatCurrency(totalExpenses)}</div>
+                    <p className="text-xs text-gray-400 font-medium">{expenses.length} registros</p>
                 </div>
 
                 {/* Utilidad Neta — the key metric */}
-                <div className={`rounded-2xl border shadow-sm p-5 flex flex-col gap-2 border-l-4 ${netProfit >= 0
-                    ? 'bg-emerald-50 dark:bg-emerald-950/30 border-green-200 dark:border-emerald-800 border-l-emerald-500'
-                    : 'bg-red-50 dark:bg-red-950/30 border-red-200 dark:border-red-800 border-l-red-500'
+                <div className={`rounded-2xl shadow-md p-6 flex flex-col gap-2 relative overflow-hidden ${netProfit >= 0
+                    ? 'bg-emerald-50 border-2 border-emerald-500/30'
+                    : 'bg-red-50 border-2 border-red-500/30'
                     }`}>
-                    <div className="flex items-center gap-2">
-                        <div className={`w-8 h-8 rounded-xl flex items-center justify-center ${netProfit >= 0 ? 'bg-emerald-100 dark:bg-emerald-900/40' : 'bg-red-100 dark:bg-red-900/40'
+                    <div className="flex items-center gap-3">
+                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${netProfit >= 0 ? 'bg-emerald-200/50' : 'bg-red-200/50'
                             }`}>
-                            <PiggyBank className={`w-4 h-4 ${netProfit >= 0 ? 'text-emerald-600' : 'text-red-500'}`} />
+                            <PiggyBank className={`w-4 h-4 ${netProfit >= 0 ? 'text-emerald-700' : 'text-red-600'}`} />
                         </div>
-                        <span className="text-[10px] font-black text-gray-500 dark:text-gray-400 uppercase tracking-widest">Utilidad Neta</span>
+                        <span className={`text-[10px] font-black uppercase tracking-widest ${netProfit >= 0 ? 'text-emerald-700/60' : 'text-red-700/60'}`}>Utilidad Neta</span>
                     </div>
-                    <div className={`text-2xl font-black tracking-tight ${netProfit >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-500'
+                    <div className={`text-3xl font-black tracking-tight mt-1 ${netProfit >= 0 ? 'text-emerald-600' : 'text-red-600'
                         }`}>
                         {netProfit >= 0 ? '' : '-'}{formatCurrency(Math.abs(netProfit))}
                     </div>
-                    <p className="text-[11px] text-gray-400 dark:text-gray-500">Ventas − Gastos registrados</p>
-                    <p className="text-[10px] text-gray-300 dark:text-gray-600 italic">* No incluye costo de producto</p>
+                    <p className={`text-xs font-medium ${netProfit >= 0 ? 'text-emerald-800/70' : 'text-red-800/70'}`}>Ventas − Gastos registrados</p>
+                    <p className={`text-[10px] italic mt-auto ${netProfit >= 0 ? 'text-emerald-800/50' : 'text-red-800/50'}`}>* No incluye costo de producto</p>
                 </div>
 
                 {/* Ticket Promedio */}
-                <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 border-l-4 border-l-amber-500 shadow-sm p-5 flex flex-col gap-2">
-                    <div className="flex items-center gap-2">
-                        <div className="w-8 h-8 rounded-xl bg-amber-50 dark:bg-amber-900/30 flex items-center justify-center">
-                            <Coins className="w-4 h-4 text-amber-500" />
+                <div className="bg-secondary rounded-2xl shadow-md p-6 flex flex-col gap-2 border border-secondary">
+                    <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-lg bg-amber-900/40 flex items-center justify-center">
+                            <Coins className="w-4 h-4 text-accent" />
                         </div>
-                        <span className="text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest">Ticket Prom.</span>
+                        <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Ticket Prom.</span>
                     </div>
-                    <div className="text-2xl font-black text-gray-900 dark:text-white tracking-tight">{formatCurrency(avgTicket)}</div>
-                    <p className="text-[11px] text-gray-400 dark:text-gray-500">Por orden</p>
+                    <div className="text-3xl font-black text-white tracking-tight mt-1">{formatCurrency(avgTicket)}</div>
+                    <p className="text-xs text-gray-400 font-medium">Por orden</p>
                 </div>
 
                 {/* Método Top */}
@@ -362,25 +362,27 @@ export function DashboardPage() {
                     onClick={() => {
                         if (topPayment) setSelectedKpi({ type: 'metodo', label: `Cobros con ${topPayment.label}`, value: `${stats?.paymentMethods?.[stats.topPayment] || 0} órdenes`, color: '#8B5CF6', icon: BadgeDollarSign })
                     }}
-                    className={`bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 border-l-4 border-l-violet-500 shadow-sm p-5 flex flex-col gap-2 ${topPayment ? 'cursor-pointer transition-all hover:-translate-y-1 hover:shadow-md' : ''}`}
+                    className={`bg-secondary rounded-2xl shadow-md p-6 flex flex-col gap-2 border border-secondary ${topPayment ? 'cursor-pointer transition-all hover:-translate-y-1 hover:shadow-lg' : ''}`}
                 >
-                    <div className="flex items-center gap-2">
-                        <div className="w-8 h-8 rounded-xl bg-violet-50 dark:bg-violet-900/30 flex items-center justify-center">
-                            <BadgeDollarSign className="w-4 h-4 text-violet-500" />
+                    <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-lg bg-violet-900/40 flex items-center justify-center">
+                            <BadgeDollarSign className="w-4 h-4 text-violet-400" />
                         </div>
-                        <span className="text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest">Cobro Top</span>
+                        <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Cobro Top</span>
                     </div>
-                    <div className="flex items-center gap-2 mt-1">
+                    <div className="flex items-center gap-3 mt-1">
                         {topPayment ? (
                             <>
-                                <topPayment.icon className="w-6 h-6" style={{ color: topPayment.color }} />
-                                <span className="text-xl font-black text-gray-900 dark:text-white">{topPayment.label}</span>
+                                <div className="p-1 rounded-md bg-white/10 flex items-center justify-center">
+                                    <topPayment.icon className="w-5 h-5 text-emerald-400" />
+                                </div>
+                                <span className="text-2xl font-black text-white">{topPayment.label}</span>
                             </>
                         ) : (
-                            <span className="text-xl font-black text-gray-400">N/A</span>
+                            <span className="text-2xl font-black text-gray-400">N/A</span>
                         )}
                     </div>
-                    <p className="text-[11px] text-gray-400 dark:text-gray-500">Método frecuente</p>
+                    <p className="text-xs text-gray-400 font-medium mt-auto">Método frecuente</p>
                 </div>
             </div>
 
@@ -468,27 +470,12 @@ export function DashboardPage() {
             </div>
 
             {/* Secondary Metrics — Ticket Avg + Order Type Distribution */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <Card className="bg-white dark:bg-gray-800 border-2 border-emerald-100 dark:border-emerald-900/50 shadow-sm">
-                    <CardHeader className="pb-2">
-                        <CardTitle className="text-emerald-600 dark:text-emerald-400 text-lg flex items-center gap-2 uppercase text-[10px] tracking-widest font-black">
-                            <Banknote className="w-5 h-5" />
-                            Ticket Promedio
-                        </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-3xl font-black text-gray-900 dark:text-white mb-1">
-                            {formatCurrency(avgTicket)}
-                        </div>
-                        <p className="text-xs text-muted-foreground">Promedio histórico del periodo.</p>
-                    </CardContent>
-                </Card>
-
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {/* Top 5 Más Vendidos */}
-                <Card className="bg-white dark:bg-gray-800 border-2 border-orange-100 dark:border-orange-900/50 shadow-sm">
-                    <CardHeader className="pb-2">
-                        <CardTitle className="text-orange-600 dark:text-orange-400 text-lg flex items-center gap-2 uppercase text-[10px] tracking-widest font-black">
-                            <Coffee className="w-5 h-5" />
+                <Card className="bg-card border-border shadow-sm">
+                    <CardHeader className="pb-2 border-b border-border mb-4">
+                        <CardTitle className="text-foreground text-sm flex items-center gap-2 font-black">
+                            <Coffee className="w-4 h-4 text-muted-foreground" />
                             Más Vendidos
                         </CardTitle>
                         <CardDescription>Por cantidad de unidades</CardDescription>
@@ -512,10 +499,10 @@ export function DashboardPage() {
                 </Card>
 
                 {/* Top 5 Más Rentables */}
-                <Card className="bg-white dark:bg-gray-800 border-2 border-blue-100 dark:border-blue-900/50 shadow-sm">
-                    <CardHeader className="pb-2">
-                        <CardTitle className="text-blue-600 dark:text-blue-400 text-lg flex items-center gap-2 uppercase text-[10px] tracking-widest font-black">
-                            <TrendingUp className="w-5 h-5" />
+                <Card className="bg-card border-border shadow-sm">
+                    <CardHeader className="pb-2 border-b border-border mb-4">
+                        <CardTitle className="text-foreground text-sm flex items-center gap-2 font-black">
+                            <TrendingUp className="w-4 h-4 text-muted-foreground" />
                             Más Rentables
                         </CardTitle>
                         <CardDescription>Por ingresos generados</CardDescription>
@@ -558,19 +545,19 @@ export function DashboardPage() {
                                     <div key={i} className="group">
                                         <div className="flex items-center justify-between text-sm mb-2">
                                             <div className="flex items-center gap-3">
-                                                <div className={`p-2 rounded-lg ${item.bg}`}>
-                                                    <item.icon className={`w-4 h-4 ${item.text}`} />
+                                                <div className={`p-2 rounded-lg bg-muted`}>
+                                                    <item.icon className="w-4 h-4 text-foreground" />
                                                 </div>
-                                                <span className="font-bold text-gray-700 dark:text-gray-300">{item.label}</span>
+                                                <span className="font-bold text-foreground">{item.label}</span>
                                             </div>
                                             <div className="flex items-baseline gap-1">
                                                 <span className="font-black text-lg text-foreground">{item.value}</span>
                                                 <span className="text-[10px] text-muted-foreground">({Math.round(percentage)}%)</span>
                                             </div>
                                         </div>
-                                        <div className="h-2 w-full bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden">
+                                        <div className="h-2 w-full bg-muted rounded-full overflow-hidden">
                                             <div
-                                                className={`h-full transition-all duration-1000 ${item.color}`}
+                                                className="h-full transition-all duration-1000 bg-accent"
                                                 style={{ width: `${percentage}%` }}
                                             />
                                         </div>
@@ -600,10 +587,10 @@ export function DashboardPage() {
                                     >
                                         <div className="flex items-center gap-4">
                                             <div className={`
-                                                w-10 h-10 rounded-full flex items-center justify-center shrink-0
-                                                ${order.status === 'delivered' ? 'bg-green-100 text-green-600 dark:bg-green-900/30' :
-                                                    order.status === 'cancelled' ? 'bg-red-100 text-red-600 dark:bg-red-900/30' :
-                                                        'bg-blue-100 text-blue-600 dark:bg-blue-900/30'}
+                                                w-10 h-10 rounded-full flex items-center justify-center shrink-0 border
+                                                ${order.status === 'delivered' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' :
+                                                    order.status === 'cancelled' ? 'bg-red-50 text-red-600 border-red-100' :
+                                                        'bg-primary/5 text-primary border-primary/10'}
                                             `}>
                                                 {order.order_type === 'delivery' ? <Truck className="w-5 h-5" /> :
                                                     order.order_type === 'dine_in' ? <Armchair className="w-5 h-5" /> :
@@ -624,12 +611,12 @@ export function DashboardPage() {
                                         <div className="text-right">
                                             <p className="font-black text-sm">{formatCurrency(order.total)}</p>
                                             <span className={`
-                                                inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold uppercase mt-1
-                                                ${order.status === 'delivered' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' :
-                                                    order.status === 'pending' ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400' :
-                                                        order.status === 'getting_ready' || order.status === 'preparing' ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400' :
-                                                            order.status === 'cancelled' ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' :
-                                                                'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'}
+                                                inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold uppercase mt-1 text-white shadow-sm
+                                                ${order.status === 'delivered' ? 'bg-emerald-600 border border-emerald-700' :
+                                                    order.status === 'pending' ? 'bg-amber-600 border border-amber-700' :
+                                                        order.status === 'getting_ready' || order.status === 'preparing' ? 'bg-purple-600 border border-purple-700' :
+                                                            order.status === 'cancelled' ? 'bg-red-600 border border-red-700' :
+                                                                'bg-blue-600 border border-blue-700'}
                                             `}>
                                                 {ORDER_STATUSES[order.status]?.label || order.status}
                                             </span>

@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect } from 'react'
-
+import { useTenant } from '../auth/tenant-context'
 const CartContext = createContext()
 
 export function useCart() {
@@ -11,11 +11,13 @@ export function useCart() {
 }
 
 export function CartProvider({ children }) {
+    const { tenant } = useTenant()
+    const storageKey = tenant?.id ? `gourmetclick_cart_${tenant.id}` : 'gourmetclick_cart'
     const [items, setItems] = useState([])
 
     // Load cart from localStorage on mount
     useEffect(() => {
-        const savedCart = localStorage.getItem('gourmetclick_cart')
+        const savedCart = localStorage.getItem(storageKey)
         if (savedCart) {
             try {
                 setItems(JSON.parse(savedCart))
@@ -23,12 +25,12 @@ export function CartProvider({ children }) {
                 console.error('Error loading cart:', error)
             }
         }
-    }, [])
+    }, [storageKey])
 
     // Save cart to localStorage whenever it changes
     useEffect(() => {
-        localStorage.setItem('gourmetclick_cart', JSON.stringify(items))
-    }, [items])
+        localStorage.setItem(storageKey, JSON.stringify(items))
+    }, [items, storageKey])
 
     const areModifiersEqual = (m1, m2) => {
         if (!m1 && !m2) return true

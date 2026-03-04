@@ -66,11 +66,16 @@ export async function getOrders(restaurantId, {
     // Mode-based filtering (canonical logic, replaces session-lookup approach)
     if (mode === 'active') {
         // All live orders regardless of session
-        query = query.not('status', 'in', '(delivered,cancelled)')
+        if (statuses && statuses.length > 0) {
+            query = query.in('status', statuses)
+        } else {
+            query = query.not('status', 'in', '(delivered,cancelled)')
+        }
     } else if (mode === 'caja') {
         // Delivered or cancelled but not yet part of a cash cut
+        const statusFilter = (statuses && statuses.length > 0) ? statuses : ['delivered', 'cancelled']
         query = query
-            .in('status', ['delivered', 'cancelled'])
+            .in('status', statusFilter)
             .is('cash_cut_id', null)
     } else if (mode === 'historial') {
         // Only orders formally closed by a cash cut
@@ -323,7 +328,7 @@ export async function reopenOrder(orderId, restaurantId, userName = 'Admin') {
         .from('orders')
         .update({
             fecha_cierre: null,
-            status: 'delivered',
+            status: 'preparing', // Return to active flow
             updated_at: new Date().toISOString(),
             audit_log: [...auditLog, {
                 action: 'REOPENED',

@@ -15,7 +15,6 @@ import { LinkCardConfigPage as MenuLinksPage } from './pages/link-card-config'
 import { LoginPage } from './pages/login'
 import { RegisterPage } from './pages/register'
 import { OnboardingPage } from './pages/onboarding'
-import { ThemeProvider } from './components/theme-provider'
 import { CashClosingPage } from './pages/cash-closing'
 import { ExpensesPage } from './pages/expenses'
 import { StaffPage } from './pages/staff'
@@ -29,7 +28,7 @@ import { PwaInstallButton } from './components/pwa-install-button'
 
 function App() {
   return (
-    <ThemeProvider defaultTheme="light" storageKey="gc-theme">
+    <>
       <BrowserRouter>
         <AuthProvider>
           <TenantProvider>
@@ -78,7 +77,7 @@ function App() {
       </BrowserRouter>
       <Toaster position="top-right" richColors />
       <PwaInstallButton />
-    </ThemeProvider>
+    </>
   )
 }
 

@@ -170,7 +170,7 @@ export async function getCashCutAnalytics(restaurantId, startDate, endDate) {
 
     const { data: cuts, error } = await supabase
         .from('cash_cuts')
-        .select('id, cut_date, total_cash, total_amount, total_card, total_transfer, order_count, created_at')
+        .select('id, cut_date, total_cash, total_amount, total_card, total_transfer, order_count, created_at, monto_real, diferencia, fondo_inicial, nombre_cajero')
         .eq('restaurant_id', restaurantId)
         .gte('cut_date', startIso)
         .lte('cut_date', endIso)
@@ -191,4 +191,67 @@ export async function getCashCutAnalytics(restaurantId, startDate, endDate) {
             perfectCuts
         }
     }
+}
+
+/**
+ * 5. Detalle Específico de Corte de Caja
+ */
+export async function getCashCutDetails(cutId) {
+    if (!cutId) throw new Error('Se requiere el ID del corte');
+
+    // Fetch the cut itself
+    const { data: cut, error: cutError } = await supabase
+        .from('cash_cuts')
+        .select('*')
+        .eq('id', cutId)
+        .single();
+    if (cutError) throw cutError;
+
+    // Fetch related active orders (delivered)
+    const { data: orders, error: ordersError } = await supabase
+        .from('orders')
+        .select('id, folio, status, total, payment_method, order_type, customer_name, created_at, items, sesion_caja_id')
+        .eq('cash_cut_id', cutId);
+    if (ordersError) throw ordersError;
+
+    // Detect the original session ID to fetch expenses
+    let sessionId = null;
+    if (orders && orders.length > 0) {
+        // If there are orders, the session ID is stamped on them
+        sessionId = orders.find(o => o.sesion_caja_id)?.sesion_caja_id;
+    }
+
+    // If we still don't have a sessionId (e.g. shift with no sales but with expenses),
+    // we attempt to match the session via the cut metadata. 
+    if (!sessionId) {
+        const { data: matchingSession } = await supabase
+            .from('sesiones_caja')
+            .select('id')
+            .eq('restaurante_id', cut.restaurant_id)
+            .eq('diferencia', cut.diferencia)
+            .order('closed_at', { ascending: false })
+            .limit(1);
+
+        if (matchingSession && matchingSession.length > 0) {
+            sessionId = matchingSession[0].id;
+        }
+    }
+
+    // Fetch related expenses using the derived session_id
+    let expenses = [];
+    if (sessionId) {
+        const { data: expData, error: expensesError } = await supabase
+            .from('gastos')
+            .select('id, descripcion, monto, categoria, created_at')
+            .eq('sesion_caja_id', sessionId);
+
+        if (expensesError) throw expensesError;
+        expenses = expData || [];
+    }
+
+    return {
+        cut,
+        orders: orders || [],
+        expenses: expenses || []
+    };
 }

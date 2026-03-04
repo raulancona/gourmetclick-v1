@@ -3,11 +3,19 @@ import { useQuery } from '@tanstack/react-query'
 import { getCashCutAnalytics } from '../../lib/reports-service'
 import { exportAuditCSV } from '../../lib/reports-export'
 import { formatCurrency } from '../../lib/utils'
-import { Loader2, TrendingUp, TrendingDown, ClipboardList, Shield, Download, AlertCircle, ChevronLeft, ChevronRight } from 'lucide-react'
+import { Loader2, TrendingUp, TrendingDown, ClipboardList, Shield, Download, AlertCircle, ChevronLeft, ChevronRight, HelpCircle } from 'lucide-react'
 import { Button } from '../../components/ui/button'
+import { CashCutDetailModal } from './cash-cut-detail-modal'
+import {
+    Tooltip,
+    TooltipContent,
+    TooltipProvider,
+    TooltipTrigger,
+} from "../../components/ui/tooltip"
 
 export function AuditTab({ tenantId, dateRange }) {
     const [page, setPage] = useState(1)
+    const [selectedCutId, setSelectedCutId] = useState(null)
     const pageSize = 15
 
     const { data, isLoading, error } = useQuery({
@@ -18,6 +26,7 @@ export function AuditTab({ tenantId, dateRange }) {
 
     useEffect(() => {
         setPage(1)
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [dateRange.start, dateRange.end])
 
     if (isLoading) {
@@ -94,11 +103,24 @@ export function AuditTab({ tenantId, dateRange }) {
                         <div className="overflow-x-auto">
                             <table className="w-full text-sm text-left">
                                 <thead className="text-[10px] text-muted-foreground uppercase tracking-wider bg-muted/50">
-                                    <tr>
+                                    <tr className="border-b border-border/50">
                                         <th className="px-6 py-3 font-black">Turno</th>
                                         <th className="px-6 py-3 font-black">Cajero</th>
                                         <th className="px-6 py-3 font-black">Declarado Físico</th>
-                                        <th className="px-6 py-3 font-black">Diferencia</th>
+                                        <th className="px-6 py-3 font-black">
+                                            <TooltipProvider>
+                                                <Tooltip delayDuration={300}>
+                                                    <TooltipTrigger asChild>
+                                                        <div className="flex items-center gap-1 cursor-help hover:text-primary transition-colors w-fit">
+                                                            Diferencia <HelpCircle className="w-3.5 h-3.5" />
+                                                        </div>
+                                                    </TooltipTrigger>
+                                                    <TooltipContent side="top" className="max-w-xs text-xs font-semibold">
+                                                        Se calcula como: (Físico Declarado) - (Fondo Inicial + Entradas Diferencia - Salidas de Gastos). Verde es un sobrante.
+                                                    </TooltipContent>
+                                                </Tooltip>
+                                            </TooltipProvider>
+                                        </th>
                                         <th className="px-6 py-3 font-black text-right">Fondo Inicial</th>
                                     </tr>
                                 </thead>
@@ -108,10 +130,14 @@ export function AuditTab({ tenantId, dateRange }) {
                                         const isSurplus = cut.diferencia > 0
 
                                         return (
-                                            <tr key={cut.id} className="hover:bg-muted/20">
+                                            <tr
+                                                key={cut.id}
+                                                className="hover:bg-muted/20 cursor-pointer transition-colors"
+                                                onClick={() => setSelectedCutId(cut.id)}
+                                            >
                                                 <td className="px-6 py-4 text-muted-foreground whitespace-nowrap">
                                                     <div className="flex flex-col">
-                                                        <span className="font-bold text-foreground">ID: {cut.id.substring(0, 8)}</span>
+                                                        <span className="font-bold text-primary group-hover:underline">ID: {cut.id.substring(0, 8)}</span>
                                                         <span className="text-xs">{new Date(cut.cut_date || cut.created_at).toLocaleString('es-MX')}</span>
                                                     </div>
                                                 </td>
@@ -163,9 +189,18 @@ export function AuditTab({ tenantId, dateRange }) {
                         )}
                     </div>
                 ) : (
-                    <div className="p-8 text-center text-muted-foreground text-sm font-medium">No hay cortes de caja cerrados en este período.</div>
+                    <div className="p-12 text-center text-muted-foreground font-bold flex flex-col items-center">
+                        <ClipboardList className="w-12 h-12 mb-3 opacity-20" />
+                        No se encontraron cortes de caja en el período seleccionado.
+                    </div>
                 )}
             </div>
+
+            <CashCutDetailModal
+                cutId={selectedCutId}
+                isOpen={!!selectedCutId}
+                onClose={() => setSelectedCutId(null)}
+            />
         </div>
     )
 }

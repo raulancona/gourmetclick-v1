@@ -20,13 +20,14 @@ import { createContext, useContext } from 'react'
 const CartCtx = createContext()
 function useCart() { return useContext(CartCtx) }
 
-function CartProvider({ children }) {
+function CartProvider({ restaurantId, children }) {
+    const storageKey = restaurantId ? `gourmetclick_cart_${restaurantId}` : 'gourmetclick_cart'
     const [items, setItems] = useState(() => {
-        try { return JSON.parse(localStorage.getItem('gourmetclick_cart') || '[]') }
+        try { return JSON.parse(localStorage.getItem(storageKey) || '[]') }
         catch { return [] }
     })
 
-    useEffect(() => { localStorage.setItem('gourmetclick_cart', JSON.stringify(items)) }, [items])
+    useEffect(() => { localStorage.setItem(storageKey, JSON.stringify(items)) }, [items, storageKey])
 
     const areModifiersEqual = (m1, m2) => {
         if (!m1 && !m2) return true
@@ -205,7 +206,7 @@ export function PublicMenuPage() {
 
     return (
         <div className="public-menu-root">
-            <CartProvider>
+            <CartProvider restaurantId={restaurant.id}>
                 <MenuContent
                     restaurant={restaurant}
                     categories={categories}
@@ -542,7 +543,7 @@ function ProductCard({ product, primaryColor, secondaryColor, onClick }) {
                         )}
                         {/* Extras indicator */}
                         {product.has_extras && (
-                            <span className="inline-flex items-center gap-1 mt-1.5 px-2 py-0.5 rounded-full text-[10px] font-black bg-orange-50 text-orange-500 border border-orange-100">
+                            <span className="inline-flex items-center gap-1 mt-1.5 px-2 py-0.5 rounded-full text-[10px] font-black bg-secondary text-white border border-secondary shadow-sm">
                                 ✨ Personalizable
                             </span>
                         )}

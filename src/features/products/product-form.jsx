@@ -8,12 +8,14 @@ import { Textarea } from '../../components/ui/textarea'
 import { ImageUpload } from './image-upload'
 import { uploadProductImage, deleteProductImage } from '../../lib/image-service'
 import { getCategories, createCategory } from '../../lib/category-service'
+import { useAuth } from '../auth/auth-context'
 import { useTenant } from '../auth/tenant-context'
 import { supabase } from '../../lib/supabase'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../components/ui/select'
 import { toast } from 'sonner'
 
 export function ProductForm({ product, onSubmit, onCancel, isLoading }) {
+    const { user } = useAuth()
     const { tenant } = useTenant()
     const [imageFile, setImageFile] = useState(null)
     const [isUploading, setIsUploading] = useState(false)
@@ -30,6 +32,7 @@ export function ProductForm({ product, onSubmit, onCancel, isLoading }) {
         register,
         handleSubmit,
         watch,
+        setValue,
         formState: { errors }
     } = useForm({
         defaultValues: {
@@ -76,13 +79,12 @@ export function ProductForm({ product, onSubmit, onCancel, isLoading }) {
             setIsCreatingCategory(true)
             const newCat = await createCategory({
                 name: newCategoryName.trim(),
-                user_id: tenant.id, // Or owner depending on arch, fallback is handled inside
-                restaurant_id: tenant.id,
-                is_active: true
-            }, tenant.id)
+                user_id: user.id, // Must be user.id to pass RLS, tenant.id might be a different user's ID
+                restaurant_id: tenant.id
+            }, user.id) // Pass user.id as the second parameter for the fallback
 
             setCategories(prev => [...prev, newCat])
-            register('category_id').onChange({ target: { name: 'category_id', value: newCat.id } }) // update form value hook natively not exposed easily without setValue
+            setValue('category_id', newCat.id, { shouldValidate: true })
             setNewCategoryName('')
             toast.success('Categoría creada')
         } catch (error) {
@@ -279,7 +281,7 @@ export function ProductForm({ product, onSubmit, onCancel, isLoading }) {
                     <Label className="text-foreground font-bold flex items-center gap-2">Categoría</Label>
 
                     <Select
-                        value={watch('category_id')}
+                        value={watch('category_id') || 'none'}
                         onValueChange={(val) => register('category_id').onChange({ target: { name: 'category_id', value: val } })}
                         disabled={loadingCategories}
                     >
@@ -350,7 +352,7 @@ export function ProductForm({ product, onSubmit, onCancel, isLoading }) {
                                 min: { value: 0, message: 'El precio debe ser mayor a 0' }
                             })}
                             placeholder="0.00"
-                            className="text-foreground bg-white dark:bg-gray-800 border-border"
+                            className="text-foreground bg-background border-border"
                         />
                     </div>
                     <div>
@@ -362,12 +364,12 @@ export function ProductForm({ product, onSubmit, onCancel, isLoading }) {
                             min="0"
                             {...register('costo')}
                             placeholder="0.00"
-                            className="text-foreground bg-white dark:bg-gray-800 border-border"
+                            className="text-foreground bg-background border-border"
                         />
                     </div>
                     <div>
                         <Label htmlFor="sku" className="text-foreground">SKU</Label>
-                        <Input id="sku" {...register('sku')} placeholder="Ej: PROD-001" className="text-foreground bg-white dark:bg-gray-800 border-border" />
+                        <Input id="sku" {...register('sku')} placeholder="Ej: PROD-001" className="text-foreground bg-background border-border" />
                     </div>
                 </div>
 
@@ -421,7 +423,7 @@ export function ProductForm({ product, onSubmit, onCancel, isLoading }) {
                             max="100"
                             {...register('discount_percent')}
                             placeholder="0"
-                            className="bg-white dark:bg-gray-800 border-border"
+                            className="bg-background border-border"
                         />
                     </div>
                     <div>
@@ -430,7 +432,7 @@ export function ProductForm({ product, onSubmit, onCancel, isLoading }) {
                             id="badge_text"
                             {...register('badge_text')}
                             placeholder="🔥 Top"
-                            className="bg-white dark:bg-gray-800 border-border"
+                            className="bg-background border-border"
                         />
                     </div>
                     <div className="flex flex-col justify-end">

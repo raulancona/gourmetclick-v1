@@ -1,9 +1,8 @@
 import { useState, useEffect } from 'react'
 import { useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
-import { CheckCircle2, Clock, ChefHat, Package, Check, Loader2, Truck, Sun, Moon } from 'lucide-react'
+import { CheckCircle2, Clock, ChefHat, Package, Check, Loader2, Truck } from 'lucide-react'
 import { formatCurrency } from '../lib/utils'
-import { useTheme } from '../components/theme-provider'
 import { Button } from '../components/ui/button'
 
 export function TrackingPage() {
@@ -11,8 +10,6 @@ export function TrackingPage() {
     const [order, setOrder] = useState(null)
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState(null)
-    const { theme, setTheme } = useTheme()
-
     useEffect(() => {
         if (!tracking_id) return
 
@@ -137,16 +134,6 @@ export function TrackingPage() {
 
     return (
         <div className="min-h-screen bg-muted/30 py-12 px-6">
-            <div className="absolute top-4 right-4">
-                <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-                    className="rounded-full bg-card/50 backdrop-blur-sm border border-border shadow-sm hover:bg-card"
-                >
-                    {theme === 'dark' ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
-                </Button>
-            </div>
 
             {/* Hidden Interaction for Audio Unlock */}
             <button id="audio-unlock" className="hidden" onClick={() => {

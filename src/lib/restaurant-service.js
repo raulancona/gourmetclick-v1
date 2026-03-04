@@ -79,11 +79,14 @@ export async function getMenuBySlug(slug) {
         .limit(1)
         .maybeSingle()
 
+    // Build OR query to include both profile ID and the actual restaurant ID
+    const orQuery = `restaurant_id.eq.${profile.id},user_id.eq.${profile.id}${restaurantRecord?.id ? `,restaurant_id.eq.${restaurantRecord.id}` : ''}`
+
     // Get categories
     const { data: categories, error: categoriesError } = await supabase
         .from('categories')
         .select('*')
-        .or(`restaurant_id.eq.${profile.id},user_id.eq.${profile.id}`)
+        .or(orQuery)
         .order('sort_order', { ascending: true })
 
     if (categoriesError) throw categoriesError
@@ -98,7 +101,8 @@ export async function getMenuBySlug(slug) {
                 modifier_options (*)
             )
         `)
-        .or(`restaurant_id.eq.${profile.id},user_id.eq.${profile.id}`)
+        .or(orQuery)
+        .eq('is_active', true)
         .eq('is_available', true)
         .order('created_at', { ascending: false })
 
