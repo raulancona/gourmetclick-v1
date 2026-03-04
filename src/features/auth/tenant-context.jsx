@@ -1,4 +1,5 @@
 import { createContext, useContext, useEffect, useState, useRef } from 'react'
+import { useLocation, matchPath } from 'react-router-dom'
 import { useAuth } from './auth-context'
 import { supabase } from '../../lib/supabase'
 
@@ -21,6 +22,7 @@ export function TenantProvider({ children }) {
     const [loading, setLoading] = useState(true)
     const [lastFetchedUserId, setLastFetchedUserId] = useState(null)
     const isFetchingRef = useRef(false)
+    const location = useLocation()
 
     useEffect(() => {
         const fetchTenant = async () => {
@@ -68,10 +70,14 @@ export function TenantProvider({ children }) {
             }
 
             // Priority 2: If we are in a public route with a slug (Terminal Access / Menu)
-            const pathParts = window.location.pathname.split('/')
-            const isTerminal = pathParts[1] === 't'
-            const isMenu = pathParts[1] === 'menu' || pathParts[1] === 'm'
-            const slug = (isTerminal || isMenu) ? pathParts[2] : null
+            let slug = null;
+            const terminalMatch = matchPath({ path: "/t/:slug" }, location.pathname);
+            const menuMatch = matchPath({ path: "/menu/:slug" }, location.pathname);
+            const mMatch = matchPath({ path: "/m/:slug" }, location.pathname);
+
+            if (terminalMatch) slug = terminalMatch.params.slug;
+            else if (menuMatch) slug = menuMatch.params.slug;
+            else if (mMatch) slug = mMatch.params.slug;
 
             if (slug) {
                 try {
@@ -106,7 +112,7 @@ export function TenantProvider({ children }) {
                 isFetchingRef.current = false;
             })
         }
-    }, [user, profile, authLoading, window.location.pathname])
+    }, [user, profile, authLoading, location.pathname])
 
     // Prevent immediate redirect in ProtectedRoute when user updates but tenant hasn't yet finished resolving
     const isFetchingForUser = user && lastFetchedUserId !== user.id;

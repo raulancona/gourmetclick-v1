@@ -19,8 +19,9 @@ import { Card, CardContent } from '../components/ui/card'
 import { toast } from 'sonner'
 import {
     getOrders, updateOrderStatus, updateOrder, deleteOrder, reopenOrder,
-    getOrderStats, ORDER_STATUSES, PAYMENT_METHODS, getNextStatuses
+    ORDER_STATUSES, PAYMENT_METHODS, getNextStatuses
 } from '../lib/order-service'
+import { getOrderStats } from '../lib/analytics-service'
 import { OrderDetailModal } from '../features/orders/order-detail-modal'
 import { formatCurrency } from '../lib/utils'
 

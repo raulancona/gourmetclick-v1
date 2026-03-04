@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import { getActiveSession } from '../lib/order-service'
+import { getActiveSession } from '../lib/session-service'
 import { useTenant } from '../features/auth/tenant-context'
 
 /**

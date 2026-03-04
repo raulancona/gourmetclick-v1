@@ -1,6 +1,7 @@
 import { useState, useRef } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { getSessionsHistory, getOrderStats } from '../../lib/order-service'
+import { getSessionsHistory } from '../../lib/session-service'
+import { getOrderStats } from '../../lib/analytics-service'
 import { useAuth } from '../auth/auth-context'
 import { useTenant } from '../auth/tenant-context'
 import { formatCurrency } from '../../lib/utils'

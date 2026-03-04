@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { X, Receipt, CreditCard, Banknote, TrendingUp, Calendar, Clock, User, Armchair, Store, Truck } from 'lucide-react'
-import { getSessionFinancialSummary } from '../../lib/order-service'
+import { getSessionFinancialSummary } from '../../lib/session-service'
 import { formatCurrency } from '../../lib/utils'
 import { OrderDetailModal } from '../orders/order-detail-modal'
 
