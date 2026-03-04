@@ -70,10 +70,13 @@ export async function getMenuBySlug(slug) {
     if (profileError) throw profileError
 
     // Get the actual restaurants.id (required for FK on orders.restaurant_id)
+    // If the user has multiple restaurants, we grab the first one to avoid maybeSingle() error
     const { data: restaurantRecord } = await supabase
         .from('restaurants')
         .select('id')
         .eq('owner_id', profile.id)
+        .order('created_at', { ascending: true })
+        .limit(1)
         .maybeSingle()
 
     // Get categories

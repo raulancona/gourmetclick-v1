@@ -40,23 +40,26 @@ function generateUniqueFilename(originalName) {
 }
 
 /**
- * Upload product image to Supabase Storage
+ * Upload product image to Supabase Storage with automatic compression
  * @param {File} file - Image file to upload
  * @param {string} userId - The authenticated user's ID
  * @returns {Promise<string>} Public URL of uploaded image
  */
 export async function uploadProductImage(file, userId) {
-    // Validate the image
+    // Validate the image originally uploaded
     validateImage(file)
 
+    // Compress the image before uploading (max width 1200px, quality 0.8)
+    const compressedFile = await compressImage(file, { maxWidth: 1200, quality: 0.8 })
+
     // Generate unique filename
-    const filename = generateUniqueFilename(file.name)
+    const filename = generateUniqueFilename(compressedFile.name)
     const filePath = `${userId}/${filename}`
 
     // Upload to Supabase Storage
     const { data, error } = await supabase.storage
         .from('product-images')
-        .upload(filePath, file, {
+        .upload(filePath, compressedFile, {
             cacheControl: '3600',
             upsert: false
         })
@@ -113,4 +116,70 @@ export function getImagePreviewUrl(file) {
  */
 export function revokeImagePreviewUrl(url) {
     URL.revokeObjectURL(url)
+}
+
+/**
+ * Compress an image file natively using Canvas API
+ * Converts to WebP if supported, otherwise JPEG.
+ * @param {File} file - Original image file
+ * @param {Object} options - Compression options
+ * @param {number} options.maxWidth - Maximum width of the compressed image
+ * @param {number} options.quality - Image quality (0.0 to 1.0)
+ * @returns {Promise<File>} A promise that resolves to the compressed File
+ */
+export async function compressImage(file, { maxWidth = 1200, quality = 0.8 } = {}) {
+    // If it's a GIF, don't compress (Canvas removes animation)
+    if (file.type === 'image/gif') return file;
+
+    return new Promise((resolve, reject) => {
+        // Use createImageBitmap which handles EXIF orientation natively in modern browsers
+        createImageBitmap(file)
+            .then(bitmap => {
+                const canvas = document.createElement('canvas');
+                let width = bitmap.width;
+                let height = bitmap.height;
+
+                // Calculate new dimensions keeping aspect ratio
+                if (width > maxWidth) {
+                    height = Math.round((height * maxWidth) / width);
+                    width = maxWidth;
+                }
+
+                canvas.width = width;
+                canvas.height = height;
+
+                const ctx = canvas.getContext('2d');
+                // Fill with white background in case of transparent PNG converting to JPEG
+                ctx.fillStyle = '#FFFFFF';
+                ctx.fillRect(0, 0, width, height);
+
+                ctx.drawImage(bitmap, 0, 0, width, height);
+
+                // Try to use WebP for better compression, fallback to JPEG
+                const targetType = 'image/webp';
+                const outputType = (canvas.toDataURL(targetType).indexOf(`data:${targetType}`) === 0) ? targetType : 'image/jpeg';
+
+                canvas.toBlob((blob) => {
+                    if (!blob) {
+                        reject(new Error('Canvas to Blob conversion failed'));
+                        return;
+                    }
+                    // Generate new filename with correct extension
+                    const ext = outputType === 'image/webp' ? 'webp' : 'jpg';
+                    const newFileName = file.name.replace(/\.[^/.]+$/, `.${ext}`);
+
+                    const compressedFile = new File([blob], newFileName, {
+                        type: outputType,
+                        lastModified: Date.now(),
+                    });
+
+                    resolve(compressedFile);
+                }, outputType, quality);
+            })
+            .catch(err => {
+                console.error('Image compression error:', err);
+                // If compression fails, fallback to original file
+                resolve(file);
+            });
+    });
 }

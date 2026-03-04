@@ -36,7 +36,8 @@ export function ProtectedRoute({ children }) {
     }
 
     // Authenticated but no restaurant configured → onboarding
-    if (user && !tenant && !activeEmployee && location.pathname !== '/onboarding') {
+    // Only redirect if we are SURE tenant is fully loaded and doesn't exist.
+    if (user && !tenant && !tenantLoading && !activeEmployee && location.pathname !== '/onboarding') {
         return <Navigate to="/onboarding" replace />
     }
 

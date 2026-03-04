@@ -110,7 +110,8 @@ export function ExpenseManager() {
             setLoading(true)
             const { data: activeSession } = await supabase
                 .from('sesiones_caja').select('id')
-                .eq('restaurant_id', restaurantId).eq('estado', 'abierta').maybeSingle()
+                .eq('restaurant_id', restaurantId).eq('estado', 'abierta')
+                .order('opened_at', { ascending: false }).limit(1).maybeSingle()
 
             if (!activeSession) toast.warning('Registrando gasto sin una sesión de caja activa.')
 

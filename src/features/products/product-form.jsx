@@ -7,14 +7,24 @@ import { Label } from '../../components/ui/label'
 import { Textarea } from '../../components/ui/textarea'
 import { ImageUpload } from './image-upload'
 import { uploadProductImage, deleteProductImage } from '../../lib/image-service'
+import { getCategories, createCategory } from '../../lib/category-service'
+import { useTenant } from '../auth/tenant-context'
 import { supabase } from '../../lib/supabase'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../components/ui/select'
 import { toast } from 'sonner'
 
 export function ProductForm({ product, onSubmit, onCancel, isLoading }) {
+    const { tenant } = useTenant()
     const [imageFile, setImageFile] = useState(null)
     const [isUploading, setIsUploading] = useState(false)
     const [modifiers, setModifiers] = useState([]) // { id?, name, extra_price, _delete? }
     const [loadingModifiers, setLoadingModifiers] = useState(false)
+
+    // Categories state
+    const [categories, setCategories] = useState([])
+    const [loadingCategories, setLoadingCategories] = useState(false)
+    const [isCreatingCategory, setIsCreatingCategory] = useState(false)
+    const [newCategoryName, setNewCategoryName] = useState('')
 
     const {
         register,
@@ -26,6 +36,7 @@ export function ProductForm({ product, onSubmit, onCancel, isLoading }) {
             name: product?.name || '',
             description: product?.description || '',
             price: product?.price || '',
+            category_id: product?.category_id || 'none', // using 'none' as default/empty
             sku: product?.sku || '',
             image_url: product?.image_url || '',
             discount_percent: product?.discount_percent || 0,
@@ -38,10 +49,49 @@ export function ProductForm({ product, onSubmit, onCancel, isLoading }) {
 
     // Load existing modifiers when editing a product
     useEffect(() => {
+        if (tenant?.id) {
+            loadCategories()
+        }
         if (product?.id) {
             loadModifiers(product.id)
         }
-    }, [product?.id])
+    }, [product?.id, tenant?.id])
+
+    const loadCategories = async () => {
+        try {
+            setLoadingCategories(true)
+            const data = await getCategories(tenant.id)
+            setCategories(data || [])
+        } catch (error) {
+            console.error('Error loading categories:', error)
+        } finally {
+            setLoadingCategories(false)
+        }
+    }
+
+    const handleCreateCategory = async () => {
+        if (!newCategoryName.trim() || !tenant?.id) return
+
+        try {
+            setIsCreatingCategory(true)
+            const newCat = await createCategory({
+                name: newCategoryName.trim(),
+                user_id: tenant.id, // Or owner depending on arch, fallback is handled inside
+                restaurant_id: tenant.id,
+                is_active: true
+            }, tenant.id)
+
+            setCategories(prev => [...prev, newCat])
+            register('category_id').onChange({ target: { name: 'category_id', value: newCat.id } }) // update form value hook natively not exposed easily without setValue
+            setNewCategoryName('')
+            toast.success('Categoría creada')
+        } catch (error) {
+            console.error('Error creating category:', error)
+            toast.error('Error al crear categoría')
+        } finally {
+            setIsCreatingCategory(false)
+        }
+    }
 
     const loadModifiers = async (productId) => {
         try {
@@ -154,13 +204,16 @@ export function ProductForm({ product, onSubmit, onCancel, isLoading }) {
             let imageUrl = product?.image_url || ''
 
             if (imageFile) {
+                toast.loading('Optimizando y subiendo imagen...', { id: 'image-upload' })
                 const { data: { user } } = await import('../../lib/supabase').then(m => m.supabase.auth.getUser())
                 if (product?.image_url) await deleteProductImage(product.image_url)
                 imageUrl = await uploadProductImage(imageFile, user.id)
+                toast.success('Imagen lista', { id: 'image-upload' })
             }
 
             const productData = {
                 name: data.name,
+                category_id: data.category_id === 'none' ? null : data.category_id,
                 description: data.description || null,
                 price: parseFloat(data.price),
                 sku: data.sku || null,
@@ -219,7 +272,53 @@ export function ProductForm({ product, onSubmit, onCancel, isLoading }) {
                         className="text-foreground bg-background"
                         error={errors.name?.message}
                     />
+                </div>
 
+                {/* Category Selection */}
+                <div className="space-y-3 p-4 bg-muted/20 border border-border rounded-xl">
+                    <Label className="text-foreground font-bold flex items-center gap-2">Categoría</Label>
+
+                    <Select
+                        value={watch('category_id')}
+                        onValueChange={(val) => register('category_id').onChange({ target: { name: 'category_id', value: val } })}
+                        disabled={loadingCategories}
+                    >
+                        <SelectTrigger className="bg-background">
+                            <SelectValue placeholder="Seleccionar categoría" />
+                        </SelectTrigger>
+                        <SelectContent className="max-h-60">
+                            <SelectItem value="none" className="italic text-muted-foreground">Sin Categoría</SelectItem>
+                            {categories.map(cat => (
+                                <SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+
+                    {/* Quick Create Category */}
+                    <div className="flex gap-2 items-center mt-2 border-t border-border pt-3">
+                        <Input
+                            placeholder="Nueva categoría..."
+                            value={newCategoryName}
+                            onChange={e => setNewCategoryName(e.target.value)}
+                            className="h-8 text-xs bg-background"
+                            onKeyDown={e => {
+                                if (e.key === 'Enter') {
+                                    e.preventDefault()
+                                    handleCreateCategory()
+                                }
+                            }}
+                        />
+                        <Button
+                            type="button"
+                            size="sm"
+                            variant="secondary"
+                            className="h-8 px-3 whitespace-nowrap"
+                            onClick={handleCreateCategory}
+                            disabled={isCreatingCategory || !newCategoryName.trim()}
+                        >
+                            {isCreatingCategory ? '...' : 'Añadir'}
+                        </Button>
+                    </div>
                 </div>
 
                 {/* Description */}

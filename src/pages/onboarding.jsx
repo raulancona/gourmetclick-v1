@@ -34,6 +34,22 @@ export function OnboardingPage() {
 
         setLoading(true)
         try {
+            // Double Check: Prevent multiple restaurants
+            const { data: existingRestaurant, error: checkError } = await supabase
+                .from('restaurants')
+                .select('id')
+                .eq('owner_id', user.id)
+                .limit(1)
+                .maybeSingle()
+
+            if (checkError) throw checkError
+
+            if (existingRestaurant) {
+                toast.success('Ya tienes un restaurante configurado. Redirigiendo...')
+                window.location.href = '/dashboard'
+                return
+            }
+
             const baseSlug = slugify(name)
             // Make slug unique by appending a short random suffix
             const slug = `${baseSlug}-${Math.random().toString(36).slice(2, 6)}`
