@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { getSalesAnalytics } from '../../lib/reports-service'
 import { exportSalesCSV } from '../../lib/reports-export'
 import { formatCurrency } from '../../lib/utils'
-import { Loader2, TrendingUp, Receipt, Download, AlertCircle, ChevronLeft, ChevronRight } from 'lucide-react'
+import { Loader2, TrendingUp, Receipt, Download, AlertCircle, ChevronLeft, ChevronRight, Lock } from 'lucide-react'
 import { Button } from '../../components/ui/button'
 import { Area, AreaChart, ResponsiveContainer, Tooltip, XAxis, YAxis, CartesianGrid } from 'recharts'
 
@@ -16,6 +16,20 @@ export function SalesTab({ tenantId, dateRange }) {
         queryFn: () => getSalesAnalytics(tenantId, dateRange.start, dateRange.end),
         enabled: !!tenantId
     })
+
+    const PAYMENT_METHODS = {
+        CASH: 'Efectivo',
+        CARD: 'Tarjeta',
+        TRANSFER: 'Transferencia'
+    }
+
+    const STATUSES = {
+        pending: 'Pendiente',
+        preparing: 'Preparando',
+        ready: 'Listo',
+        delivered: 'Entregado',
+        cancelled: 'Cancelado'
+    }
 
     useEffect(() => {
         setPage(1)
@@ -147,17 +161,20 @@ export function SalesTab({ tenantId, dateRange }) {
                                             </td>
                                             <td className="px-6 py-4 font-medium">{order.customer_name || 'General'}</td>
                                             <td className="px-6 py-4">
-                                                <span className="bg-muted px-2 py-1 rounded-md text-xs font-bold uppercase">
-                                                    {order.payment_method || 'N/A'}
+                                                <span className="bg-muted px-2 py-1 rounded-md text-xs font-bold uppercase inline-block">
+                                                    {PAYMENT_METHODS[order.payment_method?.toUpperCase()] || order.payment_method || 'N/A'}
                                                 </span>
                                             </td>
                                             <td className="px-6 py-4">
-                                                <span className={`px-2 py-1 rounded-md text-xs font-bold uppercase ${order.status === 'delivered' ? 'bg-emerald-100 text-emerald-700' :
+                                                <div className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-bold uppercase ${order.status === 'delivered' ? 'bg-emerald-100 text-emerald-700' :
                                                     order.status === 'cancelled' ? 'bg-red-100 text-red-700' :
                                                         'bg-blue-100 text-blue-700'
                                                     }`}>
-                                                    {order.status}
-                                                </span>
+                                                    <span>{STATUSES[order.status] || order.status}</span>
+                                                    {order.cash_cut_id && (
+                                                        <Lock className="w-3 h-3" title="Registrada en Corte de Caja" />
+                                                    )}
+                                                </div>
                                             </td>
                                             <td className="px-6 py-4 font-black text-right">{formatCurrency(order.total)}</td>
                                         </tr>

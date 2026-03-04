@@ -15,7 +15,7 @@ export function ProtectedRoute({ children }) {
     const restrictedRoutes = ['/dashboard', '/settings', '/inventory', '/products', '/staff']
 
     useEffect(() => {
-        if (activeEmployee && activeEmployee.rol !== 'admin') {
+        if (activeEmployee && activeEmployee.rol !== 'admin' && activeEmployee.rol !== 'gerente') {
             const isRestricted = restrictedRoutes.some(route => location.pathname.startsWith(route))
             if (isRestricted) {
                 toast.error('Acceso denegado: Se requieren permisos de administrador')
@@ -42,7 +42,7 @@ export function ProtectedRoute({ children }) {
     }
 
     // Si hay un empleado logueado Y NO es admin, verificar ruta
-    if (activeEmployee && activeEmployee.rol !== 'admin') {
+    if (activeEmployee && activeEmployee.rol !== 'admin' && activeEmployee.rol !== 'gerente') {
         const isRestricted = restrictedRoutes.some(route => location.pathname.startsWith(route))
         if (isRestricted) {
             return <Navigate to="/pos" replace />

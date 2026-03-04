@@ -73,7 +73,7 @@ export async function getSalesAnalytics(restaurantId, startDate, endDate) {
 
     const { data: orders, error } = await supabase
         .from('orders')
-        .select('id, folio, created_at, customer_name, payment_method, status, total')
+        .select('id, folio, created_at, customer_name, payment_method, status, total, cash_cut_id')
         .or(`restaurant_id.eq.${restaurantId},user_id.eq.${restaurantId}`)
         .gte('created_at', startIso)
         .lte('created_at', endIso)

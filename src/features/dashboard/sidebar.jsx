@@ -24,7 +24,7 @@ const NAV_GROUPS = [
     {
         label: 'Menú',
         items: [
-            { name: 'Menú', href: '/products', icon: Package, roles: ['admin'] },
+            { name: 'Productos', href: '/products', icon: Package, roles: ['admin'] },
             { name: 'Categorías', href: '/categories', icon: FolderTree, roles: ['admin'] },
         ]
     },
@@ -57,7 +57,7 @@ export function Sidebar({ isOpen, onClose, isCollapsed, onToggleCollapse }) {
     const isAdmin = (isOwner || isSuperAdmin) && !activeEmployee
     const isMesero = activeEmployee?.rol === 'mesero'
 
-    const userRole = isAdmin ? 'admin' : (activeEmployee?.rol || 'guest')
+    const userRole = (isAdmin || activeEmployee?.rol === 'gerente') ? 'admin' : (activeEmployee?.rol || 'guest')
 
     const visibleGroups = NAV_GROUPS.map(group => ({
         ...group,

@@ -83,7 +83,7 @@ export async function getMenuBySlug(slug) {
     const { data: categories, error: categoriesError } = await supabase
         .from('categories')
         .select('*')
-        .eq('user_id', profile.id)
+        .or(`restaurant_id.eq.${profile.id},user_id.eq.${profile.id}`)
         .order('sort_order', { ascending: true })
 
     if (categoriesError) throw categoriesError
@@ -98,7 +98,7 @@ export async function getMenuBySlug(slug) {
                 modifier_options (*)
             )
         `)
-        .eq('user_id', profile.id)
+        .or(`restaurant_id.eq.${profile.id},user_id.eq.${profile.id}`)
         .eq('is_available', true)
         .order('created_at', { ascending: false })
 
