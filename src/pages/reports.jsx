@@ -10,7 +10,9 @@ import { AuditTab } from '../features/reports/audit-tab'
 import { Loader2, TrendingUp, TrendingDown, LayoutDashboard, Wallet, PiggyBank, ReceiptText } from 'lucide-react'
 
 export function ReportsPage() {
-    const { tenant } = useTenant()
+    const { tenant, currentEmployee, user } = useTenant()
+    const isAdmin = currentEmployee?.rol === 'admin' || currentEmployee?.rol === 'gerente' || !currentEmployee
+    const [includeOpen, setIncludeOpen] = useState(false)
 
     // Default: Last 7 days
     const [dateRange, setDateRange] = useState(() => {
@@ -26,8 +28,8 @@ export function ReportsPage() {
 
     // Executive Summary (Top Bar)
     const { data: summary, isLoading: loadingSummary } = useQuery({
-        queryKey: ['reports-executive-summary', tenant?.id, dateRange.start, dateRange.end],
-        queryFn: () => getExecutiveSummary(tenant.id, dateRange.start, dateRange.end),
+        queryKey: ['reports-executive-summary', tenant?.id, dateRange.start, dateRange.end, includeOpen],
+        queryFn: () => getExecutiveSummary(tenant.id, dateRange.start, dateRange.end, includeOpen),
         enabled: !!tenant?.id
     })
 
@@ -43,12 +45,26 @@ export function ReportsPage() {
                     <p className="text-muted-foreground font-medium mt-1">Visión financiera interactiva</p>
                 </div>
 
-                <div className="w-full md:w-auto">
-                    <label className="text-xs font-bold text-muted-foreground uppercase tracking-widest pl-1 mb-1 block">Filtro de Fecha</label>
-                    <DateRangePicker
-                        dateRange={dateRange}
-                        onChange={setDateRange}
-                    />
+                <div className="w-full md:w-auto flex flex-col items-end gap-3">
+                    <div>
+                        <label className="text-xs font-bold text-muted-foreground uppercase tracking-widest pl-1 mb-1 block text-right">Filtro de Fecha</label>
+                        <DateRangePicker
+                            dateRange={dateRange}
+                            onChange={setDateRange}
+                        />
+                    </div>
+                    <div className="flex items-center gap-2 bg-muted/30 px-3 py-2 rounded-xl border border-border">
+                        <input
+                            type="checkbox"
+                            id="includeOpen"
+                            checked={includeOpen}
+                            onChange={e => setIncludeOpen(e.target.checked)}
+                            className="rounded text-primary focus:ring-primary w-4 h-4 bg-background border-border"
+                        />
+                        <label htmlFor="includeOpen" className="text-xs font-bold text-foreground cursor-pointer select-none">
+                            Incluir ventas en curso (Caja abierta)
+                        </label>
+                    </div>
                 </div>
             </div>
 
@@ -106,8 +122,8 @@ export function ReportsPage() {
                     <ReceiptText className="w-4 h-4" /> Gastos
                 </button>
                 <button
-                    onClick={() => setActiveTab('audit')}
-                    className={`flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-xl text-sm font-bold transition-all whitespace-nowrap ${activeTab === 'audit' ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground hover:bg-background/50'}`}
+                    onClick={() => setActiveTab('audits')}
+                    className={`flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-xl text-sm font-bold transition-all whitespace-nowrap ${activeTab === 'audits' ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground hover:bg-background/50'}`}
                 >
                     <Wallet className="w-4 h-4" /> Auditoría de Caja
                 </button>
@@ -115,9 +131,9 @@ export function ReportsPage() {
 
             {/* Tab Content */}
             <div className="mt-8">
-                {activeTab === 'sales' && <SalesTab tenantId={tenant?.id} dateRange={dateRange} />}
-                {activeTab === 'expenses' && <ExpensesTab tenantId={tenant?.id} dateRange={dateRange} />}
-                {activeTab === 'audit' && <AuditTab tenantId={tenant?.id} dateRange={dateRange} />}
+                {activeTab === 'sales' && <SalesTab tenantId={tenant?.id} dateRange={dateRange} includeOpen={includeOpen} isAdmin={isAdmin} />}
+                {activeTab === 'expenses' && <ExpensesTab tenantId={tenant?.id} dateRange={dateRange} isAdmin={isAdmin} />}
+                {activeTab === 'audits' && <AuditTab tenantId={tenant?.id} dateRange={dateRange} isAdmin={isAdmin} />}
             </div>
         </div>
     )

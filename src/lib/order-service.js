@@ -672,7 +672,7 @@ export async function closeSession(sessionId, montoReal, userId, closedByName, e
     // 4. *** CRITICAL: Create cash_cuts record and stamp ALL Por Liquidar orders ***
     //    RPC (SECURITY DEFINER) bypasses RLS, creates the cash_cuts record,
     //    and stamps delivered + cancelled orders with the new cut's ID.
-    const { error: stampError } = await supabase.rpc('stamp_cash_cut_orders', {
+    const { data: rpcResult, error: stampError } = await supabase.rpc('stamp_cash_cut_orders', {
         p_session_id: sessionId,
         p_restaurant_id: restaurantId,
         p_user_id: userId || null
@@ -681,6 +681,20 @@ export async function closeSession(sessionId, montoReal, userId, closedByName, e
     if (stampError) {
         console.error('Error stamping cash_cut_id on orders:', stampError)
         // Non-fatal: session is already closed, log and continue
+    }
+
+    // 5. MIGRATION TO CASH_CUTS as Source of Truth: ensure audit details exist directly on the cut
+    const { data: latestCut } = await supabase.from('cash_cuts')
+        .select('id').eq('restaurant_id', restaurantId)
+        .order('created_at', { ascending: false }).limit(1);
+
+    if (latestCut && latestCut.length > 0) {
+        await supabase.from('cash_cuts').update({
+            monto_real: parseFloat(montoReal),
+            diferencia: diferencia,
+            fondo_inicial: parseFloat(session.fondo_inicial || 0),
+            nombre_cajero: closedByName
+        }).eq('id', latestCut[0].id)
     }
 
     return closedSession

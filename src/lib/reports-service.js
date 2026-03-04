@@ -27,17 +27,23 @@ function toLocalDateString(isoString) {
 /**
  * 1. Resumen Ejecutivo (Kardex Superior)
  */
-export async function getExecutiveSummary(restaurantId, startDate, endDate) {
+export async function getExecutiveSummary(restaurantId, startDate, endDate, includeOpen = false) {
     const { startIso, endIso } = getQueryDates(startDate, endDate)
 
-    // Solo ventas entregadas cuentan como ingreso real
-    const { data: salesError, data: sales } = await supabase
+    // Solo ventas entregadas (y asociadas a un corte a menos que includeOpen sea true)
+    let query = supabase
         .from('orders')
-        .select('total, payment_method')
+        .select('total, payment_method, cash_cut_id')
         .or(`restaurant_id.eq.${restaurantId},user_id.eq.${restaurantId}`)
         .eq('status', 'delivered')
         .gte('created_at', startIso)
         .lte('created_at', endIso)
+
+    if (!includeOpen) {
+        query = query.not('cash_cut_id', 'is', null)
+    }
+
+    const { data: salesError, data: sales } = await query
 
     const { data: expensesError, data: expenses } = await supabase
         .from('gastos')
@@ -68,16 +74,23 @@ export async function getExecutiveSummary(restaurantId, startDate, endDate) {
 /**
  * 2. Analítica Detallada de Ventas (Tab 1)
  */
-export async function getSalesAnalytics(restaurantId, startDate, endDate) {
+export async function getSalesAnalytics(restaurantId, startDate, endDate, includeOpen = false) {
     const { startIso, endIso } = getQueryDates(startDate, endDate)
 
-    const { data: orders, error } = await supabase
+    let query = supabase
         .from('orders')
-        .select('id, folio, created_at, customer_name, payment_method, status, total, cash_cut_id')
+        .select('id, folio, created_at, customer_name, payment_method, status, total, cash_cut_id, sesion_caja_id')
         .or(`restaurant_id.eq.${restaurantId},user_id.eq.${restaurantId}`)
         .gte('created_at', startIso)
         .lte('created_at', endIso)
         .order('created_at', { ascending: false })
+
+    if (!includeOpen) {
+        // En modo estricto, sólo traer entregadas/canceladas que ya tengan cash_cut_id
+        query = query.in('status', ['delivered', 'cancelled']).not('cash_cut_id', 'is', null)
+    }
+
+    const { data: orders, error } = await query
 
     if (error) throw error
 
@@ -120,7 +133,7 @@ export async function getExpensesAnalytics(restaurantId, startDate, endDate) {
 
     const { data: expenses, error } = await supabase
         .from('gastos')
-        .select('id, created_at, categoria, descripcion, monto, empleado:empleados(nombre)')
+        .select('id, created_at, categoria, descripcion, monto, empleado_id')
         .eq('restaurant_id', restaurantId)
         .gte('created_at', startIso)
         .lte('created_at', endIso)
@@ -156,13 +169,12 @@ export async function getCashCutAnalytics(restaurantId, startDate, endDate) {
     const { startIso, endIso } = getQueryDates(startDate, endDate)
 
     const { data: cuts, error } = await supabase
-        .from('sesiones_caja')
-        .select('id, closed_at, nombre_cajero, monto_real, diferencia, fondo_inicial, empleado:empleados(nombre)')
+        .from('cash_cuts')
+        .select('id, cut_date, total_cash, total_amount, total_card, total_transfer, order_count, created_at')
         .eq('restaurant_id', restaurantId)
-        .eq('estado', 'cerrada')
-        .gte('closed_at', startIso)
-        .lte('closed_at', endIso)
-        .order('closed_at', { ascending: false })
+        .gte('cut_date', startIso)
+        .lte('cut_date', endIso)
+        .order('cut_date', { ascending: false })
 
     if (error) throw error
 

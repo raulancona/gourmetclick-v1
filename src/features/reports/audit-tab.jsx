@@ -112,7 +112,7 @@ export function AuditTab({ tenantId, dateRange }) {
                                                 <td className="px-6 py-4 text-muted-foreground whitespace-nowrap">
                                                     <div className="flex flex-col">
                                                         <span className="font-bold text-foreground">ID: {cut.id.substring(0, 8)}</span>
-                                                        <span className="text-xs">{new Date(cut.closed_at).toLocaleString('es-MX')}</span>
+                                                        <span className="text-xs">{new Date(cut.cut_date || cut.created_at).toLocaleString('es-MX')}</span>
                                                     </div>
                                                 </td>
                                                 <td className="px-6 py-4 font-bold">

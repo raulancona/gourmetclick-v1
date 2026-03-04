@@ -122,7 +122,7 @@ export function OrderDetailModal({ order, onClose, onUpdateStatus, onUpdateOrder
                             </Button>
                         )}
                         {!isEditing && isClosed && isAdmin && (
-                            <Button variant="ghost" size="icon" onClick={() => setIsEditing(true)} title="Editar (Admin)" className="text-amber-500">
+                            <Button variant="ghost" size="icon" onClick={() => setIsEditing(true)} title="Editar (Admin)" className="text-amber-500 hover:text-amber-600 hover:bg-amber-500/10">
                                 <Edit2 className="w-4 h-4" />
                             </Button>
                         )}
@@ -135,6 +135,13 @@ export function OrderDetailModal({ order, onClose, onUpdateStatus, onUpdateOrder
                 <div className="p-5 space-y-5 flex-1 overflow-y-auto">
                     {isEditing ? (
                         <div className="space-y-4">
+                            {isClosed && (
+                                <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-3 text-center mb-2">
+                                    <p className="text-xs font-bold text-amber-600 dark:text-amber-400">
+                                        ⚠️ Estás editando una orden ya auditada. Los cambios pueden afectar reportes históricos.
+                                    </p>
+                                </div>
+                            )}
                             <div className="space-y-2">
                                 <Label>Nombre del Cliente</Label>
                                 <Input value={formData.customer_name} onChange={e => setFormData({ ...formData, customer_name: e.target.value })} />

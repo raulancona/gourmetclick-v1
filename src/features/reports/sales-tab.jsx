@@ -6,9 +6,11 @@ import { formatCurrency } from '../../lib/utils'
 import { Loader2, TrendingUp, Receipt, Download, AlertCircle, ChevronLeft, ChevronRight, Lock } from 'lucide-react'
 import { Button } from '../../components/ui/button'
 import { Area, AreaChart, ResponsiveContainer, Tooltip, XAxis, YAxis, CartesianGrid } from 'recharts'
+import { OrderDetailModal } from '../orders/order-detail-modal'
 
 export function SalesTab({ tenantId, dateRange }) {
     const [page, setPage] = useState(1)
+    const [selectedOrder, setSelectedOrder] = useState(null)
     const pageSize = 15
 
     const { data, isLoading, error } = useQuery({
@@ -153,7 +155,11 @@ export function SalesTab({ tenantId, dateRange }) {
                                 </thead>
                                 <tbody className="divide-y divide-border/50">
                                     {currentOrders.map(order => (
-                                        <tr key={order.id} className="hover:bg-muted/20">
+                                        <tr
+                                            key={order.id}
+                                            className="hover:bg-muted/20 cursor-pointer transition-colors"
+                                            onClick={() => setSelectedOrder(order)}
+                                        >
                                             <td className="px-6 py-4 font-bold text-foreground">#{order.folio}</td>
                                             <td className="px-6 py-4 text-muted-foreground whitespace-nowrap">
                                                 {new Date(order.created_at).toLocaleDateString('es-MX')} <br />
@@ -171,8 +177,8 @@ export function SalesTab({ tenantId, dateRange }) {
                                                         'bg-blue-100 text-blue-700'
                                                     }`}>
                                                     <span>{STATUSES[order.status] || order.status}</span>
-                                                    {order.cash_cut_id && (
-                                                        <Lock className="w-3 h-3" title="Registrada en Corte de Caja" />
+                                                    {(order.cash_cut_id || order.sesion_caja_id) && (
+                                                        <Lock className="w-3 h-3 text-muted-foreground/70" title="Orden auditada" />
                                                     )}
                                                 </div>
                                             </td>
@@ -214,6 +220,13 @@ export function SalesTab({ tenantId, dateRange }) {
                     <div className="p-8 text-center text-muted-foreground text-sm font-medium">No hay órdenes en este período.</div>
                 )}
             </div>
+
+            {selectedOrder && (
+                <OrderDetailModal
+                    order={selectedOrder}
+                    onClose={() => setSelectedOrder(null)}
+                />
+            )}
         </div>
     )
 }
