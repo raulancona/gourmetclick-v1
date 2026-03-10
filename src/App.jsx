@@ -24,6 +24,7 @@ import { SessionGuard } from './features/cash-closing/session-guard'
 import { TrackingPage } from './pages/tracking'
 import { PublicMenuPage } from './pages/public-menu'
 import { PublicLinkCardPage } from './pages/public-link-card'
+import { CustomersPage } from './pages/customers'
 import { Toaster } from 'sonner'
 import { PwaInstallButton } from './components/pwa-install-button'
 
@@ -55,6 +56,7 @@ function App() {
                   <Route path="expenses" element={<SessionGuard><ExpensesPage /></SessionGuard>} />
 
                   <Route path="products" element={<ProductsPage />} />
+                  <Route path="customers" element={<CustomersPage />} />
                   <Route path="categories" element={<CategoriesPage />} />
                   <Route path="modifiers" element={<ModifiersPage />} />
                   <Route path="caja" element={<CashClosingPage />} />

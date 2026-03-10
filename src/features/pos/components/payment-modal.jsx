@@ -84,7 +84,7 @@ function CashView({ total, onConfirm, isSubmitting }) {
             <button
                 onClick={() => onConfirm({ montoRecibido: parsed, cambio: change })}
                 disabled={!isValid || isSubmitting}
-                className="w-full py-5 rounded-2xl bg-primary text-primary-foreground font-black text-lg shadow-lg shadow-primary/30 hover:shadow-primary/50 hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed transition-all active:scale-[0.98] flex items-center justify-center gap-3"
+                className="w-full py-5 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-600 text-white font-black text-lg shadow-lg shadow-emerald-500/30 hover:shadow-emerald-500/50 hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed transition-all active:scale-[0.98] flex items-center justify-center gap-3"
             >
                 {isSubmitting ? <Loader2 className="w-6 h-6 animate-spin" /> : (
                     <>
@@ -126,9 +126,24 @@ export function PaymentModal({ isOpen, onClose, total, paymentMethod, onConfirm,
     if (!isOpen) return null
 
     const methodConfig = {
-        cash: { label: 'Pago en Efectivo', icon: Banknote, color: 'text-green-500' },
-        card: { label: 'Pago con Tarjeta', icon: CreditCard, color: 'text-blue-500' },
-        transfer: { label: 'Transferencia', icon: Landmark, color: 'text-violet-400' },
+        cash: {
+            label: 'Pago en Efectivo',
+            icon: Banknote,
+            gradient: 'from-emerald-500 to-teal-600',
+            glow: 'shadow-emerald-500/30'
+        },
+        card: {
+            label: 'Pago con Tarjeta',
+            icon: CreditCard,
+            gradient: 'from-blue-500 to-indigo-600',
+            glow: 'shadow-blue-500/30'
+        },
+        transfer: {
+            label: 'Transferencia',
+            icon: Landmark,
+            gradient: 'from-violet-500 to-purple-600',
+            glow: 'shadow-violet-500/30'
+        },
     }
     const config = methodConfig[paymentMethod] || methodConfig.cash
     const Icon = config.icon
@@ -153,8 +168,8 @@ export function PaymentModal({ isOpen, onClose, total, paymentMethod, onConfirm,
                     {/* Header */}
                     <div className="flex items-center justify-between mb-6">
                         <div className="flex items-center gap-3">
-                            <div className={`w-10 h-10 rounded-2xl bg-muted flex items-center justify-center ${config.color}`}>
-                                <Icon className="w-5 h-5" />
+                            <div className={`w-11 h-11 rounded-2xl bg-gradient-to-br ${config.gradient} flex items-center justify-center shadow-lg ${config.glow}`}>
+                                <Icon className="w-5 h-5 text-white" />
                             </div>
                             <div>
                                 <h2 className="text-lg font-black text-foreground leading-none">{config.label}</h2>

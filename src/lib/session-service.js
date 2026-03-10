@@ -188,7 +188,7 @@ export async function getActiveSession(restaurantId) {
     return sessions[0]
 }
 
-export async function openSession(restaurantId, employeeId, initialAmount) {
+export async function openSession(restaurantId, employeeId, initialAmount, openedByName = 'Desconocido') {
     const { data, error } = await supabase
         .from('sesiones_caja')
         .insert([{
@@ -196,7 +196,8 @@ export async function openSession(restaurantId, employeeId, initialAmount) {
             empleado_id: employeeId,
             fondo_inicial: parseFloat(initialAmount),
             estado: 'abierta',
-            opened_at: new Date().toISOString()
+            opened_at: new Date().toISOString(),
+            opened_by_user_name: openedByName
         }])
         .select()
         .single()
@@ -206,7 +207,7 @@ export async function openSession(restaurantId, employeeId, initialAmount) {
 }
 
 export async function closeSession(sessionId, montoReal, userId, closedByName, expectedBalance) {
-    // 1. Get session details
+    // 1. Get session details to obtain the restaurant ID
     const { data: session, error: sessionError } = await supabase
         .from('sesiones_caja')
         .select('*')
@@ -217,79 +218,23 @@ export async function closeSession(sessionId, montoReal, userId, closedByName, e
 
     const restaurantId = session.restaurante_id
 
-    // 2. Calculate totals for THIS session (only delivered orders contribute to revenue)
-    const { data: orders, error: ordersError } = await supabase
-        .from('orders')
-        .select('total, payment_method')
-        .eq('sesion_caja_id', sessionId)
-        .eq('status', 'delivered')
-
-    if (ordersError) throw ordersError
-
-    const { data: gastos, error: gastosError } = await supabase
-        .from('gastos')
-        .select('monto')
-        .eq('sesion_caja_id', sessionId)
-
-    if (gastosError) throw gastosError
-
-    // Security: Recalculate server-side using ONLY cash payments for physical balance
-    const cashSales = (orders || [])
-        .filter(o => (o.payment_method || 'cash') === 'cash')
-        .reduce((sum, o) => sum + (parseFloat(o.total) || 0), 0)
-
-    const totalExpenses = (gastos || []).reduce((sum, g) => sum + (parseFloat(g.monto) || 0), 0)
-
-    const finalExpectedBalance = parseFloat(session.fondo_inicial || 0) + cashSales - totalExpenses
-    const diferencia = parseFloat(montoReal) - finalExpectedBalance
-
-    // 3. Close the session
-    const { data: closedSession, error: updateError } = await supabase
-        .from('sesiones_caja')
-        .update({
-            estado: 'cerrada',
-            monto_esperado: finalExpectedBalance,
-            monto_real: parseFloat(montoReal),
-            diferencia: diferencia,
-            closed_at: new Date().toISOString(),
-            cerrado_por: userId,
-            nombre_cajero: closedByName
-        })
-        .eq('id', sessionId)
-        .select()
-        .single()
-
-    if (updateError) throw updateError
-
-    // 4. *** CRITICAL: Create cash_cuts record and stamp ALL Por Liquidar orders ***
-    //    RPC (SECURITY DEFINER) bypasses RLS, creates the cash_cuts record,
-    //    and stamps delivered + cancelled orders with the new cut's ID.
+    // 2. *** CRITICAL: Perform authoritative mathematical cutoff on the server ***
+    //    RPC (SECURITY DEFINER) bypasses RLS, calculates the exact differences using all 
+    //    global orders, creates the cash_cuts record, and stamps orders.
     const { data: rpcResult, error: stampError } = await supabase.rpc('stamp_cash_cut_orders', {
         p_session_id: sessionId,
         p_restaurant_id: restaurantId,
-        p_user_id: userId || null
+        p_user_id: userId || null,
+        p_monto_real: parseFloat(montoReal),
+        p_closed_by_name: closedByName
     })
 
     if (stampError) {
-        console.error('Error stamping cash_cut_id on orders:', stampError)
-        // Non-fatal: session is already closed, log and continue
+        console.error('Error in authoritative cash cut server calc:', stampError)
+        throw stampError
     }
 
-    // 5. MIGRATION TO CASH_CUTS as Source of Truth: ensure audit details exist directly on the cut
-    const { data: latestCut } = await supabase.from('cash_cuts')
-        .select('id').eq('restaurant_id', restaurantId)
-        .order('created_at', { ascending: false }).limit(1);
-
-    if (latestCut && latestCut.length > 0) {
-        await supabase.from('cash_cuts').update({
-            monto_real: parseFloat(montoReal),
-            diferencia: diferencia,
-            fondo_inicial: parseFloat(session.fondo_inicial || 0),
-            nombre_cajero: closedByName
-        }).eq('id', latestCut[0].id)
-    }
-
-    return closedSession
+    return rpcResult
 }
 
 export async function getSessionsHistory(restaurantId, { page = 1, pageSize = 50 } = {}) {

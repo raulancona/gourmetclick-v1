@@ -43,6 +43,8 @@ export default function POSPage() {
 
     const [isSubmitting, setIsSubmitting] = useState(false)
     const [montoRecibido, setMontoRecibido] = useState('')
+    const [customerPhone, setCustomerPhone] = useState('')
+    const [deliveryFee, setDeliveryFee] = useState('')
 
     // Modifier Modal State
     const [selectedProduct, setSelectedProduct] = useState(null)
@@ -174,17 +176,27 @@ export default function POSPage() {
             toast.error('Indique el número de mesa')
             return
         }
+        if (orderType === 'delivery' && !deliveryAddress?.trim()) {
+            toast.error('Ingrese la dirección de entrega')
+            return
+        }
+        if (orderType === 'delivery' && !customerPhone?.trim()) {
+            toast.error('Ingrese el teléfono del cliente para domicilio')
+            return
+        }
 
         try {
             setIsSubmitting(true)
+            const feeAmount = parseFloat(deliveryFee) || 0
             const orderData = {
-                user_id: user.id, // ID del propietario logueado en auth
-                restaurant_id: tenant.id, // ID del tenant
+                user_id: user.id,
+                restaurant_id: tenant.id,
                 customer_name: customerName || 'Cliente General',
+                customer_phone: customerPhone || null,
                 order_type: orderType,
                 payment_method: paymentMethod,
-                status: editingOrder ? editingOrder.status : 'pending', // Default to pending for kitchen flow
-                total: cartTotal,
+                status: editingOrder ? editingOrder.status : 'pending',
+                total: cartTotal + (orderType === 'delivery' ? feeAmount : 0),
                 items: cart.map(item => ({
                     id: item.id, // Cart Item ID
                     product_id: item.product_id || item.id, // Original Product ID (fallback for legacy items)
@@ -196,7 +208,7 @@ export default function POSPage() {
                     modifiers: item.modifiers,
                     subtotal: item.price * item.quantity
                 })),
-                delivery_address: orderType === 'delivery' ? deliveryAddress : null,
+                delivery_address: orderType === 'delivery' ? (deliveryAddress || null) : null,
                 table_number: orderType === 'dine_in' ? tableNumber : null,
                 notes: notes || null
             }
@@ -217,6 +229,8 @@ export default function POSPage() {
 
             clearCart()
             setMontoRecibido('')
+            setCustomerPhone('')
+            setDeliveryFee('')
         } catch (error) {
             console.error('Error al procesar la orden:', error)
             toast.error(error.message || 'Error al crear la orden')
@@ -307,10 +321,16 @@ export default function POSPage() {
                 setShowMobileCart={setShowMobileCart}
                 customerName={customerName}
                 setCustomerName={setCustomerName}
+                customerPhone={customerPhone}
+                setCustomerPhone={setCustomerPhone}
                 orderType={orderType}
                 setOrderType={setOrderType}
                 tableNumber={tableNumber}
                 setTableNumber={setTableNumber}
+                deliveryAddress={deliveryAddress}
+                setDeliveryAddress={setDeliveryAddress}
+                deliveryFee={deliveryFee}
+                setDeliveryFee={setDeliveryFee}
                 notes={notes}
                 setNotes={setNotes}
                 paymentMethod={paymentMethod}

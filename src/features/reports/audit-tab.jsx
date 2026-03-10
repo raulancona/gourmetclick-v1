@@ -105,7 +105,7 @@ export function AuditTab({ tenantId, dateRange }) {
                                 <thead className="text-[10px] text-muted-foreground uppercase tracking-wider bg-muted/50">
                                     <tr className="border-b border-border/50">
                                         <th className="px-6 py-3 font-black">Turno</th>
-                                        <th className="px-6 py-3 font-black">Cajero</th>
+                                        <th className="px-6 py-3 font-black">Cajero (Apertura/Cierre)</th>
                                         <th className="px-6 py-3 font-black">Declarado Físico</th>
                                         <th className="px-6 py-3 font-black">
                                             <TooltipProvider>
@@ -142,7 +142,10 @@ export function AuditTab({ tenantId, dateRange }) {
                                                     </div>
                                                 </td>
                                                 <td className="px-6 py-4 font-bold">
-                                                    {cut.nombre_cajero || cut.empleado?.nombre || 'Administrador'}
+                                                    <div className="flex flex-col gap-0.5">
+                                                        <span className="text-xs text-muted-foreground">Aperturó: <span className="text-foreground">{cut.opened_by_user_name || 'Desconocido'}</span></span>
+                                                        <span className="text-xs text-muted-foreground">Cerró: <span className="text-foreground">{cut.closed_by_user_name || cut.nombre_cajero || cut.empleado?.nombre || 'Desconocido'}</span></span>
+                                                    </div>
                                                 </td>
                                                 <td className="px-6 py-4 font-black">
                                                     {formatCurrency(cut.monto_real)}

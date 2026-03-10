@@ -162,10 +162,30 @@ export async function createOrder(orderData) {
         details: 'Orden creada'
     }]
 
+    // Check if we need to lookup/create a customer
+    let customerId = orderData.customer_id;
+    if (!customerId) {
+        try {
+            const { data: cid, error: cidError } = await supabase.rpc('get_or_create_customer', {
+                p_restaurant_id: searchTenantId,
+                p_name: orderData.customer_name || 'Cliente Mostrador',
+                p_phone: orderData.customer_phone || ''
+            });
+            if (cidError) {
+                console.error('Error in get_or_create_customer:', cidError);
+            } else if (cid) {
+                customerId = cid;
+            }
+        } catch (e) {
+            console.error('Failed to execute get_or_create_customer RPC:', e);
+        }
+    }
+
     const finalPayload = {
         ...payload,
         sesion_caja_id: activeSession?.id || null,
         restaurant_id: searchTenantId,
+        customer_id: customerId || null,
         status: finalStatus,
         ...(auditEntry ? { audit_log: auditEntry } : {})
     }

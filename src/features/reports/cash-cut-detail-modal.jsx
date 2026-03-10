@@ -57,9 +57,17 @@ export function CashCutDetailModal({ cutId, isOpen, onClose }) {
                         Detalle del Turno
                         <span className="text-sm font-bold bg-muted px-2 py-0.5 rounded-md ml-2 text-muted-foreground">ID: {cutId?.substring(0, 8)}</span>
                     </DialogTitle>
-                    <DialogDescription className="text-sm font-medium">
-                        Cajero responsable: <span className="text-foreground font-bold">{data?.cut?.nombre_cajero || 'General'}</span> <span className="opacity-50 mx-1">•</span>
-                        {data?.cut?.cut_date && new Date(data.cut.cut_date).toLocaleString('es-MX')}
+                    <DialogDescription className="text-sm font-medium flex flex-col gap-1 mt-1">
+                        <div className="flex items-center text-xs">
+                            <span className="text-muted-foreground mr-1">Aperturó:</span>
+                            <span className="text-foreground font-bold">{data?.cut?.opened_by_user_name || 'Desconocido'}</span>
+                            <span className="opacity-30 mx-2">•</span>
+                            <span className="text-muted-foreground mr-1">Cerró:</span>
+                            <span className="text-foreground font-bold">{data?.cut?.closed_by_user_name || data?.cut?.nombre_cajero || 'Desconocido'}</span>
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                            {data?.cut?.cut_date && new Date(data.cut.cut_date).toLocaleString('es-MX')}
+                        </div>
                     </DialogDescription>
 
                     {/* Internal Tabs */}

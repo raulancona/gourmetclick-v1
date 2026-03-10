@@ -25,6 +25,16 @@ import { getOrderStats } from '../lib/analytics-service'
 import { OrderDetailModal } from '../features/orders/order-detail-modal'
 import { formatCurrency } from '../lib/utils'
 
+const ACTION_LABELS = {
+    pending: 'Marcar Pendiente',
+    confirmed: 'Aceptar Orden',
+    preparing: 'Marcar en Preparación',
+    ready: 'Marcar Listo',
+    on_the_way: 'Enviar a Domicilio',
+    delivered: 'Cobrar y Entregar',
+    cancelled: 'Cancelar Orden'
+}
+
 // ─── Time Filter Presets ──────────────────────────────────────────────────────
 const TIME_PRESETS = [
     { id: 'today', label: 'Hoy' },
@@ -626,7 +636,7 @@ export function OrdersPage() {
                                                                     onClick={e => { e.stopPropagation(); updateStatusMutation.mutate({ orderId: order.id, status: next }) }}
                                                                     className="flex-1 py-2.5 rounded-xl text-xs font-black text-white hover:brightness-110 active:scale-95 transition-all shadow-sm"
                                                                     style={{ background: nextInfo.color }}>
-                                                                    {nextInfo.emoji} {nextInfo.label}
+                                                                    {nextInfo.emoji} {ACTION_LABELS[next] || nextInfo.label}
                                                                 </button>
                                                             )
                                                         })}

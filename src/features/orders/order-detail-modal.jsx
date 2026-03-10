@@ -17,6 +17,16 @@ import { toast } from 'sonner'
 // Status flow for the timeline stepper
 const STATUS_FLOW = ['pending', 'confirmed', 'preparing', 'ready', 'on_the_way', 'delivered']
 
+const ACTION_LABELS = {
+    pending: 'Marcar Pendiente',
+    confirmed: 'Aceptar Orden',
+    preparing: 'Marcar en Preparación',
+    ready: 'Marcar Listo',
+    on_the_way: 'Enviar a Domicilio',
+    delivered: 'Cobrar y Entregar',
+    cancelled: 'Cancelar Orden'
+}
+
 export function OrderDetailModal({ order, onClose, onUpdateStatus, onUpdateOrder, onDelete, onReopenOrder, isAdmin = false }) {
     const navigate = useNavigate()
     const [isEditing, setIsEditing] = useState(false)
@@ -83,9 +93,12 @@ export function OrderDetailModal({ order, onClose, onUpdateStatus, onUpdateOrder
 
                             {/* Lifecycle Badge */}
                             {isClosed ? (
-                                <span className="flex items-center gap-1.5 text-white font-bold bg-secondary px-2.5 py-1 rounded-lg w-fit mt-1 shadow-sm border border-secondary">
-                                    <Lock className="w-3 h-3" /> Incluida en Corte <span className="font-mono opacity-80">#{order.cash_cut_id.slice(0, 8)}</span>
-                                </span>
+                                <button
+                                    onClick={() => { onClose(); navigate(`/caja?cutId=${order.cash_cut_id}`) }}
+                                    className="flex items-center gap-1.5 text-white font-bold bg-secondary hover:bg-secondary/90 transition-colors px-2.5 py-1 rounded-lg w-fit mt-1 shadow-sm border border-secondary cursor-pointer"
+                                >
+                                    <Lock className="w-3 h-3" /> Incluida en Corte <span className="font-mono opacity-80 underline decoration-white/50 underline-offset-2">#{order.cash_cut_id.slice(0, 8)}</span> <ExternalLink className="w-3 h-3 ml-0.5" />
+                                </button>
                             ) : isPendingCut && order.status === 'delivered' ? (
                                 <span className="flex items-center gap-1 text-white font-bold bg-secondary px-2.5 py-1 rounded-lg w-fit mt-1 shadow-sm border border-secondary">
                                     <CheckCircle2 className="w-3 h-3" /> Entregada · Pendiente de Corte de Caja
@@ -361,7 +374,7 @@ export function OrderDetailModal({ order, onClose, onUpdateStatus, onUpdateOrder
                                                                 className="w-full flex items-center justify-between gap-3 py-3 px-4 rounded-xl font-black text-white text-sm hover:brightness-110 active:scale-[0.98] transition-all shadow-sm disabled:opacity-60"
                                                                 style={{ background: nextInfo.color }}
                                                             >
-                                                                <span>{nextInfo.emoji} Avanzar a: {nextInfo.label}</span>
+                                                                <span>{nextInfo.emoji} {ACTION_LABELS[next] || `Avanzar a: ${nextInfo.label}`}</span>
                                                                 <ArrowRight className="w-4 h-4 shrink-0" />
                                                             </button>
                                                         )
@@ -439,8 +452,14 @@ export function OrderDetailModal({ order, onClose, onUpdateStatus, onUpdateOrder
                                     {/* Historial Context: locked badge + admin reopen */}
                                     {isClosed && (
                                         <div className="bg-muted/50 border border-border rounded-xl p-4 text-center">
-                                            <p className="text-sm font-bold text-muted-foreground mb-1">
-                                                🔒 Incluida en Corte #{order.cash_cut_id?.slice(0, 8)}
+                                            <p className="text-sm font-bold text-muted-foreground mb-1 flex items-center justify-center gap-1">
+                                                🔒 Incluida en Corte
+                                                <button
+                                                    onClick={() => { onClose(); navigate(`/caja?cutId=${order.cash_cut_id}`) }}
+                                                    className="font-mono underline hover:text-primary transition-colors inline-flex items-center gap-1 ml-1"
+                                                >
+                                                    #{order.cash_cut_id?.slice(0, 8)} <ExternalLink className="w-3 h-3" />
+                                                </button>
                                             </p>
                                             <p className="text-xs text-muted-foreground mb-3">
                                                 Esta orden fue liquidada formalmente.

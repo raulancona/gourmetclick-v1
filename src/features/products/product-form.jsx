@@ -13,7 +13,7 @@ import { getGlobalModifierGroups, getLinkedModifierGroups, linkModifierGroupToPr
 import { useAuth } from '../auth/auth-context'
 import { useTenant } from '../auth/tenant-context'
 import { supabase } from '../../lib/supabase'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../components/ui/select'
+
 import { toast } from 'sonner'
 import { cn } from '../../lib/utils'
 import { motion } from 'framer-motion'
@@ -251,11 +251,11 @@ export function ProductForm({ product, onSubmit, onCancel, isLoading }) {
         <form onSubmit={handleSubmit(onFormSubmit)} className="space-y-6">
 
             {/* TABS HEADER */}
-            <div className="flex items-center gap-2 p-1.5 bg-muted/40 rounded-xl overflow-x-auto custom-scrollbar">
+            <div className="flex items-center gap-1.5 p-1.5 bg-muted/50 rounded-2xl border border-border/40 overflow-x-auto">
                 {[
-                    { id: 'basic', label: 'Detalles Básicos', icon: Tag },
-                    { id: 'pricing', label: 'Precio y Config', icon: Banknote },
-                    { id: 'extras', label: 'Personalización', icon: Layers }
+                    { id: 'basic', label: 'Detalles Básicos', icon: Tag, activeClass: 'bg-gradient-to-br from-indigo-600 to-blue-600 text-white shadow-lg shadow-indigo-500/30' },
+                    { id: 'pricing', label: 'Precio y Config', icon: Banknote, activeClass: 'bg-gradient-to-br from-emerald-600 to-teal-600 text-white shadow-lg shadow-emerald-500/30' },
+                    { id: 'extras', label: 'Personalización', icon: Layers, activeClass: 'bg-gradient-to-br from-violet-600 to-purple-600 text-white shadow-lg shadow-violet-500/30' }
                 ].map(tab => {
                     const isActive = activeTab === tab.id
                     return (
@@ -264,19 +264,12 @@ export function ProductForm({ product, onSubmit, onCancel, isLoading }) {
                             type="button"
                             onClick={() => setActiveTab(tab.id)}
                             className={cn(
-                                "relative flex items-center gap-2 px-4 py-2.5 text-sm font-bold rounded-lg transition-all flex-1 justify-center whitespace-nowrap",
-                                isActive ? "text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+                                "flex items-center gap-2 px-4 py-2.5 text-sm font-bold rounded-xl transition-all duration-200 flex-1 justify-center whitespace-nowrap",
+                                isActive ? tab.activeClass : "text-muted-foreground hover:text-foreground hover:bg-background/60"
                             )}
                         >
-                            {isActive && (
-                                <motion.div
-                                    layoutId="activeProductTab"
-                                    className="absolute inset-0 bg-background rounded-lg border border-border/50"
-                                    transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
-                                />
-                            )}
-                            <tab.icon className="w-4 h-4 relative z-10" />
-                            <span className="relative z-10">{tab.label}</span>
+                            <tab.icon className="w-4 h-4" />
+                            <span>{tab.label}</span>
                         </button>
                     )
                 })}
@@ -335,23 +328,17 @@ export function ProductForm({ product, onSubmit, onCancel, isLoading }) {
                             <div className="grid grid-cols-1 gap-1.5">
                                 <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Categoría del Menú</Label>
                                 <div className="flex gap-2 items-center">
-                                    <Select
+                                    <select
                                         value={watch('category_id') || 'none'}
-                                        onValueChange={(val) => register('category_id').onChange({ target: { name: 'category_id', value: val } })}
+                                        onChange={(e) => setValue('category_id', e.target.value, { shouldValidate: true })}
                                         disabled={loadingCategories}
+                                        className="h-11 w-full flex-1 bg-background border border-border rounded-xl font-bold shadow-sm px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 cursor-pointer"
                                     >
-                                        <SelectTrigger className="h-11 bg-background rounded-xl font-bold shadow-sm border-border flex-1">
-                                            <SelectValue placeholder="Seleccionar categoría">
-                                                {watch('category_id') === 'none' ? 'Sin Categoría' : (categories.find(c => c.id === watch('category_id'))?.name || 'Cargando...')}
-                                            </SelectValue>
-                                        </SelectTrigger>
-                                        <SelectContent className="max-h-60 rounded-xl">
-                                            <SelectItem value="none" className="italic text-muted-foreground">-- Sin Categoría --</SelectItem>
-                                            {categories.map(cat => (
-                                                <SelectItem key={cat.id} value={cat.id} className="font-bold">{cat.name}</SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
+                                        <option value="none" className="italic text-muted-foreground">-- Sin Categoría --</option>
+                                        {categories.map(cat => (
+                                            <option key={cat.id} value={cat.id}>{cat.name}</option>
+                                        ))}
+                                    </select>
                                 </div>
                                 <div className="flex gap-2 mt-2">
                                     <Input
@@ -406,16 +393,19 @@ export function ProductForm({ product, onSubmit, onCancel, isLoading }) {
                 </div>
                 <div className="p-5 space-y-6">
 
-                    <label className="flex items-center gap-3 cursor-pointer bg-amber-500/5 p-4 rounded-xl border border-amber-500/20 hover:bg-amber-500/10 transition-colors mb-4">
+                    <label className="flex items-center gap-3 cursor-pointer bg-muted/30 p-4 rounded-xl border border-border hover:bg-muted/50 transition-colors mb-4">
+                        <div className={`flex-shrink-0 w-5 h-5 rounded border-2 transition-all flex items-center justify-center ${hasVariants ? 'bg-primary border-primary' : 'border-muted-foreground/40'}`}>
+                            {hasVariants && <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>}
+                        </div>
                         <input
                             type="checkbox"
                             checked={hasVariants}
                             onChange={(e) => setHasVariants(e.target.checked)}
-                            className="w-5 h-5 rounded border-gray-300 dark:border-gray-600 text-amber-500 focus:ring-amber-500 bg-background cursor-pointer"
+                            className="sr-only"
                         />
                         <div className="flex-1">
-                            <span className="text-sm font-black text-amber-900 dark:text-amber-400">Este producto tiene múltiples tamaños/variantes</span>
-                            <p className="text-xs text-muted-foreground font-medium">Activa esta opción si vendes este producto en distintos tamaños (Ej. Chico, Mediano) con precios diferentes.</p>
+                            <span className="text-sm font-black text-foreground">Este producto tiene múltiples tamaños/variantes</span>
+                            <p className="text-xs text-muted-foreground font-medium">Activa si vendes el producto en distintos tamaños (Ej. Chico, Mediano, Grande) con precios diferentes.</p>
                         </div>
                     </label>
 
@@ -526,28 +516,65 @@ export function ProductForm({ product, onSubmit, onCancel, isLoading }) {
                             <div className="space-y-3">
                                 {visibleVariants.map((v, index) => {
                                     const realIndex = variants.indexOf(v)
+                                    const priceNum = parseFloat(v.price) || 0
+                                    const costoNum = parseFloat(v.costo) || 0
+                                    const margin = priceNum > 0 && costoNum > 0 ? ((priceNum - costoNum) / priceNum * 100) : null
                                     return (
-                                        <div key={realIndex} className="grid grid-cols-12 gap-3 items-center p-3 rounded-xl bg-background border border-border/80 shadow-sm group">
-                                            <div className="col-span-12 md:col-span-4">
-                                                <Label className="text-[10px] uppercase text-muted-foreground mb-1 block">Tamaño (Ej: Chico)</Label>
-                                                <Input value={v.name} onChange={e => updateVariant(realIndex, 'name', e.target.value)} placeholder="Nombre del tamaño" className="h-9 font-bold text-sm" />
+                                        <div key={realIndex} className="rounded-2xl bg-gradient-to-r from-slate-50 to-white border border-border/70 shadow-sm overflow-hidden group">
+                                            {/* Variant header row */}
+                                            <div className="flex items-center gap-3 px-4 pt-3 pb-2">
+                                                <div className="flex-1">
+                                                    <Label className="text-[10px] uppercase text-muted-foreground mb-1 block font-black tracking-wider">Tamaño / Variante</Label>
+                                                    <Input
+                                                        value={v.name}
+                                                        onChange={e => updateVariant(realIndex, 'name', e.target.value)}
+                                                        placeholder="Ej: Chico, Grande, 250ml"
+                                                        className="h-9 font-bold text-sm bg-white border-border/60"
+                                                    />
+                                                </div>
+                                                {/* Price badge */}
+                                                <div className="text-right">
+                                                    <Label className="text-[10px] uppercase text-muted-foreground mb-1 block font-black tracking-wider">Precio</Label>
+                                                    <div className="relative">
+                                                        <span className="absolute left-3 top-1/2 -translate-y-1/2 font-black text-indigo-600 text-sm">$</span>
+                                                        <Input
+                                                            type="number" step="0.01" min="0"
+                                                            value={v.price}
+                                                            onChange={e => updateVariant(realIndex, 'price', e.target.value)}
+                                                            className="h-9 pl-7 font-black text-lg text-indigo-700 border-indigo-200 bg-indigo-50 w-28 text-right rounded-xl"
+                                                        />
+                                                    </div>
+                                                </div>
+                                                <div className="flex items-end pb-0.5">
+                                                    <button type="button" onClick={() => removeVariant(realIndex)}
+                                                        className="h-9 w-9 flex items-center justify-center text-muted-foreground/40 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all opacity-0 group-hover:opacity-100">
+                                                        <Trash2 className="w-4 h-4" />
+                                                    </button>
+                                                </div>
                                             </div>
-                                            <div className="col-span-6 md:col-span-2">
-                                                <Label className="text-[10px] uppercase text-muted-foreground mb-1 block">Precio ($)</Label>
-                                                <Input type="number" step="0.01" min="0" value={v.price} onChange={e => updateVariant(realIndex, 'price', e.target.value)} className="h-9 font-bold text-sm text-amber-600 dark:text-amber-400 border-amber-500/30" />
-                                            </div>
-                                            <div className="col-span-6 md:col-span-2">
-                                                <Label className="text-[10px] uppercase text-muted-foreground mb-1 block">Costo Base</Label>
-                                                <Input type="number" step="0.01" min="0" value={v.costo} onChange={e => updateVariant(realIndex, 'costo', e.target.value)} className="h-9" />
-                                            </div>
-                                            <div className="col-span-10 md:col-span-3">
-                                                <Label className="text-[10px] uppercase text-muted-foreground mb-1 block">SKU</Label>
-                                                <Input value={v.sku} onChange={e => updateVariant(realIndex, 'sku', e.target.value)} placeholder="Opcional" className="h-9 text-xs" />
-                                            </div>
-                                            <div className="col-span-2 md:col-span-1 flex justify-end items-end h-[56px] pb-1">
-                                                <Button type="button" variant="ghost" size="icon" onClick={() => removeVariant(realIndex)} className="text-red-400 hover:text-red-600 hover:bg-red-500/10 h-9 w-9">
-                                                    <Trash2 className="w-4 h-4" />
-                                                </Button>
+                                            {/* Secondary fields */}
+                                            <div className="flex items-center gap-3 px-4 pb-3 border-t border-border/30 pt-2.5 bg-muted/20">
+                                                <div className="flex-1">
+                                                    <Label className="text-[10px] uppercase text-muted-foreground mb-1 block font-semibold">Costo Insumos</Label>
+                                                    <div className="relative">
+                                                        <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground text-xs">$</span>
+                                                        <Input type="number" step="0.01" min="0" value={v.costo}
+                                                            onChange={e => updateVariant(realIndex, 'costo', e.target.value)}
+                                                            className="h-8 pl-6 text-sm bg-white border-border/60" />
+                                                    </div>
+                                                </div>
+                                                <div className="flex-1">
+                                                    <Label className="text-[10px] uppercase text-muted-foreground mb-1 block font-semibold">SKU</Label>
+                                                    <Input value={v.sku} onChange={e => updateVariant(realIndex, 'sku', e.target.value)}
+                                                        placeholder="Opcional" className="h-8 text-xs bg-white border-border/60" />
+                                                </div>
+                                                {margin !== null && (
+                                                    <div className="text-right shrink-0">
+                                                        <p className="text-[10px] text-muted-foreground font-semibold uppercase">Margen</p>
+                                                        <span className={`text-sm font-black tabular-nums ${margin >= 60 ? 'text-emerald-600' : margin >= 35 ? 'text-amber-600' : 'text-red-500'
+                                                            }`}>{margin.toFixed(0)}%</span>
+                                                    </div>
+                                                )}
                                             </div>
                                         </div>
                                     )

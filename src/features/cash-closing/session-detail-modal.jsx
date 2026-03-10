@@ -66,9 +66,10 @@ export function SessionDetailModal({ session, onClose }) {
                             <p className="font-semibold text-foreground">
                                 {new Date(session.opened_at).toLocaleDateString('es-MX', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
                             </p>
-                            <p className="text-sm text-muted-foreground">
-                                {new Date(session.opened_at).toLocaleTimeString()}
-                            </p>
+                            <div className="text-sm text-muted-foreground flex items-center justify-between">
+                                <span>{new Date(session.opened_at).toLocaleTimeString()}</span>
+                                <span className="text-xs font-bold text-primary truncate max-w-[100px] ml-2" title={session.opened_by_user_name}>{session.opened_by_user_name || 'Desconocido'}</span>
+                            </div>
                         </div>
                         <div className="bg-muted/30 p-4 rounded-2xl border border-border/50">
                             <div className="flex items-center gap-2 text-muted-foreground mb-2">
@@ -80,9 +81,10 @@ export function SessionDetailModal({ session, onClose }) {
                                     <p className="font-semibold text-foreground">
                                         {new Date(session.closed_at).toLocaleDateString('es-MX', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
                                     </p>
-                                    <p className="text-sm text-muted-foreground">
-                                        {new Date(session.closed_at).toLocaleTimeString()}
-                                    </p>
+                                    <div className="text-sm text-muted-foreground flex justify-between items-center">
+                                        <span>{new Date(session.closed_at).toLocaleTimeString()}</span>
+                                        <span className="text-xs font-bold text-primary truncate max-w-[100px] ml-2" title={session.closed_by_user_name || session.nombre_cajero}>{session.closed_by_user_name || session.nombre_cajero || 'Desconocido'}</span>
+                                    </div>
                                 </>
                             ) : session.estado === 'cerrada' ? (
                                 <p className="text-sm font-bold text-red-500 italic">Corte Forzado (Sin Hora)</p>

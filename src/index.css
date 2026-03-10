@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Outfit:wght@400;500;600;700;800;900&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -6,34 +6,33 @@
 
 @layer base {
   :root {
-    /* New Light Theme (Navy & Gold Palette) */
-    --background: 210 20% 96%;
-    /* Soft off-white to reduce glare */
-    --foreground: 216 100% 3.9%;
-    /* #000814 - Deepest Blue */
+    /* Premium Light Theme */
+    --background: 220 20% 97%;
+    --foreground: 220 25% 10%;
     --card: 0 0% 100%;
-    --card-foreground: 216 100% 3.9%;
+    --card-foreground: 220 25% 10%;
     --popover: 0 0% 100%;
-    --popover-foreground: 216 100% 3.9%;
-    --primary: 209 100% 20%;
-    /* #003566 - Medium Navy */
+    --popover-foreground: 220 25% 10%;
+    --primary: 224 71% 40%;
     --primary-foreground: 0 0% 100%;
-    --secondary: 211 100% 12%;
-    /* #001d3d - Deep Navy */
-    --secondary-foreground: 0 0% 100%;
-    --muted: 210 20% 92%;
-    --muted-foreground: 211 20% 40%;
-    --accent: 50 100% 52%;
-    /* #ffd60a - Gold */
-    --accent-foreground: 216 100% 3.9%;
-    /* Dark text on gold */
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 210 20% 86%;
-    --input: 210 20% 86%;
-    --ring: 50 100% 52%;
-    /* Gold focus rings */
-    --radius: 0.75rem;
+    --secondary: 220 15% 94%;
+    --secondary-foreground: 220 25% 15%;
+    --muted: 220 15% 93%;
+    --muted-foreground: 220 10% 46%;
+    --accent: 262 83% 58%;
+    --accent-foreground: 0 0% 100%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 220 15% 88%;
+    --input: 220 15% 88%;
+    --ring: 224 71% 40%;
+    --radius: 0.875rem;
+    /* Gradient tokens */
+    --gradient-primary: linear-gradient(135deg, #3b5fe1, #6366f1);
+    --gradient-success: linear-gradient(135deg, #059669, #0d9488);
+    --gradient-warning: linear-gradient(135deg, #d97706, #ea580c);
+    --gradient-danger: linear-gradient(135deg, #dc2626, #e11d48);
+    --gradient-violet: linear-gradient(135deg, #7c3aed, #9333ea);
   }
 }
 
@@ -44,16 +43,23 @@
 
   body {
     @apply bg-background text-foreground;
+    font-family: 'Inter', system-ui, sans-serif;
     font-feature-settings: "rlig" 1, "calt" 1;
-    /* Prevent horizontal overflow on the body itself */
     overflow-x: hidden;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    font-family: 'Outfit', 'Inter', system-ui, sans-serif;
   }
 }
 
 /* ── Native App Scrollbar Utilities ───────────────────────────────────────── */
 @layer utilities {
-
-  /* Hide scrollbar visually but keep scroll functionality */
   .scrollbar-hide::-webkit-scrollbar {
     display: none;
   }
@@ -63,13 +69,78 @@
     scrollbar-width: none;
   }
 
-  /* Minimum touch target size for accessibility */
   .touch-target {
     min-height: 44px;
     min-width: 44px;
   }
+
+  /* Gradient utilities */
+  .gradient-primary {
+    background: var(--gradient-primary);
+  }
+
+  .gradient-success {
+    background: var(--gradient-success);
+  }
+
+  .gradient-warning {
+    background: var(--gradient-warning);
+  }
+
+  .gradient-danger {
+    background: var(--gradient-danger);
+  }
+
+  .gradient-violet {
+    background: var(--gradient-violet);
+  }
+
+  /* Glass morphism card */
+  .glass-card {
+    background: rgba(255, 255, 255, 0.7);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid rgba(255, 255, 255, 0.5);
+  }
+
+  /* Glow effects */
+  .glow-primary {
+    box-shadow: 0 4px 20px -4px rgba(59, 95, 225, 0.4);
+  }
+
+  .glow-success {
+    box-shadow: 0 4px 20px -4px rgba(5, 150, 105, 0.4);
+  }
+
+  .glow-violet {
+    box-shadow: 0 4px 20px -4px rgba(124, 58, 237, 0.4);
+  }
 }
 
+/* ── Sidebar custom scrollbar (dark theme) ───────────────────────────────── */
+aside nav::-webkit-scrollbar {
+  width: 4px;
+}
+
+aside nav::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: 99px;
+  margin: 8px 0;
+}
+
+aside nav::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 99px;
+}
+
+aside nav::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.28);
+}
+
+aside nav {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.15) transparent;
+}
 
 /* ── Public Menu: Always Light Mode ────────────────────────────────────────── */
 /* The public customer menu should ALWAYS appear in light mode for clarity.

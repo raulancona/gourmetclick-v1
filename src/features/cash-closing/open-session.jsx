@@ -10,7 +10,7 @@ import { useTerminal } from '../auth/terminal-context'
 import { useTenant } from '../auth/tenant-context'
 
 export function OpenSession({ onComplete }) {
-    const { user } = useAuth()
+    const { user, profile } = useAuth()
     const { tenant } = useTenant()
     const { activeEmployee } = useTerminal()
     const [fondoInicial, setFondoInicial] = useState('')
@@ -25,7 +25,8 @@ export function OpenSession({ onComplete }) {
 
         try {
             setIsLoading(true)
-            await openSession(tenant.id, activeEmployee?.id || null, fondoInicial)
+            const openedByName = activeEmployee?.nombre || profile?.nombre_restaurante || profile?.business_name || user?.email || 'Administrador'
+            await openSession(tenant.id, activeEmployee?.id || null, fondoInicial, openedByName)
             toast.success('Sesión de caja abierta con éxito')
             if (onComplete) onComplete()
         } catch (error) {

@@ -23,8 +23,7 @@ export async function createProductVariant(variantData, restaurantId) {
         .from('product_variants')
         .insert([{
             ...variantData,
-            restaurant_id: restaurantId,
-            user_id: user?.id || restaurantId
+            restaurant_id: restaurantId
         }])
         .select()
         .single()
@@ -58,27 +57,45 @@ export async function deleteProductVariant(variantId) {
 }
 
 export async function bulkUpsertVariants(productId, variantsData, restaurantId) {
-    const { data: { user } } = await supabase.auth.getUser()
-
-    // Map variants ensuring they have product_id and restaurant_id
-    const variantsToUpsert = variantsData.map((v, idx) => ({
-        id: v.id || undefined, // undefined will let DB to generate uuid if new
+    const baseFields = (v, idx) => ({
         product_id: productId,
         restaurant_id: restaurantId,
-        user_id: user?.id || restaurantId,
         name: v.name,
-        price: v.price,
-        costo: v.costo || 0,
+        price: parseFloat(v.price) || 0,
+        costo: parseFloat(v.costo) || 0,
         sku: v.sku || null,
         is_available: v.is_available !== false,
         sort_order: idx
+    })
+
+    // Split new variants (no id) from existing ones (have id)
+    const newVariants = variantsData.filter(v => !v.id).map((v, idx) => baseFields(v, idx))
+    const existingVariants = variantsData.filter(v => !!v.id).map((v, idx) => ({
+        id: v.id,
+        ...baseFields(v, variantsData.indexOf(v))
     }))
 
-    const { data, error } = await supabase
-        .from('product_variants')
-        .upsert(variantsToUpsert)
-        .select()
+    const results = []
 
-    if (error) throw error
-    return data || []
+    // INSERT new variants (no id sent — DB generates uuid)
+    if (newVariants.length > 0) {
+        const { data, error } = await supabase
+            .from('product_variants')
+            .insert(newVariants)
+            .select()
+        if (error) throw error
+        results.push(...(data || []))
+    }
+
+    // UPSERT existing variants (id present — updates in place)
+    if (existingVariants.length > 0) {
+        const { data, error } = await supabase
+            .from('product_variants')
+            .upsert(existingVariants, { onConflict: 'id' })
+            .select()
+        if (error) throw error
+        results.push(...(data || []))
+    }
+
+    return results
 }
