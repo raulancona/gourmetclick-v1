@@ -251,3 +251,116 @@ export async function getSessionsHistory(restaurantId, { page = 1, pageSize = 50
     if (error) throw error
     return { data: data || [], count }
 }
+
+/**
+ * Get all SHIFT cuts (cut_type='shift') for today for a restaurant.
+ * Returns them with their linked session info.
+ */
+export async function getTodayShiftCuts(restaurantId) {
+    const todayStart = new Date()
+    todayStart.setHours(0, 0, 0, 0)
+    const todayEnd = new Date()
+    todayEnd.setHours(23, 59, 59, 999)
+
+    const { data, error } = await supabase
+        .from('cash_cuts')
+        .select('*')
+        .eq('restaurant_id', restaurantId)
+        .eq('cut_type', 'shift')
+        .gte('cut_date', todayStart.toISOString())
+        .lte('cut_date', todayEnd.toISOString())
+        .order('cut_date', { ascending: true })
+
+    if (error) throw error
+    return data || []
+}
+
+/**
+ * Check if a daily close already exists for today.
+ */
+export async function hasDailyClose(restaurantId) {
+    const today = new Date().toISOString().split('T')[0]
+    const { data, error } = await supabase
+        .from('daily_closes')
+        .select('id')
+        .eq('restaurant_id', restaurantId)
+        .eq('date', today)
+        .maybeSingle()
+
+    if (error) throw error
+    return data !== null
+}
+
+/**
+ * Get the daily close for today (or return null)
+ */
+export async function getTodayDailyClose(restaurantId) {
+    const today = new Date().toISOString().split('T')[0]
+    const { data, error } = await supabase
+        .from('daily_closes')
+        .select('*')
+        .eq('restaurant_id', restaurantId)
+        .eq('date', today)
+        .maybeSingle()
+
+    if (error) throw error
+    return data
+}
+
+/**
+ * Create a daily close summarizing all shift cuts for today.
+ * Only admin/gerente can call this (enforced by RLS).
+ */
+export async function createDailyClose(restaurantId, userId, closedByName, shiftCuts, sessionExpenses) {
+    const alreadyClosed = await hasDailyClose(restaurantId)
+    if (alreadyClosed) throw new Error('Ya existe un cierre total para hoy.')
+
+    const totalShifts = shiftCuts.length
+    const grossSales = shiftCuts.reduce((s, c) => s + (parseFloat(c.total_amount) || 0), 0)
+    const totalCash = shiftCuts.reduce((s, c) => s + (parseFloat(c.total_cash) || 0), 0)
+    const totalCard = shiftCuts.reduce((s, c) => s + (parseFloat(c.total_card) || 0), 0)
+    const totalTransfer = shiftCuts.reduce((s, c) => s + (parseFloat(c.total_transfer) || 0), 0)
+    const totalExpenses = (sessionExpenses || []).reduce((s, g) => s + (parseFloat(g.monto) || 0), 0)
+    const netAmount = grossSales - totalExpenses
+
+    const { data, error } = await supabase
+        .from('daily_closes')
+        .insert([{
+            restaurant_id: restaurantId,
+            closed_by: userId,
+            closed_by_name: closedByName,
+            date: new Date().toISOString().split('T')[0],
+            total_shifts: totalShifts,
+            gross_sales: grossSales,
+            total_cash: totalCash,
+            total_card: totalCard,
+            total_transfer: totalTransfer,
+            total_expenses: totalExpenses,
+            net_amount: netAmount,
+            shift_cut_ids: shiftCuts.map(c => c.id),
+        }])
+        .select()
+        .single()
+
+    if (error) throw error
+    return data
+}
+
+/**
+ * Get today's expenses for a restaurant (across all sessions today)
+ */
+export async function getTodayExpenses(restaurantId) {
+    const todayStart = new Date()
+    todayStart.setHours(0, 0, 0, 0)
+
+    const { data, error } = await supabase
+        .from('gastos')
+        .select('*')
+        .eq('restaurant_id', restaurantId)
+        .gte('created_at', todayStart.toISOString())
+        .order('created_at', { ascending: true })
+
+    if (error) throw error
+    return data || []
+}
+

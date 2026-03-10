@@ -1,21 +1,26 @@
 import { useState, useMemo } from 'react'
-import { Banknote, Loader2, AlertCircle, TrendingUp, TrendingDown, ShieldCheck } from 'lucide-react'
+import { Banknote, Loader2, AlertCircle, TrendingUp, TrendingDown, ShieldCheck, Printer, CheckCircle2 } from 'lucide-react'
 import { Button } from '../../components/ui/button'
 import { Input } from '../../components/ui/input'
 import { Label } from '../../components/ui/label'
 import { Card } from '../../components/ui/card'
 import { toast } from 'sonner'
 import { closeSession } from '../../lib/session-service'
+import { printShiftCloseReport } from '../../lib/print-service'
 import { useAuth } from '../auth/auth-context'
 import { useTerminal } from '../auth/terminal-context'
+import { useTenant } from '../auth/tenant-context'
 import { formatCurrency } from '../../lib/utils'
 
 export function BlindCashCut({ onComplete, session, isAdmin, orders = [], expenses = [] }) {
     const { user } = useAuth()
     const { activeEmployee } = useTerminal()
+    const { tenant } = useTenant()
     const [montoReal, setMontoReal] = useState('')
     const [isLoading, setIsLoading] = useState(false)
     const [showConfirm, setShowConfirm] = useState(false)
+    const [cutResult, setCutResult] = useState(null) // holds the closed cut data for printing
+
 
     // ─── Blind summary: CASH ONLY ─────────────────────────────────────────────
     // Principle: The blind cut only validates PHYSICAL cash in the register.
@@ -66,17 +71,59 @@ export function BlindCashCut({ onComplete, session, isAdmin, orders = [], expens
             setIsLoading(true)
             if (!session?.id) throw new Error('No hay una sesión activa para cerrar')
 
-            await closeSession(session.id, montoReal, user.id, closerName, expectedCash)
+            const result = await closeSession(session.id, montoReal, user.id, closerName, expectedCash)
+            setCutResult(result)
             toast.success('Turno cerrado con éxito ✓')
             setMontoReal('')
             setShowConfirm(false)
-            if (onComplete) onComplete()
+            // Don't call onComplete yet — wait for print decision
         } catch (error) {
             console.error('Error closing session:', error)
             toast.error('Error al cerrar: ' + error.message)
         } finally {
             setIsLoading(false)
         }
+    }
+
+    const handlePrint = () => {
+        printShiftCloseReport({
+            session,
+            cut: cutResult,
+            orders,
+            expenses,
+            closerName,
+            restaurantName: tenant?.name || tenant?.nombre || 'Restaurante'
+        })
+    }
+
+    // ─── Print decision screen (after successful close) ───────────────────────
+    if (cutResult) {
+        return (
+            <Card className="max-w-md mx-auto border-border/50 shadow-xl p-10 text-center space-y-6 rounded-[2.5rem]">
+                <div className="w-20 h-20 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto">
+                    <CheckCircle2 className="w-10 h-10" />
+                </div>
+                <div>
+                    <h3 className="text-2xl font-black text-foreground">Turno Cerrado</h3>
+                    <p className="text-sm text-muted-foreground mt-2">¿Deseas imprimir el reporte de este turno?</p>
+                </div>
+                <div className="flex flex-col gap-3">
+                    <Button
+                        onClick={handlePrint}
+                        className="h-14 rounded-2xl bg-gradient-to-r from-blue-500 to-indigo-600 text-white font-black text-base gap-2 hover:scale-[1.01] transition-transform"
+                    >
+                        <Printer className="w-5 h-5" /> Imprimir Reporte de Turno
+                    </Button>
+                    <Button
+                        variant="outline"
+                        onClick={() => { setCutResult(null); if (onComplete) onComplete() }}
+                        className="h-12 rounded-2xl font-bold"
+                    >
+                        Continuar sin imprimir
+                    </Button>
+                </div>
+            </Card>
+        )
     }
 
     // ─── Confirmation screen ─────────────────────────────────────────────────

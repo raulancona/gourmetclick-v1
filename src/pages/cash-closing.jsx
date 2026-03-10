@@ -4,13 +4,14 @@ import { useAuth } from '../features/auth/auth-context'
 import { useTenant } from '../features/auth/tenant-context'
 import { useRealtimeSubscription } from '../features/realtime/realtime-context'
 import { getUnclosedOrders, updateOrderStatus, updateOrder, deleteOrder } from '../lib/order-service'
-import { createCashCut, getActiveSession } from '../lib/session-service'
+import { createCashCut, getActiveSession, getTodayShiftCuts, hasDailyClose } from '../lib/session-service'
 import { supabase as sb } from '../lib/supabase'
 import { generateClosingSummary, sendWhatsAppOrder } from '../lib/whatsapp-service'
 import { OrderDetailModal } from '../features/orders/order-detail-modal'
 import { BlindCashCut } from '../features/cash-closing/blind-cash-cut'
 import { OpenSession } from '../features/cash-closing/open-session'
 import { CortesHistory } from '../features/cash-closing/cortes-history'
+import { DailyCloseModal } from '../features/cash-closing/daily-close-modal'
 import { useTerminal } from '../features/auth/terminal-context'
 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card'
@@ -19,11 +20,10 @@ import {
     Calculator, Banknote, CreditCard, Landmark,
     ArrowRight, Loader2, CheckCircle2, ShoppingBag,
     TrendingUp, Send, History, LayoutPanelLeft, ShieldCheck,
+    CalendarCheck, Clock,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { formatCurrency } from '../lib/utils'
-
-import { ExpenseManager } from '../features/expenses/expense-manager'
 import { supabase } from '../lib/supabase'
 
 export function CashClosingPage() {
@@ -31,17 +31,18 @@ export function CashClosingPage() {
     const { tenant } = useTenant()
     const { activeEmployee } = useTerminal()
     const queryClient = useQueryClient()
-    const [view, setView] = useState('closing') // 'closing', 'history', 'expenses'
+    const [view, setView] = useState('closing') // 'closing', 'history'
     const [selectedOrder, setSelectedOrder] = useState(null)
+    const [showDailyClose, setShowDailyClose] = useState(false)
 
-    // Admin if no terminal session (direct owner) or terminal role is admin
     const isAdmin = !activeEmployee || activeEmployee.rol === 'admin' || activeEmployee.rol === 'gerente'
+
 
     const { data: orders = [], isLoading: loadingOrders } = useQuery({
         queryKey: ['unclosed-orders', tenant?.id],
         queryFn: () => getUnclosedOrders(tenant.id),
         enabled: !!tenant?.id,
-        refetchInterval: 30_000, // Polling fallback every 30s
+        refetchInterval: 30_000,
     })
 
     const { data: activeSession, isLoading: loadingSession } = useQuery({
@@ -57,13 +58,28 @@ export function CashClosingPage() {
         queryFn: async () => {
             const { data, error } = await sb
                 .from('gastos')
-                .select('id, descripcion, monto, categoria, created_at')
+                .select('id, descripcion, monto, categoria, created_at, medio_pago')
                 .eq('sesion_caja_id', activeSession.id)
             if (error) throw error
             return data || []
         },
         enabled: !!activeSession?.id,
         refetchInterval: 30_000,
+    })
+
+    // Today's shift cuts (for count display and daily close)
+    const { data: todayShifts = [] } = useQuery({
+        queryKey: ['today-shift-cuts', tenant?.id],
+        queryFn: () => getTodayShiftCuts(tenant.id),
+        enabled: !!tenant?.id,
+        refetchInterval: 30_000,
+    })
+
+    const { data: dailyClosed = false } = useQuery({
+        queryKey: ['has-daily-close', tenant?.id],
+        queryFn: () => hasDailyClose(tenant.id),
+        enabled: !!tenant?.id,
+        refetchInterval: 60_000,
     })
 
     // Realtime: session changes + order status changes
@@ -81,7 +97,7 @@ export function CashClosingPage() {
         queryClient.invalidateQueries(['active-session'])
         queryClient.invalidateQueries(['cortes-history'])
         queryClient.invalidateQueries(['sessions-history'])
-        // Stay on closing view (history is now in Reports page)
+        queryClient.invalidateQueries(['today-shift-cuts'])
     }
 
     if (loadingOrders || loadingSession) {
@@ -97,20 +113,18 @@ export function CashClosingPage() {
                 </div>
 
                 {isAdmin && (
-                    <div className="flex p-1 bg-muted rounded-2xl border border-border w-fit">
+                    <div className="flex items-center gap-2 flex-wrap">
+                        {/* Cierre Total del Día - prominent button */}
                         <Button
-                            variant={view === 'closing' ? 'default' : 'ghost'}
-                            onClick={() => setView('closing')}
-                            className="rounded-xl font-bold h-10 px-4"
+                            onClick={() => setShowDailyClose(true)}
+                            disabled={dailyClosed || todayShifts.length === 0}
+                            className={`h-11 rounded-2xl font-bold gap-2 ${dailyClosed
+                                ? 'bg-emerald-100 text-emerald-700 border border-emerald-300 hover:bg-emerald-100 cursor-not-allowed'
+                                : 'bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-md shadow-emerald-600/20 hover:scale-[1.01] transition-transform'
+                                }`}
                         >
-                            <LayoutPanelLeft className="w-4 h-4 mr-2" /> Corte Actual
-                        </Button>
-                        <Button
-                            variant={view === 'expenses' ? 'default' : 'ghost'}
-                            onClick={() => setView('expenses')}
-                            className="rounded-xl font-bold h-10 px-4"
-                        >
-                            <Banknote className="w-4 h-4 mr-2" /> Gastos
+                            <CalendarCheck className="w-4 h-4" />
+                            {dailyClosed ? 'Día Cerrado ✓' : 'Cierre Total del Día'}
                         </Button>
                     </div>
                 )}
@@ -144,9 +158,23 @@ export function CashClosingPage() {
                         </div>
                     </div>
                 )}
+
+                {isAdmin && todayShifts.length > 0 && (
+                    <div className="flex items-center gap-2 ml-auto">
+                        <Clock className="w-3.5 h-3.5 text-muted-foreground" />
+                        <span className="text-xs font-bold text-muted-foreground">
+                            {todayShifts.length} turno{todayShifts.length !== 1 ? 's' : ''} cerrado{todayShifts.length !== 1 ? 's' : ''} hoy
+                        </span>
+                        {dailyClosed && (
+                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-600 text-xs font-black border border-emerald-500/20">
+                                ✓ Día cerrado
+                            </span>
+                        )}
+                    </div>
+                )}
             </div>
 
-            {view === 'closing' ? (
+            {view === 'closing' && (
                 <div className="grid lg:grid-cols-5 gap-8 items-start">
                     {/* Main Cut Component - 60% */}
                     <div className="lg:col-span-3">
@@ -209,10 +237,6 @@ export function CashClosingPage() {
                         )}
                     </div>
                 </div>
-            ) : view === 'expenses' ? (
-                <ExpenseManager />
-            ) : (
-                <CortesHistory />
             )}
 
             {selectedOrder && (
@@ -221,7 +245,6 @@ export function CashClosingPage() {
                     onClose={() => setSelectedOrder(null)}
                     onUpdateStatus={async (status) => {
                         try {
-                            // Legacy update logic remains here
                             setSelectedOrder({ ...selectedOrder, status })
                             queryClient.invalidateQueries(['unclosed-orders'])
                         } catch (err) {
@@ -231,6 +254,17 @@ export function CashClosingPage() {
                     onDelete={async () => {
                         setSelectedOrder(null)
                         queryClient.invalidateQueries(['unclosed-orders'])
+                    }}
+                />
+            )}
+
+            {showDailyClose && (
+                <DailyCloseModal
+                    onClose={() => setShowDailyClose(false)}
+                    onComplete={() => {
+                        setShowDailyClose(false)
+                        queryClient.invalidateQueries(['today-shift-cuts'])
+                        queryClient.invalidateQueries(['has-daily-close'])
                     }}
                 />
             )}
