@@ -50,6 +50,8 @@ export default function POSPage() {
     const [customizations, setCustomizations] = useState('')
     const [availableModifiers, setAvailableModifiers] = useState([])
     const [selectedModifiers, setSelectedModifiers] = useState([])
+    const [availableVariants, setAvailableVariants] = useState([])
+    const [selectedVariant, setSelectedVariant] = useState(null)
     const [fetchingModifiers, setFetchingModifiers] = useState(false)
     const [modalQuantity, setModalQuantity] = useState(1)
 
@@ -58,42 +60,68 @@ export default function POSPage() {
     const [isSuccessModalOpen, setIsSuccessModalOpen] = useState(false)
 
     const handleProductClick = async (product) => {
-        if (product.has_extras) {
+        if (product.has_extras || product.has_variants) {
             setSelectedProduct(product)
             setCustomizations('')
             setSelectedModifiers([])
+            setAvailableModifiers([])
+            setAvailableVariants([])
+            setSelectedVariant(null)
             setModalQuantity(1)
             setIsOptionsModalOpen(true)
 
             try {
                 setFetchingModifiers(true)
-                const { data: groups, error: groupError } = await supabase
-                    .from('modifier_groups')
-                    .select('id, name, min_selection')
-                    .eq('product_id', product.id)
 
-                if (groupError) throw groupError
+                let variants = []
+                if (product.has_variants) {
+                    const { data: vData, error: vError } = await supabase
+                        .from('product_variants')
+                        .select('*')
+                        .eq('product_id', product.id)
+                        .eq('is_available', true)
 
-                if (groups && groups.length > 0) {
-                    const groupIds = groups.map(g => g.id)
-                    const { data: options, error: optError } = await supabase
-                        .from('modifier_options')
-                        .select('id, name, extra_price, group_id')
-                        .in('group_id', groupIds)
-
-                    if (optError) throw optError
-
-                    const optionsWithGroup = (options || []).map(opt => ({
-                        ...opt,
-                        groupName: groups.find(g => g.id === opt.group_id)?.name || 'Extras'
-                    }))
-                    setAvailableModifiers(optionsWithGroup)
-                } else {
-                    setAvailableModifiers([])
+                    if (vError) throw vError
+                    variants = vData || []
+                    setAvailableVariants(variants)
+                    if (variants.length > 0) setSelectedVariant(variants[0])
                 }
+
+                let optionsWithGroup = []
+                if (product.has_extras) {
+                    const { data: pmg, error: pmgError } = await supabase
+                        .from('product_modifier_groups')
+                        .select(`
+                            modifier_groups (
+                                id, name, min_selection,
+                                modifier_options (id, name, extra_price, group_id)
+                            )
+                        `)
+                        .eq('product_id', product.id)
+
+                    if (pmgError) throw pmgError
+
+                    if (pmg && pmg.length > 0) {
+                        pmg.forEach(rel => {
+                            if (rel.modifier_groups) {
+                                const group = rel.modifier_groups
+                                const opts = group.modifier_options || []
+                                opts.forEach(opt => {
+                                    optionsWithGroup.push({
+                                        ...opt,
+                                        groupName: group.name || 'Extras'
+                                    })
+                                })
+                            }
+                        })
+                    }
+                }
+
+                setAvailableModifiers(optionsWithGroup)
+
             } catch (err) {
-                console.error('Error fetching modifiers:', err)
-                toast.error('No se pudieron cargar los extras')
+                console.error('Error fetching modifiers/variants:', err)
+                toast.error('Error al cargar opciones del producto')
             } finally {
                 setFetchingModifiers(false)
             }
@@ -108,12 +136,14 @@ export default function POSPage() {
             ...(customizations.trim() ? [{ name: 'Nota', value: customizations }] : [])
         ]
 
+        const basePrice = selectedVariant ? parseFloat(selectedVariant.price) : parseFloat(selectedProduct.price)
         const extraTotal = selectedModifiers.reduce((acc, m) => acc + parseFloat(m.extra_price), 0)
 
         // Add items according to quantity chosen in modal
         addMultipleToCart({
             ...selectedProduct,
-            price: parseFloat(selectedProduct.price) + extraTotal
+            name: selectedVariant ? `${selectedProduct.name} (${selectedVariant.name})` : selectedProduct.name,
+            price: basePrice + extraTotal
         }, itemModifiers, modalQuantity)
 
         setIsOptionsModalOpen(false)
@@ -121,6 +151,8 @@ export default function POSPage() {
         setCustomizations('')
         setSelectedModifiers([])
         setAvailableModifiers([])
+        setAvailableVariants([])
+        setSelectedVariant(null)
         setModalQuantity(1)
     }
 
@@ -299,6 +331,9 @@ export default function POSPage() {
                 availableModifiers={availableModifiers}
                 selectedModifiers={selectedModifiers}
                 onToggleModifier={toggleModifier}
+                availableVariants={availableVariants}
+                selectedVariant={selectedVariant}
+                setSelectedVariant={setSelectedVariant}
                 customizations={customizations}
                 onCustomizationsChange={setCustomizations}
                 quantity={modalQuantity}

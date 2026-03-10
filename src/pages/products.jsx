@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Plus, Upload, Search, Trash2, Images } from 'lucide-react'
 import { useTenant } from '../features/auth/tenant-context'
+import { useAuth } from '../features/auth/auth-context'
 import { getProducts, createProduct, updateProduct, deleteProduct } from '../lib/product-service'
 import { deleteProductImage } from '../lib/image-service'
 import { ProductCard } from '../features/products/product-card'
@@ -16,6 +17,7 @@ import { toast } from 'sonner'
 
 export function ProductsPage() {
     const { tenant } = useTenant()
+    const { user } = useAuth()
     const queryClient = useQueryClient()
 
     // State
@@ -40,7 +42,7 @@ export function ProductsPage() {
 
     // Create mutation
     const createMutation = useMutation({
-        mutationFn: (productData) => createProduct(productData, tenant.id),
+        mutationFn: (productData) => createProduct(productData, tenant.id, user?.id),
         onSuccess: (data) => {
             queryClient.invalidateQueries(['products'])
             setIsCreateModalOpen(false)
@@ -228,7 +230,7 @@ export function ProductsPage() {
                 isOpen={isCreateModalOpen}
                 onClose={() => setIsCreateModalOpen(false)}
                 title="Nuevo Producto"
-                size="md"
+                size="lg"
             >
                 <ProductForm
                     onSubmit={handleCreateSubmit}
@@ -245,7 +247,7 @@ export function ProductsPage() {
                     setSelectedProduct(null)
                 }}
                 title="Editar Producto"
-                size="md"
+                size="lg"
             >
                 <ProductForm
                     product={selectedProduct}

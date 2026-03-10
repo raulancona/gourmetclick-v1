@@ -16,13 +16,17 @@ export function ModifierModal({
     onCustomizationsChange,
     quantity,
     onQuantityChange,
-    onAddToCart
+    onAddToCart,
+    availableVariants = [],
+    selectedVariant,
+    setSelectedVariant
 }) {
     if (!product) return null
 
     // Calculate total price based on product price + selected modifiers
+    const basePrice = selectedVariant ? parseFloat(selectedVariant.price) : parseFloat(product.price || 0)
     const extraTotal = selectedModifiers.reduce((acc, m) => acc + parseFloat(m.extra_price), 0)
-    const unitPrice = parseFloat(product.price || 0) + extraTotal
+    const unitPrice = basePrice + extraTotal
     const totalPrice = unitPrice * quantity
 
     // Group modifiers by their groupName
@@ -47,6 +51,41 @@ export function ModifierModal({
                     </div>
                 ) : (
                     <>
+                        {availableVariants.length > 0 && (
+                            <div className="space-y-2 mb-4 bg-muted/30 p-4 rounded-xl border border-border">
+                                <div className="flex items-center gap-2 mb-3">
+                                    <div className="h-px flex-1 bg-border" />
+                                    <span className="text-[11px] font-black text-muted-foreground uppercase tracking-widest px-2">Tamaño / Opción</span>
+                                    <div className="h-px flex-1 bg-border" />
+                                </div>
+                                <div className="grid grid-cols-1 gap-2">
+                                    {availableVariants.map(variant => {
+                                        const isSelected = selectedVariant?.id === variant.id
+                                        return (
+                                            <button
+                                                key={variant.id}
+                                                onClick={() => setSelectedVariant(variant)}
+                                                className={`flex items-center justify-between p-3.5 rounded-xl border-2 cursor-pointer transition-all text-left ${isSelected
+                                                    ? 'border-primary bg-primary/5 shadow-sm'
+                                                    : 'border-border hover:border-primary/40 bg-card'
+                                                    }`}
+                                            >
+                                                <div className="flex items-center gap-3">
+                                                    <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 transition-all ${isSelected ? 'border-primary bg-primary' : 'border-muted-foreground/40'}`}>
+                                                        {isSelected && <Check className="w-3 h-3 text-primary-foreground" />}
+                                                    </div>
+                                                    <span className={`font-semibold text-sm ${isSelected ? 'text-foreground' : 'text-muted-foreground'}`}>{variant.name}</span>
+                                                </div>
+                                                <span className={`text-sm font-black shrink-0 ml-2 ${isSelected ? 'text-primary' : 'text-muted-foreground'}`}>
+                                                    {formatCurrency(variant.price)}
+                                                </span>
+                                            </button>
+                                        )
+                                    })}
+                                </div>
+                            </div>
+                        )}
+
                         {availableModifiers.length > 0 ? (
                             Object.entries(groups).map(([groupName, mods]) => (
                                 <div key={groupName} className="space-y-2">
@@ -130,7 +169,7 @@ export function ModifierModal({
                 <Button
                     onClick={onAddToCart}
                     className="rounded-xl px-8"
-                    disabled={fetchingModifiers}
+                    disabled={fetchingModifiers || (availableVariants.length > 0 && !selectedVariant)}
                 >
                     Agregar {quantity > 1 ? `${quantity}x ` : ''}por {formatCurrency(totalPrice)}
                 </Button>

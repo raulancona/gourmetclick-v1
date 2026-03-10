@@ -6,16 +6,16 @@ import { supabase } from './supabase'
  */
 
 /**
- * Get all modifier groups for a product
+ * Get all modifier groups for a restaurant (Global Modifiers)
  */
-export async function getModifierGroups(productId) {
+export async function getGlobalModifierGroups(restaurantId) {
     const { data, error } = await supabase
         .from('modifier_groups')
         .select(`
             *,
             modifier_options (*)
         `)
-        .eq('product_id', productId)
+        .eq('restaurant_id', restaurantId)
         .order('created_at', { ascending: true })
 
     if (error) throw error
@@ -23,17 +23,37 @@ export async function getModifierGroups(productId) {
 }
 
 /**
- * Create a modifier group with options
+ * Get linked modifier groups for a product
  */
-export async function createModifierGroup(groupData, productId) {
+export async function getLinkedModifierGroups(productId) {
+    const { data, error } = await supabase
+        .from('product_modifier_groups')
+        .select(`
+            sort_order,
+            modifier_groups (*, modifier_options (*))
+        `)
+        .eq('product_id', productId)
+        .order('sort_order', { ascending: true })
+
+    if (error) throw error
+    // Flatten the result to match the old format
+    return data?.map(d => ({ ...d.modifier_groups, link_sort_order: d.sort_order })) || []
+}
+
+/**
+ * Create a modifier group with options (Global by default)
+ */
+export async function createModifierGroup(groupData, restaurantId) {
     const { options, ...groupFields } = groupData
+    const { data: { user } } = await supabase.auth.getUser()
 
     // Create the group
     const { data: group, error: groupError } = await supabase
         .from('modifier_groups')
         .insert([{
             ...groupFields,
-            product_id: productId
+            restaurant_id: restaurantId,
+            user_id: user?.id || restaurantId
         }])
         .select()
         .single()
@@ -135,17 +155,48 @@ export async function deleteModifierOption(id) {
 }
 
 /**
+ * Link a global modifier group to a product
+ */
+export async function linkModifierGroupToProduct(modifierGroupId, productId, sortOrder = 0) {
+    const { error } = await supabase
+        .from('product_modifier_groups')
+        .insert([{
+            modifier_group_id: modifierGroupId,
+            product_id: productId,
+            sort_order: sortOrder
+        }])
+
+    if (error) throw error
+}
+
+/**
+ * Unlink a global modifier group from a product
+ */
+export async function unlinkModifierGroupFromProduct(modifierGroupId, productId) {
+    const { error } = await supabase
+        .from('product_modifier_groups')
+        .delete()
+        .eq('modifier_group_id', modifierGroupId)
+        .eq('product_id', productId)
+
+    if (error) throw error
+}
+
+/**
  * Get modifiers by product slug (public access)
  */
 export async function getModifiersByProductId(productId) {
     const { data, error } = await supabase
-        .from('modifier_groups')
+        .from('product_modifier_groups')
         .select(`
-            *,
-            modifier_options (*)
+            modifier_groups (
+                *,
+                modifier_options (*)
+            )
         `)
         .eq('product_id', productId)
+        .order('sort_order', { ascending: true })
 
     if (error) throw error
-    return data || []
+    return data?.map(d => d.modifier_groups) || []
 }

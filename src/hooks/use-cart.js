@@ -63,18 +63,19 @@ export function useCart() {
 
         return sorted1.every((mod, index) => {
             const other = sorted2[index]
-            return mod.name === other.name && mod.extra_price === other.extra_price && mod.value === other.value
+            return mod.name === other.name && mod.extra_price === other.extra_price
         })
     }
 
     const addToCart = useCallback((product, modifiers = [], quantity = 1) => {
         setCart(prev => {
-            // Find an existing item that matches product_id, modifiers AND current price
+            // Find an existing item that matches product_id, modifiers AND current price AND name
             // We use item.product_id || item.id to support legacy and new structure
             const existingIndex = prev.findIndex(item =>
                 (item.product_id === product.id || item.id === product.id) &&
                 areModifiersEqual(item.modifiers, modifiers) &&
-                parseFloat(item.price) === parseFloat(product.price)
+                parseFloat(item.price) === parseFloat(product.price) &&
+                item.name === product.name
             )
 
             if (existingIndex > -1) {

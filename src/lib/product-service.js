@@ -50,12 +50,13 @@ export async function getProductById(id, userId) {
  * @param {string} userId - The authenticated user's ID
  * @returns {Promise<Object>} Created product
  */
-export async function createProduct(productData, userId) {
+export async function createProduct(productData, restaurantId, userId) {
     const { data, error } = await supabase
         .from('products')
         .insert([{
             ...productData,
-            restaurant_id: userId
+            restaurant_id: restaurantId,
+            user_id: userId || restaurantId
         }])
         .select()
         .single()
@@ -115,10 +116,11 @@ export async function deleteProduct(id, userId) {
  * @param {string} userId - The authenticated user's ID
  * @returns {Promise<Array>} Array of created products
  */
-export async function bulkCreateProducts(productsArray, userId) {
+export async function bulkCreateProducts(productsArray, restaurantId, userId) {
     const productsWithUserId = productsArray.map(product => ({
         ...product,
-        restaurant_id: userId
+        restaurant_id: restaurantId,
+        user_id: userId || restaurantId
     }))
 
     const { data, error } = await supabase

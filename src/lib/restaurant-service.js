@@ -91,14 +91,17 @@ export async function getMenuBySlug(slug) {
 
     if (categoriesError) throw categoriesError
 
-    // Get products with modifiers
-    const { data: products, error: productsError } = await supabase
+    // Get products with variants and global modifiers
+    const { data: productsData, error: productsError } = await supabase
         .from('products')
         .select(`
             *,
-            modifier_groups (
-                *,
-                modifier_options (*)
+            product_variants (*),
+            product_modifier_groups (
+                modifier_groups (
+                    *,
+                    modifier_options (*)
+                )
             )
         `)
         .or(orQuery)
@@ -107,6 +110,18 @@ export async function getMenuBySlug(slug) {
         .order('created_at', { ascending: false })
 
     if (productsError) throw productsError
+
+    // Map the products to extract modifier_groups from the junction table
+    const products = productsData.map(product => {
+        const groups = product.product_modifier_groups?.map(pmg => pmg.modifier_groups).filter(Boolean) || []
+        // Filter out unavailable variants
+        const variants = product.product_variants?.filter(v => v.is_available) || []
+        return {
+            ...product,
+            modifier_groups: groups,
+            product_variants: variants
+        }
+    })
 
     return {
         // Merge restaurants.id into the profile so public-menu can use it for orders

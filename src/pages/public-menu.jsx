@@ -37,22 +37,33 @@ function CartProvider({ restaurantId, children }) {
         const sorted2 = [...m2].sort((a, b) => (a.name || '').localeCompare(b.name || ''))
         return sorted1.every((mod, index) => {
             const other = sorted2[index]
-            return mod.name === other.name && mod.extra_price === other.extra_price && mod.value === other.value
+            return mod.name === other.name && mod.extra_price === other.extra_price
         })
     }
 
-    const addItem = (product, modifiers = [], quantity = 1) => {
+    const areVariantsEqual = (v1, v2) => {
+        if (!v1 && !v2) return true
+        if (!v1 || !v2) return false
+        return v1.id === v2.id
+    }
+
+    const getBasePrice = (item) => {
+        return item.variant ? parseFloat(item.variant.price) : parseFloat(item.product.price)
+    }
+
+    const addItem = (product, modifiers = [], quantity = 1, variant = null) => {
         setItems(prev => {
             const existingIndex = prev.findIndex(item =>
                 item.product.id === product.id &&
-                areModifiersEqual(item.modifiers, modifiers)
+                areModifiersEqual(item.modifiers, modifiers) &&
+                areVariantsEqual(item.variant, variant)
             )
 
             if (existingIndex > -1) {
                 return prev.map((item, idx) => {
                     if (idx === existingIndex) {
                         const newQuantity = item.quantity + quantity
-                        const base = parseFloat(item.product.price)
+                        const base = getBasePrice(item)
                         const discountPct = parseInt(item.product.discount_percent) || 0
                         const discountedBase = discountPct > 0 ? base * (1 - discountPct / 100) : base
                         const mods = item.modifiers.reduce((s, m) => s + parseFloat(m.extra_price || 0), 0)
@@ -62,13 +73,13 @@ function CartProvider({ restaurantId, children }) {
                 })
             }
 
-            const basePrice = parseFloat(product.price)
+            const basePrice = variant ? parseFloat(variant.price) : parseFloat(product.price)
             const modsTotal = modifiers.reduce((s, m) => s + parseFloat(m.extra_price || 0), 0)
             const discountPct = parseInt(product.discount_percent) || 0
             const discountedBase = discountPct > 0 ? basePrice * (1 - discountPct / 100) : basePrice
             return [...prev, {
                 id: Date.now() + Math.random(),
-                product, modifiers, quantity,
+                product, modifiers, quantity, variant,
                 subtotal: (discountedBase + modsTotal) * quantity
             }]
         })
@@ -80,7 +91,7 @@ function CartProvider({ restaurantId, children }) {
         if (qty <= 0) return removeItem(id)
         setItems(prev => prev.map(i => {
             if (i.id !== id) return i
-            const base = parseFloat(i.product.price)
+            const base = getBasePrice(i)
             const discountPct = parseInt(i.product.discount_percent) || 0
             const discountedBase = discountPct > 0 ? base * (1 - discountPct / 100) : base
             const mods = i.modifiers.reduce((s, m) => s + parseFloat(m.extra_price || 0), 0)
@@ -584,6 +595,9 @@ function ProductModal({ product, primaryColor, secondaryColor, onClose }) {
     const { addItem } = useCart()
     const [quantity, setQuantity] = useState(1)
     const [selectedModifiers, setSelectedModifiers] = useState([])
+    const [selectedVariant, setSelectedVariant] = useState(
+        product.has_variants && product.product_variants?.length > 0 ? product.product_variants[0] : null
+    )
 
     const toggleModifier = (mod) => {
         setSelectedModifiers(prev =>
@@ -594,13 +608,13 @@ function ProductModal({ product, primaryColor, secondaryColor, onClose }) {
     }
 
     const discountPct = parseInt(product.discount_percent) || 0
-    const basePrice = parseFloat(product.price)
+    const basePrice = selectedVariant ? parseFloat(selectedVariant.price) : parseFloat(product.price)
     const discountedBase = discountPct > 0 ? basePrice * (1 - discountPct / 100) : basePrice
     const modsPrice = selectedModifiers.reduce((s, m) => s + parseFloat(m.extra_price || 0), 0)
     const total = (discountedBase + modsPrice) * quantity
 
     const handleAdd = () => {
-        addItem(product, selectedModifiers, quantity)
+        addItem(product, selectedModifiers, quantity, selectedVariant)
         toast.success(`Agregado al carrito`, {
             icon: '✅',
             style: { borderRadius: '1rem' }
@@ -666,6 +680,42 @@ function ProductModal({ product, primaryColor, secondaryColor, onClose }) {
                                 )}
                             </div>
                         </div>
+
+                        {/* Variants */}
+                        {product.has_variants && product.product_variants?.length > 0 && (
+                            <div className="bg-gray-50/50 p-6 rounded-[2rem] border border-gray-100 mb-6">
+                                <div className="mb-4">
+                                    <h3 className="font-black text-gray-900 text-base">Tamaño / Opción</h3>
+                                    <p className="text-[11px] text-gray-400 font-bold uppercase tracking-tighter">
+                                        Requerido
+                                    </p>
+                                </div>
+                                <div className="flex flex-col gap-2">
+                                    {product.product_variants.map(variant => {
+                                        const isSelected = selectedVariant?.id === variant.id
+                                        return (
+                                            <button
+                                                key={variant.id}
+                                                onClick={() => setSelectedVariant(variant)}
+                                                className={`w-full flex items-center justify-between p-4 rounded-2xl border transition-all duration-200 ${isSelected
+                                                    ? 'shadow-sm scale-[0.99] bg-white'
+                                                    : 'bg-white border-gray-100 hover:border-gray-200'
+                                                    }`}
+                                                style={isSelected ? { borderColor: primaryColor } : {}}
+                                            >
+                                                <div className="flex items-center gap-3">
+                                                    <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 ${isSelected ? '' : 'border-gray-200'}`} style={isSelected ? { borderColor: primaryColor } : {}}>
+                                                        {isSelected && <div className="w-2.5 h-2.5 rounded-full" style={{ background: primaryColor }}></div>}
+                                                    </div>
+                                                    <span className={`text-[15px] font-bold ${isSelected ? 'text-gray-900' : 'text-gray-600'}`}>{variant.name}</span>
+                                                </div>
+                                                <span className="text-[14px] font-black" style={{ color: primaryColor }}>${parseFloat(variant.price).toFixed(0)}</span>
+                                            </button>
+                                        )
+                                    })}
+                                </div>
+                            </div>
+                        )}
 
                         {/* Modifier Groups */}
                         {product.modifier_groups?.length > 0 && (
@@ -843,6 +893,11 @@ function CartPanel({ restaurant, primaryColor, onClose, onCheckout }) {
 
                                     <div className="flex-1 min-w-0">
                                         <h3 className="font-black text-gray-900 text-[15px] leading-tight mb-1">{item.product.name}</h3>
+                                        {item.variant && (
+                                            <div className="mb-1">
+                                                <span className="text-[10px] font-black bg-gray-100 px-2 py-0.5 rounded-lg text-gray-700">T: {item.variant.name}</span>
+                                            </div>
+                                        )}
                                         {item.modifiers.length > 0 && (
                                             <div className="flex flex-wrap gap-1">
                                                 {item.modifiers.map((mod, i) => (
@@ -970,18 +1025,18 @@ function CheckoutFlow({ restaurant, primaryColor, secondaryColor, onClose, onBac
             notes: formData.notes,
             items: items.map(item => ({
                 product_id: item.product.id,
-                name: item.product.name,
-                unit_price: parseFloat(item.product.price),
-                price: parseFloat(item.product.price),
-                costo: parseFloat(item.product.costo || 0), // Include cost for snapshotting in order-service
+                name: item.variant ? `${item.product.name} (${item.variant.name})` : item.product.name,
+                unit_price: item.variant ? parseFloat(item.variant.price) : parseFloat(item.product.price),
+                price: item.variant ? parseFloat(item.variant.price) : parseFloat(item.product.price),
+                costo: item.variant ? parseFloat(item.variant.costo || 0) : parseFloat(item.product.costo || 0),
                 quantity: item.quantity,
                 subtotal: item.subtotal,
                 modifiers: item.modifiers, // Pass full modifiers array
                 product: { // Keep legacy structure just in case, but rely on top-level fields
                     id: item.product.id,
                     name: item.product.name,
-                    price: item.product.price,
-                    costo: item.product.costo
+                    price: item.variant ? item.variant.price : item.product.price,
+                    costo: item.variant ? item.variant.costo : item.product.costo
                 }
             })),
             total: getTotal(),
@@ -1295,7 +1350,9 @@ function CheckoutFlow({ restaurant, primaryColor, secondaryColor, onClose, onBac
                                                     border: '2px solid #e5e7eb', display: 'flex', alignItems: 'center', justifyContent: 'center',
                                                     fontWeight: 900, fontSize: 13, color: '#111827', flexShrink: 0
                                                 }}>{item.quantity}</span>
-                                                <span style={{ fontWeight: 700, color: '#374151', fontSize: 14 }}>{item.product.name}</span>
+                                                <span style={{ fontWeight: 700, color: '#374151', fontSize: 14 }}>
+                                                    {item.product.name} {item.variant ? `(${item.variant.name})` : ''}
+                                                </span>
                                             </div>
                                             <span style={{ fontWeight: 900, color: '#111827', fontSize: 15 }}>${item.subtotal.toFixed(0)}</span>
                                         </div>

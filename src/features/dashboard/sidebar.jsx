@@ -4,7 +4,7 @@ import {
     LayoutDashboard, UtensilsCrossed, FolderTree, ClipboardList,
     Settings, LogOut, Calculator, ChefHat, Home, Grid, Package,
     Globe, BarChart3, Receipt, Lock, ChevronLeft, ChevronRight,
-    PanelLeftClose, PanelLeftOpen, Users
+    PanelLeftClose, PanelLeftOpen, Users, Layers
 } from 'lucide-react'
 import { useAuth } from '../auth/auth-context'
 import { useTerminal } from '../auth/terminal-context'
@@ -25,6 +25,7 @@ const NAV_GROUPS = [
         items: [
             { name: 'Productos', href: '/products', icon: Package, roles: ['admin'] },
             { name: 'Categorías', href: '/categories', icon: FolderTree, roles: ['admin'] },
+            { name: 'Modificadores', href: '/modifiers', icon: Layers, roles: ['admin'] },
         ]
     },
     {

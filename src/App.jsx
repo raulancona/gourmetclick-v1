@@ -9,6 +9,7 @@ import POSPage from './pages/pos'
 import { OrdersPage } from './pages/orders'
 import { ProductsPage } from './pages/products'
 import { CategoriesPage } from './pages/categories'
+import { ModifiersPage } from './pages/modifiers'
 import { ReportsPage } from './pages/reports'
 import { SettingsPage } from './pages/settings'
 import { LinkCardConfigPage as MenuLinksPage } from './pages/link-card-config'
@@ -55,6 +56,7 @@ function App() {
 
                   <Route path="products" element={<ProductsPage />} />
                   <Route path="categories" element={<CategoriesPage />} />
+                  <Route path="modifiers" element={<ModifiersPage />} />
                   <Route path="caja" element={<CashClosingPage />} />
                   <Route path="reportes" element={<ReportsPage />} />
                   <Route path="staff" element={<StaffPage />} />
