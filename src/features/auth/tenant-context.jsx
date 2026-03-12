@@ -62,6 +62,39 @@ export function TenantProvider({ children }) {
                         setLoading(false)
                         return
                     }
+
+                    // Fallback: user is staff/cashier — resolve via restaurant_access
+                    const { data: access, error: accessError } = await supabase
+                        .from('restaurant_access')
+                        .select('restaurant_id, role')
+                        .eq('user_id', user.id)
+                        .limit(1)
+                        .maybeSingle()
+
+                    if (accessError) throw accessError
+
+                    if (access?.restaurant_id) {
+                        const { data: restaurant, error: restaurantError } = await supabase
+                            .from('restaurants')
+                            .select('id, name, slug')
+                            .eq('id', access.restaurant_id)
+                            .single()
+
+                        if (restaurantError) throw restaurantError
+
+                        if (restaurant) {
+                            setTenant({
+                                id: restaurant.id,
+                                name: restaurant.name,
+                                slug: restaurant.slug,
+                                role: access.role
+                            })
+                            clearTimeout(timeout)
+                            setLastFetchedUserId(user.id)
+                            setLoading(false)
+                            return
+                        }
+                    }
                 } catch (err) {
                     console.error('Error fetching tenant for user:', err)
                 } finally {
@@ -100,6 +133,27 @@ export function TenantProvider({ children }) {
                 } catch (err) {
                     console.error('Error fetching tenant by slug:', err)
                 }
+            }
+
+            // Priority 3: PIN-based terminal session — read from localStorage employee session
+            // (set by terminal-context at login time with restaurant_slug and restaurante_id)
+            try {
+                const savedSession = localStorage.getItem('pos_session')
+                if (savedSession) {
+                    const employeeSession = JSON.parse(savedSession)
+                    if (employeeSession?.restaurante_id && employeeSession?.restaurant_slug) {
+                        setTenant({
+                            id: employeeSession.restaurante_id,
+                            name: employeeSession.restaurant_name || '',
+                            slug: employeeSession.restaurant_slug,
+                            role: employeeSession.rol || 'cajero'
+                        })
+                        setLoading(false)
+                        return
+                    }
+                }
+            } catch (err) {
+                console.error('Error reading terminal session from localStorage:', err)
             }
 
             setTenant(null)

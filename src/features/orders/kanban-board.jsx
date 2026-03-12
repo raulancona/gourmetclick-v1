@@ -1,10 +1,19 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState, useCallback } from 'react'
 import { Card, CardContent } from '../../components/ui/card'
 import { Button } from '../../components/ui/button'
-import { Clock, MessageCircle, ArrowRight, GripVertical } from 'lucide-react'
+import { Clock, MessageCircle, ChevronRight, GripVertical } from 'lucide-react'
 import { formatCurrency } from '../../lib/utils'
 import { ORDER_STATUSES, getNextStatuses } from '../../lib/order-service'
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd'
+
+const ACTION_LABELS = {
+    pending: 'Aceptar',
+    confirmed: 'Preparar',
+    preparing: 'Listo',
+    ready: 'En Camino',
+    on_the_way: 'Entregar',
+    delivered: 'Cobrar'
+}
 
 // Format the time since creation in mm:ss or hh:mm
 function ElapsedTime({ createdAt }) {
@@ -23,11 +32,10 @@ function ElapsedTime({ createdAt }) {
         }
 
         update()
-        const interval = setInterval(update, 60000) // Update every minute
+        const interval = setInterval(update, 60000)
         return () => clearInterval(interval)
     }, [createdAt])
 
-    // SLA logic (e.g., > 20 mins is late)
     const isLate = elapsed.mins > 20
     const isWarning = elapsed.mins > 15 && !isLate
 
@@ -43,8 +51,8 @@ function ElapsedTime({ createdAt }) {
 
 function KanbanCard({ order, onClick, onAdvanceStatus, index }) {
     const items = Array.isArray(order.items) ? order.items : []
+    const [isAdvancing, setIsAdvancing] = useState(false)
 
-    // SLA coloring
     const diffMs = Date.now() - new Date(order.created_at).getTime()
     const diffMins = Math.floor(diffMs / 60000)
     const isLate = diffMins > 20
@@ -53,9 +61,15 @@ function KanbanCard({ order, onClick, onAdvanceStatus, index }) {
     const nextStatusId = nextStatuses.length > 0 ? nextStatuses[0] : null
     const nextStatusInfo = nextStatusId ? ORDER_STATUSES[nextStatusId] : null
 
-    const handleAdvance = (e) => {
+    const handleAdvance = async (e) => {
         e.stopPropagation()
-        if (nextStatusId) onAdvanceStatus(order.id, nextStatusId)
+        if (!nextStatusId || isAdvancing) return
+        setIsAdvancing(true)
+        try {
+            await onAdvanceStatus(order.id, nextStatusId)
+        } finally {
+            setIsAdvancing(false)
+        }
     }
 
     const openWhatsApp = (e) => {
@@ -73,7 +87,7 @@ function KanbanCard({ order, onClick, onAdvanceStatus, index }) {
                     {...provided.draggableProps}
                     onClick={() => onClick(order)}
                     className={`bg-card rounded-xl p-3 mb-3 cursor-pointer transition-all border-l-4 ${isLate ? 'border-l-red-500 shadow-red-500/10' : 'border-l-primary/60'
-                        } border-t border-r border-b border-border/50  ${snapshot.isDragging ? 'shadow-2xl scale-[1.02] z-50 ring-2 ring-primary/40 rotate-1' : 'hover:-translate-y-1 hover:shadow-lg shadow-sm'}`}
+                        } border-t border-r border-b border-border/50 ${snapshot.isDragging ? 'shadow-2xl scale-[1.02] z-50 ring-2 ring-primary/40 rotate-1' : 'hover:-translate-y-1 hover:shadow-lg shadow-sm'}`}
                 >
                     <div className="flex justify-between items-start mb-2">
                         <div className="flex items-start gap-2">
@@ -114,13 +128,23 @@ function KanbanCard({ order, onClick, onAdvanceStatus, index }) {
                             )}
 
                             {nextStatusInfo && (
-                                <Button
-                                    className="h-7 px-2.5 text-[10px] font-black uppercase text-white shadow-sm flex items-center gap-1 rounded-lg transition-transform active:scale-95"
-                                    style={{ background: nextStatusInfo.color }}
+                                <button
                                     onClick={handleAdvance}
+                                    disabled={isAdvancing}
+                                    className="h-7 px-2.5 rounded-lg text-[10px] font-black text-white flex items-center gap-1 shadow-sm transition-all active:scale-95 hover:brightness-110 disabled:opacity-60 disabled:cursor-not-allowed"
+                                    style={{ background: nextStatusInfo.color }}
+                                    title={`Avanzar a: ${nextStatusInfo.label}`}
                                 >
-                                    {nextStatusInfo.emoji} <ArrowRight className="w-3 h-3" />
-                                </Button>
+                                    {isAdvancing ? (
+                                        <span className="w-3 h-3 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                                    ) : (
+                                        <>
+                                            <span>{nextStatusInfo.emoji}</span>
+                                            <span className="hidden sm:inline">{ACTION_LABELS[nextStatusId] || nextStatusInfo.label}</span>
+                                            <ChevronRight className="w-3 h-3" />
+                                        </>
+                                    )}
+                                </button>
                             )}
                         </div>
                     </div>
@@ -179,7 +203,6 @@ export function KanbanBoard({ orders, onOrderClick, onAdvanceStatus }) {
         setLocalOrders(orders)
     }, [orders])
 
-    // Pipeline grouping logic
     const columns = [
         { id: 'pending', title: 'Recibidas', emoji: '🕐', color: ORDER_STATUSES.pending.color, statuses: ['pending'] },
         { id: 'preparing', title: 'En Preparación', emoji: '👨‍🍳', color: ORDER_STATUSES.preparing.color, statuses: ['confirmed', 'preparing'] },
@@ -187,26 +210,25 @@ export function KanbanBoard({ orders, onOrderClick, onAdvanceStatus }) {
         { id: 'on_the_way', title: 'En Camino', emoji: '🛵', color: ORDER_STATUSES.on_the_way.color, statuses: ['on_the_way'] },
     ]
 
+    // Shared optimistic update — used by BOTH drag AND button
+    const handleAdvanceOptimistic = useCallback((orderId, newStatus) => {
+        // 1. Move card locally right away
+        setLocalOrders(prev => prev.map(o =>
+            String(o.id) === String(orderId) ? { ...o, status: newStatus } : o
+        ))
+        // 2. Fire server mutation (parent handles invalidation/rollback on error)
+        onAdvanceStatus(orderId, newStatus)
+    }, [onAdvanceStatus])
+
     const onDragEnd = (result) => {
         const { destination, source, draggableId } = result
-
         if (!destination) return
         if (destination.droppableId === source.droppableId && destination.index === source.index) return
 
         const targetCol = columns.find(c => c.id === destination.droppableId)
-        if (!targetCol) return // Invalid drop target
-        const newStatus = targetCol.statuses[0]
+        if (!targetCol) return
 
-        // Optimistically update locally for immediate UX response
-        const updatedOrders = localOrders.map(o => {
-            if (String(o.id) === draggableId) {
-                return { ...o, status: newStatus }
-            }
-            return o
-        })
-
-        setLocalOrders(updatedOrders)
-        onAdvanceStatus(draggableId, newStatus)
+        handleAdvanceOptimistic(draggableId, targetCol.statuses[0])
     }
 
     return (
@@ -223,7 +245,7 @@ export function KanbanBoard({ orders, onOrderClick, onAdvanceStatus }) {
                             color={col.color}
                             orders={colOrders}
                             onClickOrder={onOrderClick}
-                            onAdvanceStatus={onAdvanceStatus}
+                            onAdvanceStatus={handleAdvanceOptimistic}
                         />
                     )
                 })}

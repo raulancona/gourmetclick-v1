@@ -5,9 +5,12 @@ import { supabase } from '../lib/supabase'
 import { toast } from 'sonner'
 import { useRealtimeSubscription } from '../features/realtime/realtime-context'
 import { useTenant } from '../features/auth/tenant-context'
+import { useTerminal } from '../features/auth/terminal-context'
 
 export function useProducts() {
     const { tenant } = useTenant()
+    const { activeEmployee } = useTerminal()
+    const restaurantId = tenant?.id || activeEmployee?.restaurante_id
     const [products, setProducts] = useState([])
     const [categories, setCategories] = useState([])
     const [loading, setLoading] = useState(true)
@@ -17,12 +20,12 @@ export function useProducts() {
     const [selectedCategory, setSelectedCategory] = useState('all')
 
     const loadData = async () => {
-        if (!tenant?.id) return
+        if (!restaurantId) return
         try {
             setLoading(true)
             const [productsResponse, cats] = await Promise.all([
-                getProducts(tenant.id, { pageSize: 1000 }), // Fetch all/large batch for POS for now, or implement pagination in POS later
-                getCategories(tenant.id)
+                getProducts(restaurantId, { pageSize: 1000 }),
+                getCategories(restaurantId)
             ])
             setProducts(productsResponse.data)
             setCategories(cats)
@@ -36,7 +39,7 @@ export function useProducts() {
 
     useEffect(() => {
         loadData()
-    }, [tenant?.id])
+    }, [restaurantId])
 
     // Products Realtime Subscription
     useRealtimeSubscription('products', () => {

@@ -53,7 +53,9 @@ export function TerminalProvider({ children }) {
             id: employeeData.id,
             nombre: employeeData.nombre,
             rol: employeeData.rol,
-            restaurante_id: employeeData.restaurante_id
+            restaurante_id: employeeData.restaurante_id,
+            restaurant_slug: tenant.slug,
+            restaurant_name: tenant.name
         }
 
         setActiveEmployee(sessionData)
