@@ -1,19 +1,21 @@
 import { useState, useRef } from 'react'
-import { Upload, FileText, AlertCircle, CheckCircle2, RefreshCw, Loader2, Package } from 'lucide-react'
+import { Upload, FileText, AlertCircle, CheckCircle2, RefreshCw, Loader2, Package, Download } from 'lucide-react'
 import Papa from 'papaparse'
 import { Button } from '../../components/ui/button'
 import { cn } from '../../lib/utils'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../auth/auth-context'
+import { useTenant } from '../auth/tenant-context'
 import { toast } from 'sonner'
 
 /**
- * CSV Format:
- * nombre, categoria, precio, costo, imagen_url
+ * CSV Format Example:
+ * nombre, categoria, precio, costo, sku, descripcion, disponible, vegano, extras, imagen_url
  */
 
 export function CSVUpload({ onImport, onCancel }) {
     const { user } = useAuth()
+    const { tenant } = useTenant()
     const [file, setFile] = useState(null)
     const [processedData, setProcessedData] = useState(null)
     const [errors, setErrors] = useState([])
@@ -33,25 +35,57 @@ export function CSVUpload({ onImport, onCancel }) {
 
             if (name?.trim()) {
                 if (!priceRaw || isNaN(parseFloat(priceRaw))) {
-                    validationErrors.push(`Fila ${rowNum}: "${name}" requiere un precio válido`)
+                    validationErrors.push(`Fila ${rowNum}: "${name}" requiere un precio numérico`)
                     return
                 }
 
-                const costoRaw = row.costo || 0
+                const costoRaw = row.costo || row.cost || 0
                 const costo = isNaN(parseFloat(costoRaw)) ? 0 : parseFloat(costoRaw)
+
+                // Boolean parsers
+                const parseBool = (val, defaultVal) => {
+                    if (!val) return defaultVal;
+                    const v = val.toString().toLowerCase().trim();
+                    return v === 'true' || v === '1' || v === 'si' || v === 'sí' || v === 'yes';
+                }
 
                 products.push({
                     name: name.trim(),
+                    description: (row.descripcion || row.description)?.trim() || null,
                     category: (row.categoria || row.category)?.trim() || null,
                     price: parseFloat(priceRaw),
                     costo: costo,
+                    sku: (row.sku || row.codigo)?.trim() || null,
                     image_url: (row.imagen_url || row.image_url)?.trim() || null,
-                    is_available: true
+                    is_available: row.disponible !== undefined ? parseBool(row.disponible, true) : true,
+                    is_vegan: parseBool(row.vegano || row.vegan, false),
+                    has_extras: parseBool(row.extras || row.has_extras, false),
+                    is_active: true
                 })
             }
         })
 
         return { products, validationErrors }
+    }
+
+    const downloadTemplate = (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        
+        const headers = ["sku", "nombre", "categoria", "precio", "costo", "descripcion", "disponible", "vegano", "extras", "imagen_url"];
+        const examples = ["HAM-01", "Hamburguesa Clásica", "Hamburguesas", "120.00", "45.50", "Deliciosa hamburguesa con queso", "true", "false", "true", "https://ejemplo.com/foto.jpg"];
+        
+        const csvContent = "\uFEFF" + headers.join(",") + "\n" + examples.join(","); // Add BOM for Excel UTF-8 compatibility
+        
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.setAttribute("href", url);
+        link.setAttribute("download", "plantilla_productos.csv");
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
     }
 
     const handleFileChange = (selectedFile) => {
@@ -76,45 +110,80 @@ export function CSVUpload({ onImport, onCancel }) {
     }
 
     const handleImport = async () => {
-        if (!processedData || errors.length > 0 || !user) return
+        if (!processedData || errors.length > 0 || !user || !tenant) return
         setIsImporting(true)
         try {
-            setImportProgress('Limpiando datos...')
-            await supabase.from('products').delete().eq('user_id', user.id)
-            await supabase.from('categories').delete().eq('user_id', user.id)
+            setImportProgress('Preparando catálogo...')
+            
+            // 1. Soft-delete current products instead of hard delete to preserve order history
+            await supabase.from('products')
+                .update({ is_active: false, is_available: false })
+                .eq('restaurant_id', tenant.id)
 
-            setImportProgress('Creando categorías...')
-            const categoryNames = [...new Set(processedData.map(p => p.category).filter(Boolean))]
+            // 2. Fetch existing categories to reuse them
+            setImportProgress('Actualizando categorías...')
+            const { data: existingCategories } = await supabase
+                .from('categories')
+                .select('id, name')
+                .eq('restaurant_id', tenant.id)
+
             const categoryMap = {}
-
-            for (let i = 0; i < categoryNames.length; i++) {
-                const { data: cat } = await supabase.from('categories')
-                    .insert([{ name: categoryNames[i], user_id: user.id, order_index: i }])
-                    .select().single()
-                if (cat) categoryMap[categoryNames[i].toLowerCase()] = cat.id
+            if (existingCategories) {
+                existingCategories.forEach(c => {
+                    categoryMap[c.name.toLowerCase()] = c.id
+                })
             }
 
+            // Identify and insert missing categories
+            const newCategoryNames = [...new Set(processedData.map(p => p.category).filter(Boolean))]
+            for (let i = 0; i < newCategoryNames.length; i++) {
+                const catName = newCategoryNames[i]
+                if (!categoryMap[catName.toLowerCase()]) {
+                    const { data: insertedCat } = await supabase.from('categories')
+                        .insert([{ 
+                            name: catName, 
+                            user_id: user.id, // Legacy compatibility
+                            restaurant_id: tenant.id, 
+                            order_index: Object.keys(categoryMap).length + i 
+                        }])
+                        .select().single()
+                    
+                    if (insertedCat) {
+                        categoryMap[catName.toLowerCase()] = insertedCat.id
+                    }
+                }
+            }
+
+            // 3. Import new products in chunks
             setImportProgress('Importando productos...')
             let total = 0
-            for (const item of processedData) {
-                const { error } = await supabase.from('products').insert([{
-                    name: item.name,
-                    price: item.price,
-                    costo: item.costo,
-                    image_url: item.image_url,
-                    user_id: user.id,
+            
+            // Batch inserts in chunks of 50 for performance
+            const chunkSize = 50
+            for (let i = 0; i < processedData.length; i += chunkSize) {
+                const chunk = processedData.slice(i, i + chunkSize).map(item => ({
+                    ...item,
+                    user_id: user.id, // Legacy compatibility
+                    restaurant_id: tenant.id,
                     category_id: item.category ? categoryMap[item.category.toLowerCase()] || null : null,
-                    is_available: true
-                }])
-                if (!error) total++
+                    status: 'disponible'
+                }))
+                
+                // Remove the string category field before inserting
+                const rowsToInsert = chunk.map(({ category, ...rest }) => rest)
+
+                const { error } = await supabase.from('products').insert(rowsToInsert)
+                if (error) throw error
+                
+                total += rowsToInsert.length
                 setImportProgress(`Importando... ${total}/${processedData.length}`)
             }
 
-            toast.success(`${total} productos importados correctamente`)
-            onImport(processedData)
+            toast.success(`${total} productos sincronizados correctamente`)
+            if (onImport) onImport()
         } catch (error) {
             console.error('Import error:', error)
-            toast.error('Error: ' + error.message)
+            toast.error('Error al importar: ' + error.message)
         } finally {
             setIsImporting(false)
             setImportProgress('')
@@ -137,7 +206,17 @@ export function CSVUpload({ onImport, onCancel }) {
                     >
                         <Upload className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
                         <p className="text-sm text-foreground mb-1 font-bold">Haz clic o arrastra tu CSV</p>
-                        <p className="text-xs text-muted-foreground">Formato: nombre, categoria, precio, costo, imagen_url</p>
+                        <p className="text-xs text-muted-foreground mb-4">Formato incl. sku, nombre, categoria, precio, costo, etc.</p>
+                        
+                        <Button 
+                            variant="secondary" 
+                            size="sm" 
+                            className="mt-2"
+                            onClick={downloadTemplate}
+                        >
+                            <Download className="w-4 h-4 mr-2" />
+                            Descargar Plantilla CSV
+                        </Button>
                     </div>
                     <input ref={fileInputRef} type="file" accept=".csv" onChange={(e) => handleFileChange(e.target.files[0])} className="hidden" />
 
@@ -145,18 +224,18 @@ export function CSVUpload({ onImport, onCancel }) {
                         <div className="flex items-start gap-3">
                             <RefreshCw className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
                             <div>
-                                <p className="text-sm font-bold text-amber-900 dark:text-amber-400">Modo Reemplazo</p>
-                                <p className="text-xs text-amber-700 dark:text-amber-500/80">Se reemplazarán todos los productos y categorías actuales.</p>
+                                <p className="text-sm font-bold text-amber-900 dark:text-amber-400">Modo Reemplazo Seguro</p>
+                                <p className="text-xs text-amber-700 dark:text-amber-500/80">Los productos anteriores serán ocultados (Soft-Delete) para no afectar tu historial de órdenes. Se crearán los nuevos.</p>
                             </div>
                         </div>
                     </div>
 
                     <div className="p-4 bg-muted/30 rounded-xl space-y-3">
-                        <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground text-center">Ejemplo de formato</p>
-                        <pre className="text-[10px] bg-background border border-border p-3 rounded-lg overflow-x-auto font-mono">
-                            {`nombre,categoria,precio,costo,imagen_url
-Hamburguesa Clásica,Hamburguesas,120,45.50,https://ejemplo.com/h.jpg
-Ensalada,Ensaladas,85,25,`}
+                        <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground text-center">Columnas Soportadas (Ejemplo)</p>
+                        <pre className="text-[10px] bg-background border border-border p-3 rounded-lg overflow-x-auto font-mono text-muted-foreground">
+                            {`nombre,categoria,precio,costo,sku,disponible,vegano,extras,imagen_url
+Hamburguesa Clásica,Hamburguesas,120,45.50,HAM-01,true,false,true,https://url.com/h.jpg
+Ensalada,Ensaladas,85,25,,true,true,false,`}
                         </pre>
                     </div>
                 </div>
@@ -179,6 +258,7 @@ Ensalada,Ensaladas,85,25,`}
                                     <p className="font-bold text-destructive text-sm leading-tight mb-1">{errors.length} errores encontrados</p>
                                     <ul className="text-xs text-destructive/80 list-disc list-inside">
                                         {errors.slice(0, 3).map((e, i) => <li key={i}>{e}</li>)}
+                                        {errors.length > 3 && <li>... y {errors.length - 3} más</li>}
                                     </ul>
                                 </div>
                             </div>
@@ -187,35 +267,52 @@ Ensalada,Ensaladas,85,25,`}
 
                     <div className="border border-border rounded-xl overflow-hidden max-h-64 overflow-y-auto">
                         <table className="w-full text-xs text-left">
-                            <thead className="bg-muted border-b border-border sticky top-0">
+                            <thead className="bg-muted border-b border-border sticky top-0 z-10">
                                 <tr>
-                                    <th className="px-4 py-3 font-black uppercase tracking-widest text-muted-foreground">Nombre</th>
+                                    <th className="px-4 py-3 font-black uppercase tracking-widest text-muted-foreground">SKU / Nombre</th>
                                     <th className="px-4 py-3 font-black uppercase tracking-widest text-muted-foreground">Categoría</th>
-                                    <th className="px-4 py-3 font-black uppercase tracking-widest text-muted-foreground text-right">Precio</th>
-                                    <th className="px-4 py-3 font-black uppercase tracking-widest text-muted-foreground text-right">Costo</th>
+                                    <th className="px-4 py-3 font-black uppercase tracking-widest text-muted-foreground text-center">Attrs</th>
+                                    <th className="px-4 py-3 font-black uppercase tracking-widest text-muted-foreground text-right">Precio/Costo</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-border">
-                                {processedData.slice(0, 10).map((p, i) => (
+                                {processedData.slice(0, 50).map((p, i) => (
                                     <tr key={i} className="hover:bg-muted/20">
-                                        <td className="px-4 py-3 font-bold">{p.name}</td>
+                                        <td className="px-4 py-3">
+                                            {p.sku && <span className="text-[9px] font-mono text-muted-foreground block">{p.sku}</span>}
+                                            <span className="font-bold">{p.name}</span>
+                                        </td>
                                         <td className="px-4 py-3 text-muted-foreground uppercase font-semibold text-[10px]">{p.category || '—'}</td>
-                                        <td className="px-4 py-3 text-right font-black text-primary">${p.price.toFixed(2)}</td>
-                                        <td className="px-4 py-3 text-right font-black text-destructive">${p.costo.toFixed(2)}</td>
+                                        <td className="px-4 py-3 text-center">
+                                            <div className="flex gap-1 justify-center">
+                                                {p.is_vegan && <span className="w-2 h-2 rounded-full bg-green-500" title="Vegano" />}
+                                                {p.has_extras && <span className="w-2 h-2 rounded-full bg-blue-500" title="Extras" />}
+                                                {!p.is_available && <span className="w-2 h-2 rounded-full bg-red-500" title="Agotado" />}
+                                            </div>
+                                        </td>
+                                        <td className="px-4 py-3 text-right">
+                                            <span className="font-black text-primary block">${p.price.toFixed(2)}</span>
+                                            {p.costo > 0 && <span className="text-[10px] font-black text-destructive">${p.costo.toFixed(2)}</span>}
+                                        </td>
                                     </tr>
                                 ))}
                             </tbody>
                         </table>
+                        {processedData.length > 50 && (
+                            <div className="p-2 text-center text-[10px] font-bold text-muted-foreground bg-muted/50">
+                                Mostrando 50 de {processedData.length}
+                            </div>
+                        )}
                     </div>
                 </div>
             )}
 
             <div className="flex items-center justify-end gap-3 pt-4 border-t border-border">
-                <Button variant="outline" onClick={onCancel}>Cancelar</Button>
+                <Button variant="outline" onClick={onCancel} disabled={isImporting}>Cancelar</Button>
                 <Button
                     onClick={handleImport}
                     disabled={!processedData || errors.length > 0 || isImporting}
-                    className="font-bold"
+                    className="font-bold bg-primary hover:bg-primary/90 text-primary-foreground"
                 >
                     {isImporting ? (
                         <>
@@ -223,7 +320,7 @@ Ensalada,Ensaladas,85,25,`}
                             {importProgress}
                         </>
                     ) : (
-                        `Importar ${processedData?.length || 0} Productos`
+                        `Sincronizar ${processedData?.length || 0} Productos`
                     )}
                 </Button>
             </div>

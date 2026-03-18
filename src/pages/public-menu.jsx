@@ -1,9 +1,9 @@
 import { useState, useEffect, useRef } from 'react'
 import { useParams } from 'react-router-dom'
 import {
-    Search, ShoppingBag, X, Plus, Minus, Trash2, Send, MapPin, Clock, Star,
+    Search, ShoppingBag, X, Plus, Minus, Trash2, Send, MapPin, Clock,
     ChevronDown, User, Phone, MessageCircle, CreditCard, Banknote, Building2,
-    MapPinned, Loader2, Leaf, Tag, UtensilsCrossed, ChevronRight, CheckCircle2
+    MapPinned, Loader2, Leaf, UtensilsCrossed, ChevronRight, CheckCircle2
 } from 'lucide-react'
 
 import { getRestaurantBySlug, getMenuBySlug } from '../lib/restaurant-service'
@@ -236,6 +236,8 @@ export function PublicMenuPage() {
                     setShowCheckout={setShowCheckout}
                     primaryColor={primaryColor}
                     secondaryColor={secondaryColor}
+                    showPrices={restaurant?.config?.show_prices !== false}
+                    showDesc={restaurant?.config?.show_description !== false}
                 />
 
                 {/* Promo Popup */}
@@ -306,11 +308,13 @@ function MenuContent({
     restaurant, categories, filteredProducts, groupedProducts,
     searchTerm, setSearchTerm, selectedCategory, setSelectedCategory,
     selectedProduct, setSelectedProduct, showCart, setShowCart,
-    showCheckout, setShowCheckout, primaryColor, secondaryColor
+    showCheckout, setShowCheckout, primaryColor, secondaryColor,
+    showPrices = true, showDesc = true
 }) {
     const { getItemCount, getTotal } = useCart()
     const itemCount = getItemCount()
     const categoryScrollRef = useRef(null)
+    const waNumber = restaurant?.whatsapp_number?.replace(/\D/g, '') || ''
 
     return (
         <div className="min-h-screen scrollbar-hide" style={{ background: '#FAFAFA' }}>
@@ -360,19 +364,16 @@ function MenuContent({
 
             {/* ─── Category Tabs ─────────────────────────────────── */}
             {categories.length > 0 && (
-                <div className="sticky top-0 z-30 bg-white/80 backdrop-blur-xl border-b border-gray-100/50 shadow-sm transition-all duration-300">
+                <div className="sticky top-0 z-30 bg-white/90 backdrop-blur-xl border-b border-gray-100 shadow-sm">
                     <div className="max-w-lg mx-auto">
-                        <div ref={categoryScrollRef} className="flex gap-2 px-4 py-3.5 overflow-x-auto scrollbar-hide scroll-smooth">
+                        <div ref={categoryScrollRef} className="flex gap-2 px-4 py-3 overflow-x-auto scrollbar-hide scroll-smooth">
                             <button
                                 onClick={() => setSelectedCategory('all')}
-                                className={`px-5 py-2.5 rounded-full text-sm font-black whitespace-nowrap transition-all duration-300 ${selectedCategory === 'all'
-                                    ? 'shadow-[0_4px_12px_rgba(0,0,0,0.1)] scale-105'
-                                    : 'opacity-60 hover:opacity-100 scale-100'
+                                className={`px-4 py-2 rounded-full text-sm font-black whitespace-nowrap transition-all duration-300 flex items-center gap-1.5 ${selectedCategory === 'all'
+                                    ? 'text-white shadow-md scale-105'
+                                    : 'text-gray-500 bg-white border border-gray-200 hover:border-gray-300 scale-100'
                                     }`}
-                                style={selectedCategory === 'all'
-                                    ? { background: primaryColor, color: '#fff' }
-                                    : { background: '#f8fafc', color: '#64748b' }
-                                }
+                                style={selectedCategory === 'all' ? { background: primaryColor } : {}}
                             >
                                 ✨ Todos
                             </button>
@@ -380,14 +381,11 @@ function MenuContent({
                                 <button
                                     key={cat.id}
                                     onClick={() => setSelectedCategory(cat.id)}
-                                    className={`px-5 py-2.5 rounded-full text-sm font-black whitespace-nowrap transition-all duration-300 ${selectedCategory === cat.id
-                                        ? 'shadow-[0_4px_12px_rgba(0,0,0,0.1)] scale-105'
-                                        : 'opacity-60 hover:opacity-100 scale-100'
+                                    className={`px-4 py-2 rounded-full text-sm font-black whitespace-nowrap transition-all duration-300 ${selectedCategory === cat.id
+                                        ? 'text-white shadow-md scale-105'
+                                        : 'text-gray-500 bg-white border border-gray-200 hover:border-gray-300 scale-100'
                                         }`}
-                                    style={selectedCategory === cat.id
-                                        ? { background: primaryColor, color: '#fff' }
-                                        : { background: '#f8fafc', color: '#64748b' }
-                                    }
+                                    style={selectedCategory === cat.id ? { background: primaryColor } : {}}
                                 >
                                     {cat.name}
                                 </button>
@@ -410,11 +408,13 @@ function MenuContent({
                     </div>
                 ) : (
                     groupedProducts.map(group => (
-                        <div key={group.id} className="mb-8">
-                            <h2 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
-                                <div className="w-1 h-6 rounded-full" style={{ background: primaryColor }}></div>
-                                {group.name}
-                            </h2>
+                        <div key={group.id} className="mb-10">
+                            <div className="flex items-center gap-3 mb-4">
+                                <div className="w-1.5 h-7 rounded-full" style={{ background: primaryColor }} />
+                                <h2 className="text-lg font-black text-gray-900 tracking-tight">{group.name}</h2>
+                                <div className="flex-1 h-px bg-gray-100" />
+                                <span className="text-xs font-bold text-gray-400">{group.products.length} platillos</span>
+                            </div>
                             <div className="space-y-3">
                                 {group.products.map(product => (
                                     <ProductCard
@@ -422,6 +422,8 @@ function MenuContent({
                                         product={product}
                                         primaryColor={primaryColor}
                                         secondaryColor={secondaryColor}
+                                        showPrices={showPrices}
+                                        showDesc={showDesc}
                                         onClick={() => setSelectedProduct(product)}
                                     />
                                 ))}
@@ -429,10 +431,74 @@ function MenuContent({
                         </div>
                     ))
                 )}
+
+                {/* ─── Social Footer ─── */}
+                {(restaurant.facebook_url || restaurant.instagram_url || restaurant.whatsapp_number) && (
+                    <div className="mt-4 pt-6 border-t border-gray-100 text-center">
+                        <p className="text-xs text-gray-400 font-bold uppercase tracking-widest mb-3">Síguenos</p>
+                        <div className="flex items-center justify-center gap-3">
+                            {restaurant.whatsapp_number && (
+                                <a
+                                    href={`https://wa.me/${restaurant.whatsapp_number.replace(/\D/g, '')}`}
+                                    target="_blank" rel="noopener noreferrer"
+                                    className="flex items-center gap-2 px-4 py-2 rounded-2xl text-white text-sm font-black transition-transform hover:scale-105 active:scale-95"
+                                    style={{ background: '#25D366' }}
+                                >
+                                    <svg className="w-4 h-4 fill-white" viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.121.554 4.109 1.524 5.838L0 24l6.338-1.524A11.953 11.953 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 22c-1.87 0-3.625-.49-5.148-1.348L3 21.5l.877-3.79A9.958 9.958 0 012 12C2 6.477 6.477 2 12 2s10 4.477 10 10-4.477 10-10 10z"/></svg>
+                                    WhatsApp
+                                </a>
+                            )}
+                            {restaurant.instagram_url && (
+                                <a
+                                    href={restaurant.instagram_url}
+                                    target="_blank" rel="noopener noreferrer"
+                                    className="w-10 h-10 rounded-2xl flex items-center justify-center text-white transition-transform hover:scale-105 active:scale-95"
+                                    style={{ background: 'linear-gradient(135deg,#833ab4,#fd1d1d,#fcb045)' }}
+                                >
+                                    <svg className="w-5 h-5 fill-white" viewBox="0 0 24 24"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/></svg>
+                                </a>
+                            )}
+                            {restaurant.facebook_url && (
+                                <a
+                                    href={restaurant.facebook_url}
+                                    target="_blank" rel="noopener noreferrer"
+                                    className="w-10 h-10 rounded-2xl flex items-center justify-center text-white transition-transform hover:scale-105 active:scale-95"
+                                    style={{ background: '#1877F2' }}
+                                >
+                                    <svg className="w-5 h-5 fill-white" viewBox="0 0 24 24"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>
+                                </a>
+                            )}
+                        </div>
+                        <p className="text-[10px] text-gray-300 mt-4">Menú digital por <span className="font-bold">Gourmet Click</span></p>
+                    </div>
+                )}
             </main>
 
+            {/* ─── Floating WhatsApp CTA (catalog mode, no prices) ── */}
+            {!showPrices && waNumber && (
+                <div className="fixed bottom-0 left-0 right-0 z-40 p-4 pb-6">
+                    <div className="max-w-lg mx-auto">
+                        <a
+                            href={`https://wa.me/${waNumber}?text=Hola, me interesa hacer un pedido`}
+                            target="_blank" rel="noopener noreferrer"
+                            className="w-full h-16 rounded-[1.5rem] flex items-center justify-between px-6 text-white shadow-2xl transition-transform active:scale-[0.98]"
+                            style={{ background: '#25D366', boxShadow: '0 12px 32px rgba(37,211,102,0.4)' }}
+                        >
+                            <div className="flex items-center gap-3">
+                                <svg className="w-7 h-7 fill-white" viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.121.554 4.109 1.524 5.838L0 24l6.338-1.524A11.953 11.953 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 22c-1.87 0-3.625-.49-5.148-1.348L3 21.5l.877-3.79A9.958 9.958 0 012 12C2 6.477 6.477 2 12 2s10 4.477 10 10-4.477 10-10 10z"/></svg>
+                                <div>
+                                    <p className="font-black text-base leading-tight">Hacer pedido por WhatsApp</p>
+                                    <p className="text-white/80 text-xs">Consulta precios y disponibilidad</p>
+                                </div>
+                            </div>
+                            <ChevronRight className="w-5 h-5" />
+                        </a>
+                    </div>
+                </div>
+            )}
+
             {/* ─── Floating Cart Button ──────────────────────────── */}
-            {itemCount > 0 && !showCart && !showCheckout && (
+            {showPrices && itemCount > 0 && !showCart && !showCheckout && (
                 <div className="fixed bottom-0 left-0 right-0 z-40 p-4 pb-6">
                     <div className="max-w-lg mx-auto">
                         <button
@@ -458,6 +524,7 @@ function MenuContent({
                     product={selectedProduct}
                     primaryColor={primaryColor}
                     secondaryColor={secondaryColor}
+                    showPrices={showPrices}
                     onClose={() => setSelectedProduct(null)}
                 />
             )}
@@ -488,9 +555,8 @@ function MenuContent({
     )
 }
 
-// ─── Product Card (with badges + discount) ────────────────────────────────────
-// ─── Product Card (Redesigned for premium look) ────────────────────────────────
-function ProductCard({ product, primaryColor, secondaryColor, onClick }) {
+// ─── Product Card — Premium redesign ────────────────────────────────────────
+function ProductCard({ product, primaryColor, secondaryColor, showPrices = true, showDesc = true, onClick }) {
     const { addItem } = useCart()
     const discountPct = parseInt(product.discount_percent) || 0
     const originalPrice = parseFloat(product.price)
@@ -508,81 +574,107 @@ function ProductCard({ product, primaryColor, secondaryColor, onClick }) {
     return (
         <div
             onClick={onClick}
-            className="group bg-white rounded-[2rem] overflow-hidden shadow-[0_4px_20px_rgba(0,0,0,0.04)] hover:shadow-[0_8px_30px_rgba(0,0,0,0.08)] transition-all duration-500 cursor-pointer border border-gray-100/50 relative mb-4 active:scale-[0.98]"
+            className="group bg-white rounded-2xl overflow-hidden transition-all duration-300 cursor-pointer border border-gray-100 hover:border-gray-200 hover:shadow-lg active:scale-[0.99] relative flex items-stretch"
         >
-            {/* Badges - Floating Style */}
-            <div className="absolute top-4 left-4 z-10 flex flex-col gap-1.5">
-                {discountPct > 0 && (
-                    <span className="px-3 py-1 rounded-full text-[10px] font-black text-white shadow-xl flex items-center gap-1 animate-bounce" style={{ background: '#EF4444' }}>
-                        <Tag className="w-3 h-3" /> -{discountPct}%
-                    </span>
+            {/* Image Section */}
+            <div className="w-28 h-28 flex-shrink-0 overflow-hidden relative" style={{ minWidth: '7rem' }}>
+                {product.image_url ? (
+                    <img
+                        src={product.image_url}
+                        alt={product.name}
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                        onError={(e) => { e.target.style.display='none'; e.target.nextSibling.style.display='flex' }}
+                    />
+                ) : null}
+                <div
+                    className="w-full h-full items-center justify-center"
+                    style={{
+                        display: product.image_url ? 'none' : 'flex',
+                        background: `linear-gradient(135deg, ${primaryColor}18, ${primaryColor}30)`
+                    }}
+                >
+                    <UtensilsCrossed className="w-9 h-9" style={{ color: primaryColor, opacity: 0.5 }} />
+                </div>
+
+                {/* Vegan badge */}
+                {product.is_vegan && (
+                    <div className="absolute bottom-2 left-2 p-1.5 rounded-full bg-white/95 shadow-md border border-green-100">
+                        <Leaf className="w-3 h-3 text-green-500 fill-green-500" />
+                    </div>
                 )}
-                {product.badge_text && (
-                    <span className="px-3 py-1 rounded-full text-[10px] font-black text-white shadow-xl flex items-center gap-1" style={{ background: secondaryColor }}>
-                        <Star className="w-3 h-3 fill-white" /> {product.badge_text}
-                    </span>
+
+                {/* Discount badge */}
+                {discountPct > 0 && (
+                    <div className="absolute top-2 left-2 px-2 py-0.5 rounded-full text-[10px] font-black text-white" style={{ background: '#EF4444' }}>
+                        -{discountPct}%
+                    </div>
                 )}
             </div>
 
-            <div className="flex p-3">
-                {/* Image Section */}
-                <div className="w-32 h-32 flex-shrink-0 overflow-hidden rounded-[1.5rem] bg-gray-50 relative">
-                    {product.image_url ? (
-                        <img src={product.image_url} alt={product.name} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" />
-                    ) : (
-                        <div className="w-full h-full flex items-center justify-center">
-                            <UtensilsCrossed className="w-10 h-10 text-gray-200" />
+            {/* Info Section */}
+            <div className="flex-1 px-4 py-3 flex flex-col justify-between min-w-0">
+                <div>
+                    {/* Inline badges row */}
+                    {(product.badge_text || product.has_extras) && (
+                        <div className="flex gap-1.5 mb-1.5 flex-wrap">
+                            {product.badge_text && (
+                                <span className="px-2 py-0.5 rounded-full text-[9px] font-black text-white" style={{ background: secondaryColor }}>
+                                    ⭐ {product.badge_text}
+                                </span>
+                            )}
+                            {product.has_extras && (
+                                <span className="px-2 py-0.5 rounded-full text-[9px] font-black text-white" style={{ background: primaryColor + 'cc' }}>
+                                    ✨ Personalizable
+                                </span>
+                            )}
                         </div>
                     )}
-                    {product.is_vegan && (
-                        <div className="absolute bottom-2 right-2 p-1.5 rounded-full bg-white/90 backdrop-blur shadow-sm border border-green-100">
-                            <Leaf className="w-3.5 h-3.5 text-green-500 fill-green-500" />
-                        </div>
+
+                    <h3 className="font-black text-gray-900 text-[15px] leading-tight mb-1 truncate">
+                        {product.name}
+                    </h3>
+                    {showDesc && product.description && (
+                        <p className="text-[12px] text-gray-400 line-clamp-2 leading-relaxed font-medium">
+                            {product.description}
+                        </p>
                     )}
                 </div>
 
-                {/* Info Section */}
-                <div className="flex-1 pl-4 flex flex-col justify-between py-1 pr-1 min-w-0">
-                    <div>
-                        <h3 className="font-black text-gray-900 text-[16px] leading-tight mb-1 group-hover:text-primary transition-colors truncate">
-                            {product.name}
-                        </h3>
-                        {product.description && (
-                            <p className="text-[12px] text-gray-400 line-clamp-2 leading-relaxed font-medium">
-                                {product.description}
-                            </p>
-                        )}
-                        {/* Extras indicator */}
-                        {product.has_extras && (
-                            <span className="inline-flex items-center gap-1 mt-1.5 px-2 py-0.5 rounded-full text-[10px] font-black bg-secondary text-white border border-secondary shadow-sm">
-                                ✨ Personalizable
-                            </span>
-                        )}
-                    </div>
-
-                    <div className="flex items-end justify-between mt-2">
-                        <div className="flex flex-col">
-                            {discountPct > 0 && (
-                                <span className="text-[11px] line-through text-gray-300 font-bold leading-none mb-0.5">
-                                    ${originalPrice.toFixed(0)}
-                                </span>
-                            )}
-                            <span className="text-xl font-black tracking-tight" style={{ color: discountPct > 0 ? '#EF4444' : primaryColor }}>
+                {/* Price + Add button */}
+                <div className="flex items-center justify-between mt-2.5">
+                    {showPrices ? (
+                        <div className="flex items-center gap-2">
+                            <span
+                                className="text-lg font-black tracking-tight px-2.5 py-1 rounded-xl"
+                                style={{
+                                    color: discountPct > 0 ? '#EF4444' : primaryColor,
+                                    background: discountPct > 0 ? '#FEF2F2' : `${primaryColor}15`
+                                }}
+                            >
                                 ${finalPrice.toFixed(0)}
                             </span>
+                            {discountPct > 0 && (
+                                <span className="text-[11px] line-through text-gray-300 font-bold">${originalPrice.toFixed(0)}</span>
+                            )}
                         </div>
+                    ) : (
+                        <span className="text-[11px] text-gray-400 font-bold flex items-center gap-1">
+                            <span>ℹ</span> Ver detalles
+                        </span>
+                    )}
 
+                    {showPrices && (
                         <button
                             onClick={handleQuickAdd}
-                            className="w-11 h-11 rounded-2xl flex items-center justify-center text-white shadow-lg transition-all duration-300 hover:scale-110 active:scale-95 group/btn"
+                            className="w-10 h-10 rounded-xl flex items-center justify-center text-white shadow-md transition-all duration-200 hover:scale-110 hover:shadow-lg active:scale-95"
                             style={{
                                 background: primaryColor,
-                                boxShadow: `0 8px 16px ${primaryColor}40`
+                                boxShadow: `0 4px 12px ${primaryColor}40`
                             }}
                         >
-                            <Plus className="w-6 h-6 group-hover/btn:rotate-90 transition-transform duration-300" />
+                            <Plus className="w-5 h-5" />
                         </button>
-                    </div>
+                    )}
                 </div>
             </div>
         </div>
@@ -591,7 +683,7 @@ function ProductCard({ product, primaryColor, secondaryColor, onClick }) {
 
 
 // ─── Product Modal (Refined Aesthetics) ──────────────────────────────────────
-function ProductModal({ product, primaryColor, secondaryColor, onClose }) {
+function ProductModal({ product, primaryColor, secondaryColor, showPrices = true, onClose }) {
     const { addItem } = useCart()
     const [quantity, setQuantity] = useState(1)
     const [selectedModifiers, setSelectedModifiers] = useState([])
@@ -673,12 +765,14 @@ function ProductModal({ product, primaryColor, secondaryColor, onClose }) {
                                     </p>
                                 )}
                             </div>
+                            {showPrices && (
                             <div className="text-right shrink-0">
                                 <p className="text-2xl font-black" style={{ color: primaryColor }}>${discountedBase.toFixed(0)}</p>
                                 {discountPct > 0 && (
                                     <p className="text-xs text-gray-400 font-bold line-through">${basePrice.toFixed(0)}</p>
                                 )}
                             </div>
+                            )}
                         </div>
 
                         {/* Variants */}
@@ -709,7 +803,9 @@ function ProductModal({ product, primaryColor, secondaryColor, onClose }) {
                                                     </div>
                                                     <span className={`text-[15px] font-bold ${isSelected ? 'text-gray-900' : 'text-gray-600'}`}>{variant.name}</span>
                                                 </div>
+                                                {showPrices && (
                                                 <span className="text-[14px] font-black" style={{ color: primaryColor }}>${parseFloat(variant.price).toFixed(0)}</span>
+                                                )}
                                             </button>
                                         )
                                     })}
@@ -774,7 +870,7 @@ function ProductModal({ product, primaryColor, secondaryColor, onClose }) {
                                                                     {isSelected && <div className={`w-2 h-2 ${isRequired ? 'rounded-full' : 'rounded-[2px]'}`} style={{ background: primaryColor }}></div>}
                                                                 </div>
                                                             </div>
-                                                            {parseFloat(opt.extra_price) > 0 && (
+                                                            {showPrices && parseFloat(opt.extra_price) > 0 && (
                                                                 <span className="text-[11px] font-black" style={{ color: primaryColor }}>+${parseFloat(opt.extra_price).toFixed(0)}</span>
                                                             )}
                                                         </button>
@@ -791,6 +887,7 @@ function ProductModal({ product, primaryColor, secondaryColor, onClose }) {
 
                 {/* Footer Controls */}
                 <div className="p-6 border-t border-gray-100 bg-white shadow-[0_-8px_40px_rgba(0,0,0,0.04)]">
+                    {showPrices ? (
                     <div className="flex items-center gap-4 mb-6 justify-between px-2">
                         <div className="flex flex-col">
                             <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Total acumulado</span>
@@ -813,7 +910,13 @@ function ProductModal({ product, primaryColor, secondaryColor, onClose }) {
                             </button>
                         </div>
                     </div>
+                    ) : (
+                        <div className="mb-4 p-3 rounded-2xl bg-gray-50 border text-center">
+                            <p className="text-sm text-gray-500 font-medium">Los precios se consultan directamente con el restaurante.</p>
+                        </div>
+                    )}
 
+                    {showPrices ? (
                     <button
                         onClick={handleAdd}
                         disabled={product.modifier_groups?.some(g => g.min_selection > 0 && !selectedModifiers.some(sm => g.modifier_options.some(opt => opt.id === sm.id)))}
@@ -828,6 +931,7 @@ function ProductModal({ product, primaryColor, secondaryColor, onClose }) {
                             ? 'Selecciona opciones requeridas'
                             : 'Agregar al pedido'}
                     </button>
+                    ) : null}
                 </div>
             </div>
         </div>

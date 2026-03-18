@@ -70,10 +70,9 @@ export async function getMenuBySlug(slug) {
     if (profileError) throw profileError
 
     // Get the actual restaurants.id (required for FK on orders.restaurant_id)
-    // If the user has multiple restaurants, we grab the first one to avoid maybeSingle() error
     const { data: restaurantRecord } = await supabase
         .from('restaurants')
-        .select('id')
+        .select('id, facebook_url, instagram_url, whatsapp_number, config')
         .eq('owner_id', profile.id)
         .order('created_at', { ascending: true })
         .limit(1)
@@ -114,19 +113,24 @@ export async function getMenuBySlug(slug) {
     // Map the products to extract modifier_groups from the junction table
     const products = productsData.map(product => {
         const groups = product.product_modifier_groups?.map(pmg => pmg.modifier_groups).filter(Boolean) || []
-        // Filter out unavailable variants
         const variants = product.product_variants?.filter(v => v.is_available) || []
-        return {
-            ...product,
-            modifier_groups: groups,
-            product_variants: variants
-        }
+        return { ...product, modifier_groups: groups, product_variants: variants }
     })
 
+    // Filter categories: only show categories that have at least one active+available product
+    const productCategoryIds = new Set(products.map(p => p.category_id).filter(Boolean))
+    const visibleCategories = (categories || []).filter(cat => productCategoryIds.has(cat.id))
+
     return {
-        // Merge restaurants.id into the profile so public-menu can use it for orders
-        restaurant: { ...profile, restaurant_table_id: restaurantRecord?.id || null },
-        categories: categories || [],
+        restaurant: {
+            ...profile,
+            restaurant_table_id: restaurantRecord?.id || null,
+            facebook_url: restaurantRecord?.facebook_url || profile.facebook_url || null,
+            instagram_url: restaurantRecord?.instagram_url || profile.instagram_url || null,
+            whatsapp_number: restaurantRecord?.whatsapp_number || profile.whatsapp_number || profile.phone || null,
+            config: restaurantRecord?.config || profile.config || {}
+        },
+        categories: visibleCategories,
         products: products || []
     }
 }
