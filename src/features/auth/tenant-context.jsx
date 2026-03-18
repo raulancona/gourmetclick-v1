@@ -118,7 +118,7 @@ export function TenantProvider({ children }) {
                         .from('restaurants')
                         .select('id, name, slug')
                         .eq('slug', slug)
-                        .single()
+                        .maybeSingle()
 
                     if (data) {
                         setTenant({

@@ -3,7 +3,7 @@ import { useParams } from 'react-router-dom'
 import {
     Search, ShoppingBag, X, Plus, Minus, Trash2, Send, MapPin, Clock,
     ChevronDown, User, Phone, MessageCircle, CreditCard, Banknote, Building2,
-    MapPinned, Loader2, Leaf, UtensilsCrossed, ChevronRight, CheckCircle2
+    MapPinned, Loader2, Leaf, UtensilsCrossed, ChevronRight, CheckCircle2, Tag
 } from 'lucide-react'
 
 import { getRestaurantBySlug, getMenuBySlug } from '../lib/restaurant-service'
@@ -170,6 +170,8 @@ export function PublicMenuPage() {
         return matchesSearch && matchesCategory
     })
 
+    const promotedProducts = products.filter(p => p.badge_text === 'KIT')
+
     // Group by category
     const getGroupedProducts = () => {
         const groups = []
@@ -223,6 +225,7 @@ export function PublicMenuPage() {
                     categories={categories}
                     products={products}
                     filteredProducts={filteredProducts}
+                    promotedProducts={promotedProducts}
                     groupedProducts={groupedProducts}
                     searchTerm={searchTerm}
                     setSearchTerm={setSearchTerm}
@@ -305,7 +308,7 @@ function PromoPopup({ restaurant, primaryColor, onClose }) {
 
 // ─── Menu Content (needs cart context) ────────────────────────────────────────
 function MenuContent({
-    restaurant, categories, filteredProducts, groupedProducts,
+    restaurant, categories, filteredProducts, promotedProducts, groupedProducts,
     searchTerm, setSearchTerm, selectedCategory, setSelectedCategory,
     selectedProduct, setSelectedProduct, showCart, setShowCart,
     showCheckout, setShowCheckout, primaryColor, secondaryColor,
@@ -316,41 +319,45 @@ function MenuContent({
     const categoryScrollRef = useRef(null)
     const waNumber = restaurant?.whatsapp_number?.replace(/\D/g, '') || ''
     const [distance, setDistance] = useState(null)
+    const [hoursModalOpen, setHoursModalOpen] = useState(false)
 
     return (
         <div className="min-h-screen scrollbar-hide" style={{ background: '#FAFAFA' }}>
             {/* ─── Hero Header ───────────────────────────────────── */}
-            <header className="relative overflow-hidden" style={{ background: `linear-gradient(135deg, ${primaryColor}dd 0%, ${primaryColor} 50%, ${primaryColor}bb 100%)` }}>
-                {restaurant.banner_url && (
+            <header className="relative overflow-hidden bg-black min-h-[300px] flex flex-col justify-between">
+                {restaurant.banner_url ? (
                     <div className="absolute inset-0">
-                        <img src={restaurant.banner_url} alt="" className="w-full h-full object-cover" />
-                        <div className="absolute inset-0 bg-black/50 backdrop-blur-sm"></div>
+                        <img src={restaurant.banner_url} alt="" className="w-full h-full object-cover opacity-60" />
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent"></div>
                     </div>
+                ) : (
+                    <div className="absolute inset-0" style={{ background: `linear-gradient(135deg, ${primaryColor}dd 0%, ${primaryColor} 50%, ${primaryColor}bb 100%)` }}></div>
                 )}
-                <div className="relative z-10 px-5 pt-6 pb-6">
-                    <div className="max-w-lg mx-auto">
+                
+                <div className="relative z-10 px-5 pt-6 pb-8 flex-1 flex flex-col">
+                    <div className="max-w-3xl mx-auto w-full flex-1 flex flex-col">
 
                         {/* Top row: social icons */}
                         {(restaurant.facebook_url || restaurant.instagram_url || restaurant.whatsapp_number) && (
-                            <div className="flex items-center justify-end gap-2 mb-4">
+                            <div className="flex items-center justify-end gap-2 mb-auto">
                                 {restaurant.whatsapp_number && (
                                     <a href={`https://wa.me/${restaurant.whatsapp_number.replace(/\D/g,'')}`}
                                         target="_blank" rel="noopener noreferrer"
-                                        className="w-8 h-8 rounded-xl bg-white/20 backdrop-blur flex items-center justify-center hover:bg-white/30 transition-colors"
+                                        className="w-9 h-9 rounded-full bg-white/20 backdrop-blur-md flex items-center justify-center hover:bg-white/30 transition-all shadow-lg border border-white/10"
                                         title="WhatsApp">
                                         <svg className="w-4 h-4 fill-white" viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.121.554 4.109 1.524 5.838L0 24l6.338-1.524A11.953 11.953 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 22c-1.87 0-3.625-.49-5.148-1.348L3 21.5l.877-3.79A9.958 9.958 0 012 12C2 6.477 6.477 2 12 2s10 4.477 10 10-4.477 10-10 10z"/></svg>
                                     </a>
                                 )}
                                 {restaurant.instagram_url && (
                                     <a href={restaurant.instagram_url} target="_blank" rel="noopener noreferrer"
-                                        className="w-8 h-8 rounded-xl bg-white/20 backdrop-blur flex items-center justify-center hover:bg-white/30 transition-colors"
+                                        className="w-9 h-9 rounded-full bg-white/20 backdrop-blur-md flex items-center justify-center hover:bg-white/30 transition-all shadow-lg border border-white/10"
                                         title="Instagram">
                                         <svg className="w-4 h-4 fill-white" viewBox="0 0 24 24"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/></svg>
                                     </a>
                                 )}
                                 {restaurant.facebook_url && (
                                     <a href={restaurant.facebook_url} target="_blank" rel="noopener noreferrer"
-                                        className="w-8 h-8 rounded-xl bg-white/20 backdrop-blur flex items-center justify-center hover:bg-white/30 transition-colors"
+                                        className="w-9 h-9 rounded-full bg-white/20 backdrop-blur-md flex items-center justify-center hover:bg-white/30 transition-all shadow-lg border border-white/10"
                                         title="Facebook">
                                         <svg className="w-4 h-4 fill-white" viewBox="0 0 24 24"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>
                                     </a>
@@ -358,102 +365,174 @@ function MenuContent({
                             </div>
                         )}
 
-                        {/* Restaurant identity row */}
-                        <div className="flex items-center gap-4 mb-4">
-                            {restaurant.logo_url ? (
-                                <img src={restaurant.logo_url} alt="" className="w-16 h-16 rounded-2xl object-cover border-2 border-white/30 shadow-xl" />
-                            ) : (
-                                <div className="w-16 h-16 rounded-2xl bg-white/20 backdrop-blur flex items-center justify-center border border-white/30">
-                                    <span className="text-2xl font-black text-white">{restaurant.company_name?.charAt(0) || 'R'}</span>
-                                </div>
-                            )}
-                            <div className="flex-1 min-w-0">
-                                <h1 className="text-2xl font-black text-white tracking-tight">{restaurant.company_name || 'Menú Digital'}</h1>
-
-                                {/* Address row — truncated + map link + distance */}
-                                {restaurant.address && (
-                                    <div className="flex items-center gap-2 mt-1 flex-wrap">
-                                        <MapPin className="w-3.5 h-3.5 text-white/70 shrink-0" />
-                                        <span className="text-xs text-white/80">
-                                            {restaurant.address.length > 35
-                                                ? restaurant.address.slice(0, 35) + '…'
-                                                : restaurant.address}
-                                        </span>
-                                        <a
-                                            href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(restaurant.address)}`}
-                                            target="_blank" rel="noopener noreferrer"
-                                            className="text-[10px] font-black text-white bg-white/20 px-2 py-0.5 rounded-full hover:bg-white/30 transition-colors whitespace-nowrap"
-                                        >
-                                            Ver ubicación ↗
-                                        </a>
-                                        <button
-                                            onClick={() => {
-                                                if (!navigator.geolocation) return
-                                                navigator.geolocation.getCurrentPosition(pos => {
-                                                    const toRad = d => d * Math.PI / 180
-                                                    // We geocode the restaurant address via Nominatim to get coords
-                                                    fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(restaurant.address)}&format=json&limit=1`)
-                                                        .then(r => r.json())
-                                                        .then(results => {
-                                                            if (!results.length) return
-                                                            const lat2 = parseFloat(results[0].lat)
-                                                            const lon2 = parseFloat(results[0].lon)
-                                                            const lat1 = pos.coords.latitude
-                                                            const lon1 = pos.coords.longitude
-                                                            const R = 6371
-                                                            const dLat = toRad(lat2 - lat1)
-                                                            const dLon = toRad(lon2 - lon1)
-                                                            const a = Math.sin(dLat/2)**2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon/2)**2
-                                                            const dist = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a))
-                                                            setDistance(dist < 1
-                                                                ? `${Math.round(dist * 1000)}m de distancia`
-                                                                : `${dist.toFixed(1)}km de distancia`)
-                                                        })
-                                                }, () => {})
-                                            }}
-                                            className="text-[10px] font-black text-white bg-white/20 px-2 py-0.5 rounded-full hover:bg-white/30 transition-colors whitespace-nowrap"
-                                        >
-                                            📍 Distancia
-                                        </button>
-                                        {distance && (
-                                            <span className="text-[10px] font-black text-white bg-white/30 px-2 py-0.5 rounded-full">{distance}</span>
-                                        )}
+                        {/* Centered Restaurant Identity */}
+                        <div className="flex flex-col items-center text-center mt-10 mb-8 w-full">
+                            <div className="flex items-center justify-center gap-5 w-full">
+                                {restaurant.logo_url ? (
+                                    <img src={restaurant.logo_url} alt="" className="w-20 h-20 rounded-[1.25rem] object-cover shadow-2xl ring-1 ring-white/20" />
+                                ) : (
+                                    <div className="w-20 h-20 rounded-[1.25rem] bg-gradient-to-br from-white/20 to-white/5 backdrop-blur-md flex items-center justify-center ring-1 ring-white/20 shadow-2xl">
+                                        <span className="text-3xl font-black text-white">{restaurant.company_name?.charAt(0) || 'R'}</span>
                                     </div>
                                 )}
+                                <div className="flex flex-col items-start gap-1">
+                                    <h1 className="text-3xl font-black text-white tracking-tight drop-shadow-md">{restaurant.company_name || 'Menú Digital'}</h1>
 
-                                {/* Today's hours badge */}
-                                {restaurant.config?.hours && (() => {
-                                    const days = ['domingo','lunes','martes','miércoles','jueves','viernes','sábado']
-                                    const today = days[new Date().getDay()]
-                                    const h = restaurant.config.hours[today]
-                                    if (!h) return null
-                                    return (
-                                        <div className="flex items-center gap-1.5 mt-1.5">
-                                            <Clock className="w-3 h-3 text-white/70" />
-                                            {h.closed
-                                                ? <span className="text-[11px] text-red-300 font-black">Cerrado hoy</span>
-                                                : <span className="text-[11px] text-white/90 font-bold">{h.open} – {h.close}</span>
-                                            }
+                                    {/* Address row */}
+                                    {restaurant.address && (
+                                        <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                                            <MapPin className="w-4 h-4 text-white/80 shrink-0" />
+                                            <span className="text-sm font-medium text-white/90 drop-shadow">
+                                                {restaurant.address.length > 35
+                                                    ? restaurant.address.slice(0, 35) + '…'
+                                                    : restaurant.address}
+                                            </span>
+                                            <a
+                                                href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(restaurant.address)}`}
+                                                target="_blank" rel="noopener noreferrer"
+                                                className="text-[11px] font-bold text-white bg-white/20 backdrop-blur-md px-2.5 py-1 rounded-full hover:bg-white/30 transition-all border border-white/10"
+                                            >
+                                                Ver ubicación ↗
+                                            </a>
+                                            <button
+                                                onClick={() => {
+                                                    if (!navigator.geolocation) return
+                                                    navigator.geolocation.getCurrentPosition(pos => {
+                                                        const toRad = d => d * Math.PI / 180
+                                                        fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(restaurant.address)}&format=json&limit=1`)
+                                                            .then(r => r.json())
+                                                            .then(results => {
+                                                                if (!results.length) return
+                                                                const lat2 = parseFloat(results[0].lat)
+                                                                const lon2 = parseFloat(results[0].lon)
+                                                                const lat1 = pos.coords.latitude
+                                                                const lon1 = pos.coords.longitude
+                                                                const R = 6371
+                                                                const dLat = toRad(lat2 - lat1)
+                                                                const dLon = toRad(lon2 - lon1)
+                                                                const a = Math.sin(dLat/2)**2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon/2)**2
+                                                                const dist = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a))
+                                                                setDistance(dist < 1
+                                                                    ? `${Math.round(dist * 1000)}m`
+                                                                    : `${dist.toFixed(1)}km`)
+                                                            })
+                                                    }, () => {})
+                                                }}
+                                                className="text-[11px] font-bold text-white bg-white/20 backdrop-blur-md px-2.5 py-1 rounded-full hover:bg-white/30 transition-all border border-white/10 flex items-center gap-1"
+                                            >
+                                                <MapPin className="w-3 h-3" />
+                                                Distancia
+                                            </button>
+                                            {distance && (
+                                                <span className="text-[11px] font-black text-primary bg-white px-2.5 py-1 rounded-full shadow-lg">{distance}</span>
+                                            )}
                                         </div>
-                                    )
-                                })()}
+                                    )}
+
+                                    {/* Today's hours badge (clickable for modal) */}
+                                    {restaurant.config?.hours && (() => {
+                                        const days = ['domingo','lunes','martes','miércoles','jueves','viernes','sábado']
+                                        const today = days[new Date().getDay()]
+                                        const h = restaurant.config.hours[today]
+                                        if (!h) return null
+
+                                        let isCurrentlyOpen = true
+                                        if (h.closed) {
+                                            isCurrentlyOpen = false
+                                        } else if (h.open && h.close) {
+                                            const now = new Date()
+                                            const currentMins = now.getHours() * 60 + now.getMinutes()
+                                            const [oH, oM] = h.open.split(':').map(Number)
+                                            const [cH, cM] = h.close.split(':').map(Number)
+                                            const oMins = oH * 60 + oM
+                                            const cMins = cH * 60 + cM
+                                            if (cMins < oMins) {
+                                                isCurrentlyOpen = currentMins >= oMins || currentMins <= cMins
+                                            } else {
+                                                isCurrentlyOpen = currentMins >= oMins && currentMins <= cMins
+                                            }
+                                        }
+
+                                        return (
+                                            <button 
+                                                onClick={() => setHoursModalOpen(true)}
+                                                className="flex items-center gap-1.5 mt-1.5 hover:bg-white/10 px-2.5 py-1 rounded-full transition-colors group cursor-pointer border border-transparent hover:border-white/20"
+                                            >
+                                                <Clock className="w-3.5 h-3.5 text-white/90 group-hover:text-white" />
+                                                {!isCurrentlyOpen
+                                                    ? <span className="text-[12px] text-red-300 font-bold tracking-wide">Cerrado ahora</span>
+                                                    : <span className="text-[12px] text-white/90 font-bold tracking-wide group-hover:text-white">{h.open} – {h.close}</span>
+                                                }
+                                                <ChevronRight className="w-3.5 h-3.5 text-white/50 group-hover:text-white/90 opacity-0 group-hover:opacity-100 transition-opacity -ml-1" />
+                                            </button>
+                                        )
+                                    })()}
+                                </div>
                             </div>
                         </div>
 
                         {/* Search */}
-                        <div className="relative">
+                        <div className="relative w-full max-w-lg mx-auto">
                             <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
                             <input
                                 type="text"
                                 placeholder="¿Qué se te antoja hoy?"
                                 value={searchTerm}
                                 onChange={e => setSearchTerm(e.target.value)}
-                                className="w-full pl-12 pr-4 py-3.5 bg-white rounded-2xl text-gray-800 placeholder-gray-400 shadow-lg focus:outline-none focus:ring-2 focus:ring-white/50 text-[15px]"
+                                className="w-full pl-12 pr-4 py-3.5 bg-white rounded-2xl text-gray-800 placeholder-gray-400 shadow-xl focus:outline-none focus:ring-2 focus:ring-primary text-[15px]"
                             />
                         </div>
+
                     </div>
                 </div>
+
+                {/* Hours Modal */}
+                {hoursModalOpen && restaurant.config?.hours && (
+                    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+                         onClick={(e) => { if(e.target === e.currentTarget) setHoursModalOpen(false) }}>
+                        <div className="bg-white rounded-[2rem] p-6 max-w-sm w-full shadow-2xl relative animate-in fade-in zoom-in duration-200">
+                            <button onClick={() => setHoursModalOpen(false)} className="absolute top-4 right-4 w-8 h-8 flex items-center justify-center rounded-full bg-gray-100 hover:bg-gray-200 transition-colors">
+                                <X className="w-4 h-4 text-gray-500" />
+                            </button>
+                            <div className="flex items-center justify-center w-12 h-12 rounded-full bg-primary/10 mb-4 mx-auto">
+                                <Clock className="w-6 h-6 text-primary" />
+                            </div>
+                            <h2 className="text-xl font-black text-center mb-1">Horario de Atención</h2>
+                            <p className="text-sm text-gray-500 text-center mb-6">Consulta los días y horas que operamos.</p>
+                            
+                            <div className="space-y-3">
+                                {['lunes','martes','miércoles','jueves','viernes','sábado','domingo'].map(day => {
+                                    const h = restaurant.config.hours[day]
+                                    if(!h) return null
+                                    const today = ['domingo','lunes','martes','miércoles','jueves','viernes','sábado'][new Date().getDay()]
+                                    const isToday = day === today
+                                    return (
+                                        <div key={day} className={`flex items-center justify-between p-3 rounded-2xl border ${isToday ? 'border-primary/30 bg-primary/5' : 'border-gray-100'}`}>
+                                            <div className="flex items-center gap-2">
+                                                <span className={`text-sm font-bold capitalize ${isToday ? 'text-primary' : 'text-gray-700'}`}>
+                                                    {day}
+                                                </span>
+                                                {isToday && <span className="text-[10px] font-black uppercase text-primary bg-primary/20 px-2 py-0.5 rounded-md tracking-wider">Hoy</span>}
+                                            </div>
+                                            <div className="text-sm font-medium">
+                                                {h.closed ? (
+                                                    <span className="text-red-500 font-bold bg-red-50 px-2 py-1 rounded-md">Cerrado</span>
+                                                ) : (
+                                                    <span className="text-gray-600">{h.open} – {h.close}</span>
+                                                )}
+                                            </div>
+                                        </div>
+                                    )
+                                })}
+                            </div>
+                            <button onClick={() => setHoursModalOpen(false)} className="w-full mt-6 py-3.5 bg-gray-100 text-gray-900 font-bold rounded-xl hover:bg-gray-200 transition-colors">
+                                Cerrar
+                            </button>
+                        </div>
+                    </div>
+                )}
             </header>
+
 
             {/* ─── Category Tabs ─────────────────────────────────── */}
             {categories.length > 0 && (
@@ -489,7 +568,53 @@ function MenuContent({
             )}
 
 
-            {/* ─── Products ──────────────────────────────────────── */}
+            {/* ─── Promoted Products Carousel ───────────────────── */}
+            {selectedCategory === 'all' && !searchTerm && promotedProducts.length > 0 && (
+                <div className="max-w-lg mx-auto px-4 mt-6">
+                    <div className="flex items-center gap-2 mb-3">
+                        <Tag className="w-5 h-5 text-red-500 fill-red-100" />
+                        <h2 className="text-lg font-black text-gray-900 tracking-tight">Promociones</h2>
+                        <span className="text-[10px] font-bold text-red-500 bg-red-50 px-2 py-0.5 rounded-full uppercase tracking-wider">¡Aprovecha!</span>
+                    </div>
+                    <div className="flex gap-4 overflow-x-auto pb-4 scrollbar-hide snap-x">
+                        {promotedProducts.map(product => {
+                            const discountPct = parseInt(product.discount_percent) || 0
+                            const originalPrice = parseFloat(product.price)
+                            const finalPrice = originalPrice * (1 - discountPct / 100)
+                            
+                            return (
+                                <div 
+                                    key={product.id} 
+                                    onClick={() => setSelectedProduct(product)}
+                                    className="min-w-[200px] sm:min-w-[240px] bg-white rounded-2xl shadow-sm border border-red-100 p-3 cursor-pointer hover:shadow-md transition-shadow snap-start flex flex-col relative overflow-hidden group"
+                                >
+                                    {/* Discount Ribbon */}
+                                    <div className="absolute -right-8 top-3 bg-red-500 text-white text-[10px] font-black px-8 py-0.5 transform rotate-45 shadow-sm z-10">
+                                        -{discountPct}%
+                                    </div>
+                                    
+                                    <div className="relative w-full aspect-video rounded-xl overflow-hidden bg-gray-50 mb-3">
+                                        {product.image_url ? (
+                                            <img src={product.image_url} alt={product.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                                        ) : (
+                                            <div className="w-full h-full flex items-center justify-center">
+                                                <UtensilsCrossed className="w-6 h-6 text-gray-300" />
+                                            </div>
+                                        )}
+                                    </div>
+                                    <h3 className="font-bold text-sm text-gray-900 line-clamp-1 mb-1">{product.name}</h3>
+                                    <div className="mt-auto flex items-center gap-2">
+                                        <span className="text-red-500 font-black text-sm">${finalPrice.toFixed(0)}</span>
+                                        <span className="text-gray-300 font-semibold text-xs line-through">${originalPrice.toFixed(0)}</span>
+                                    </div>
+                                </div>
+                            )
+                        })}
+                    </div>
+                </div>
+            )}
+
+            {/* ─── Products Grid ─────────────────────────────────── */}
             <main className="max-w-lg mx-auto px-4 py-6 pb-32">
                 {groupedProducts.length === 0 ? (
                     <div className="text-center py-16">
