@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { useForm } from 'react-hook-form'
 import {
     Upload, Loader2, Link as LinkIcon, Copy, ExternalLink, Image,
-    MapPin, Phone, Instagram, Facebook, X, CheckCircle2
+    MapPin, Phone, Instagram, Facebook, X, CheckCircle2, Clock
 } from 'lucide-react'
 import { Button } from '../../components/ui/button'
 import { Input } from '../../components/ui/input'
@@ -112,6 +112,15 @@ export function CompanyProfileForm() {
     const [slugPreview, setSlugPreview] = useState('')
     const [slugAvailable, setSlugAvailable] = useState(null)
     const slugDebounce = useRef(null)
+    const [hours, setHours] = useState({
+        lunes:     { open: '09:00', close: '21:00', closed: false },
+        martes:    { open: '09:00', close: '21:00', closed: false },
+        miércoles: { open: '09:00', close: '21:00', closed: false },
+        jueves:    { open: '09:00', close: '21:00', closed: false },
+        viernes:   { open: '09:00', close: '21:00', closed: false },
+        sábado:    { open: '10:00', close: '22:00', closed: false },
+        domingo:   { open: '10:00', close: '20:00', closed: false },
+    })
 
     const { register, handleSubmit, setValue, watch, formState: { errors } } = useForm()
     const companyName = watch('company_name')
@@ -144,6 +153,8 @@ export function CompanyProfileForm() {
                 whatsapp_number: p?.whatsapp_number || p?.phone || '',
                 ...p
             }
+
+            if (r?.config?.hours) setHours(r.config.hours)
 
             setProfile(merged)
             setValue('company_name', merged.company_name)
@@ -227,6 +238,7 @@ export function CompanyProfileForm() {
 
             // Sync key fields to restaurants too
             if (tenant?.id) {
+                const { data: cur } = await supabase.from('restaurants').select('config').eq('id', tenant.id).single()
                 await supabase.from('restaurants').update({
                     address: address || null,
                     phone: formData.phone || null,
@@ -234,6 +246,7 @@ export function CompanyProfileForm() {
                     facebook_url: formData.facebook_url || null,
                     instagram_url: formData.instagram_url || null,
                     whatsapp_number: formData.whatsapp_number || null,
+                    config: { ...(cur?.config || {}), hours }
                 }).eq('id', tenant.id)
             }
 
@@ -415,6 +428,45 @@ export function CompanyProfileForm() {
                                     </Label>
                                     <Input placeholder="521234567890" {...register('whatsapp_number')} />
                                 </div>
+                            </div>
+                        </div>
+
+                        {/* ── Horario de Atención ── */}
+                        <div className="pt-4 border-t space-y-4">
+                            <div className="flex items-center gap-2">
+                                <Clock className="w-4 h-4 text-primary" />
+                                <div>
+                                    <p className="font-bold text-sm">Horario de Atención</p>
+                                    <p className="text-xs text-muted-foreground">Aparecerá en tu menú público</p>
+                                </div>
+                            </div>
+                            <div className="space-y-2">
+                                {Object.entries(hours).map(([day, h]) => (
+                                    <div key={day} className="grid grid-cols-[1fr_auto_auto_auto] gap-2 items-center">
+                                        <span className="text-sm font-bold capitalize">{day}</span>
+                                        <input
+                                            type="time" value={h.open}
+                                            disabled={h.closed}
+                                            onChange={e => setHours(prev => ({ ...prev, [day]: { ...prev[day], open: e.target.value } }))}
+                                            className="text-xs border rounded-lg px-2 py-1.5 bg-background disabled:opacity-30 w-24"
+                                        />
+                                        <input
+                                            type="time" value={h.close}
+                                            disabled={h.closed}
+                                            onChange={e => setHours(prev => ({ ...prev, [day]: { ...prev[day], close: e.target.value } }))}
+                                            className="text-xs border rounded-lg px-2 py-1.5 bg-background disabled:opacity-30 w-24"
+                                        />
+                                        <button
+                                            type="button"
+                                            onClick={() => setHours(prev => ({ ...prev, [day]: { ...prev[day], closed: !prev[day].closed } }))}
+                                            className={`text-[10px] font-black px-2.5 py-1.5 rounded-lg border transition-colors ${
+                                                h.closed ? 'bg-red-50 text-red-500 border-red-200' : 'bg-green-50 text-green-600 border-green-200'
+                                            }`}
+                                        >
+                                            {h.closed ? 'Cerrado' : 'Abierto'}
+                                        </button>
+                                    </div>
+                                ))}
                             </div>
                         </div>
 
