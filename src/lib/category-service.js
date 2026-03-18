@@ -8,11 +8,15 @@ import { supabase } from './supabase'
 /**
  * Fetch all categories for a user
  */
-export async function getCategories(userId) {
+export async function getCategories(restaurantId, ownerId = null) {
+    const orFilter = ownerId 
+        ? `user_id.eq.${restaurantId},restaurant_id.eq.${restaurantId},user_id.eq.${ownerId},restaurant_id.eq.${ownerId}`
+        : `user_id.eq.${restaurantId},restaurant_id.eq.${restaurantId}`
+
     const { data, error } = await supabase
         .from('categories')
         .select('*')
-        .or(`user_id.eq.${userId},restaurant_id.eq.${userId}`)
+        .or(orFilter)
         .order('sort_order', { ascending: true })
 
     if (error) throw error

@@ -30,12 +30,12 @@ export function PromotionsPage() {
                 </p>
             </div>
             
-            <KitsCreator tenantId={tenant.id} user={user} />
+            <KitsCreator tenantId={tenant.id} ownerId={tenant.ownerId} user={user} />
         </div>
     )
 }
 
-function KitsCreator({ tenantId, user }) {
+function KitsCreator({ tenantId, ownerId, user }) {
     const [products, setProducts] = useState([]) // all standard products to select from
     const [kits, setKits] = useState([])
     const [loading, setLoading] = useState(true)
@@ -65,10 +65,14 @@ function KitsCreator({ tenantId, user }) {
     const loadData = async () => {
         try {
             setLoading(true)
+            const orFilter = ownerId 
+                ? `restaurant_id.eq.${tenantId},user_id.eq.${tenantId},restaurant_id.eq.${ownerId},user_id.eq.${ownerId}`
+                : `restaurant_id.eq.${tenantId},user_id.eq.${tenantId}`
+
             const { data, error } = await supabase
                 .from('products')
                 .select('id, name, price, image_url, badge_text, metadata')
-                .eq('restaurant_id', tenantId)
+                .or(orFilter)
                 .order('created_at', { ascending: false })
             
             if (error) throw error

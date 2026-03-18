@@ -11,6 +11,8 @@ export function useProducts() {
     const { tenant } = useTenant()
     const { activeEmployee } = useTerminal()
     const restaurantId = tenant?.id || activeEmployee?.restaurante_id
+    const ownerId = tenant?.ownerId || activeEmployee?.owner_id
+    
     const [products, setProducts] = useState([])
     const [categories, setCategories] = useState([])
     const [loading, setLoading] = useState(true)
@@ -24,8 +26,8 @@ export function useProducts() {
         try {
             setLoading(true)
             const [productsResponse, cats] = await Promise.all([
-                getProducts(restaurantId, { pageSize: 1000 }),
-                getCategories(restaurantId)
+                getProducts(restaurantId, { pageSize: 1000, ownerId }),
+                getCategories(restaurantId, ownerId)
             ])
             setProducts(productsResponse.data)
             setCategories(cats)
@@ -39,7 +41,7 @@ export function useProducts() {
 
     useEffect(() => {
         loadData()
-    }, [restaurantId])
+    }, [restaurantId, ownerId])
 
     // Products Realtime Subscription
     useRealtimeSubscription('products', () => {

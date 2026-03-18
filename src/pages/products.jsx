@@ -32,8 +32,8 @@ export function ProductsPage() {
 
     // Fetch products
     const { data: productsData, isLoading } = useQuery({
-        queryKey: ['products', tenant?.id],
-        queryFn: () => getProducts(tenant.id),
+        queryKey: ['products', tenant?.id, tenant?.ownerId],
+        queryFn: () => getProducts(tenant?.id, { pageSize: 1000, ownerId: tenant?.ownerId }),
         enabled: !!tenant?.id
     })
 

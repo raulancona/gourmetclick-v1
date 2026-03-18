@@ -10,14 +10,20 @@ import { supabase } from './supabase'
  * @param {string} userId - The authenticated user's ID
  * @returns {Promise<Array>} Array of products
  */
-export async function getProducts(userId, { page = 1, pageSize = 50 } = {}) {
+export async function getProducts(restaurantId, { page = 1, pageSize = 50, ownerId = null } = {}) {
     const from = (page - 1) * pageSize
     const to = from + pageSize - 1
 
-    const { data, error, count } = await supabase
+    let query = supabase
         .from('products')
         .select('*', { count: 'exact' })
-        .or(`restaurant_id.eq.${userId},user_id.eq.${userId}`)
+
+    const orFilter = ownerId 
+        ? `restaurant_id.eq.${restaurantId},user_id.eq.${restaurantId},restaurant_id.eq.${ownerId},user_id.eq.${ownerId}`
+        : `restaurant_id.eq.${restaurantId},user_id.eq.${restaurantId}`
+
+    const { data, error, count } = await query
+        .or(orFilter)
         .eq('is_active', true) // Only fetch active products
         .order('created_at', { ascending: false })
         .range(from, to)
@@ -137,11 +143,16 @@ export async function bulkCreateProducts(productsArray, restaurantId, userId) {
  * @param {string} userId - The authenticated user's ID
  * @returns {Promise<number>} Product count
  */
-export async function getProductCount(userId) {
-    const { count, error } = await supabase
+export async function getProductCount(restaurantId, ownerId = null) {
+    let query = supabase
         .from('products')
         .select('*', { count: 'exact', head: true })
-        .or(`restaurant_id.eq.${userId},user_id.eq.${userId}`)
+
+    const orFilter = ownerId 
+        ? `restaurant_id.eq.${restaurantId},user_id.eq.${restaurantId},restaurant_id.eq.${ownerId},user_id.eq.${ownerId}`
+        : `restaurant_id.eq.${restaurantId},user_id.eq.${restaurantId}`
+
+    const { count, error } = await query.or(orFilter)
 
     if (error) throw error
     return count || 0

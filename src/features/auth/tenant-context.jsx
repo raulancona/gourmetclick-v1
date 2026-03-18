@@ -55,6 +55,7 @@ export function TenantProvider({ children }) {
                             id: data.id,
                             name: data.name,
                             slug: data.slug,
+                            ownerId: user.id, // The authenticated user is the owner
                             role: profile.role
                         })
                         clearTimeout(timeout)
@@ -75,10 +76,10 @@ export function TenantProvider({ children }) {
 
                     if (access?.restaurant_id) {
                         const { data: restaurant, error: restaurantError } = await supabase
-                            .from('restaurants')
-                            .select('id, name, slug')
-                            .eq('id', access.restaurant_id)
-                            .single()
+                        .from('restaurants')
+                        .select('id, name, slug, owner_id')
+                        .eq('id', access.restaurant_id)
+                        .single()
 
                         if (restaurantError) throw restaurantError
 
@@ -87,6 +88,7 @@ export function TenantProvider({ children }) {
                                 id: restaurant.id,
                                 name: restaurant.name,
                                 slug: restaurant.slug,
+                                ownerId: restaurant.owner_id || null, // Capture owner ID for staff
                                 role: access.role
                             })
                             clearTimeout(timeout)
@@ -116,7 +118,7 @@ export function TenantProvider({ children }) {
                 try {
                     const { data, error } = await supabase
                         .from('restaurants')
-                        .select('id, name, slug')
+                        .select('id, name, slug, owner_id')
                         .eq('slug', slug)
                         .maybeSingle()
 
@@ -125,6 +127,7 @@ export function TenantProvider({ children }) {
                             id: data.id,
                             name: data.name,
                             slug: data.slug,
+                            ownerId: data.owner_id || null,
                             role: 'public' // Default for non-auth sessions
                         })
                         setLoading(false)
@@ -146,6 +149,7 @@ export function TenantProvider({ children }) {
                             id: employeeSession.restaurante_id,
                             name: employeeSession.restaurant_name || '',
                             slug: employeeSession.restaurant_slug,
+                            ownerId: employeeSession.owner_id || null, // Assuming this might be in session
                             role: employeeSession.rol || 'cajero'
                         })
                         setLoading(false)

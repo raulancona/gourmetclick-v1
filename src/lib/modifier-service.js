@@ -8,14 +8,20 @@ import { supabase } from './supabase'
 /**
  * Get all modifier groups for a restaurant (Global Modifiers)
  */
-export async function getGlobalModifierGroups(restaurantId) {
-    const { data, error } = await supabase
+export async function getGlobalModifierGroups(restaurantId, ownerId = null) {
+    let query = supabase
         .from('modifier_groups')
         .select(`
             *,
             modifier_options (*)
         `)
-        .eq('restaurant_id', restaurantId)
+    
+    const orFilter = ownerId 
+        ? `restaurant_id.eq.${restaurantId},user_id.eq.${restaurantId},restaurant_id.eq.${ownerId},user_id.eq.${ownerId}`
+        : `restaurant_id.eq.${restaurantId},user_id.eq.${restaurantId}`
+
+    const { data, error } = await query
+        .or(orFilter)
         .order('created_at', { ascending: true })
 
     if (error) throw error

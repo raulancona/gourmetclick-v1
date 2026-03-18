@@ -76,9 +76,9 @@ export function CategoriesPage() {
     const [categoryName, setCategoryName] = useState('')
 
     // Fetch categories
-    const { data: categories = [], isLoading } = useQuery({
-        queryKey: ['categories', tenant?.id],
-        queryFn: () => getCategories(tenant.id),
+    const { data: categories = [], isLoading, refetch } = useQuery({
+        queryKey: ['categories', tenant?.id, tenant?.ownerId],
+        queryFn: () => getCategories(tenant?.id, tenant?.ownerId),
         enabled: !!tenant?.id
     })
 
